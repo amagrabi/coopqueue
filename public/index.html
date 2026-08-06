@@ -290,6 +290,9 @@
           <label class="toggle">
             <input type="checkbox" id="browse-fits"> Only ones we can all play
           </label>
+          <label class="toggle">
+            <input type="checkbox" id="browse-hide-pooled" checked> Hide games already in our pool
+          </label>
         </div>
       </div>
       <p id="browse-status" class="add-status"></p>
@@ -314,12 +317,6 @@
           <div id="genre-chart" class="bars"></div>
         </section>
       </div>
-      <section class="panel">
-        <h3 class="panel-title">Biggest arguments</h3>
-        <p class="panel-sub">Games you played where the gap between the highest and lowest score was 2 or more.</p>
-        <div id="arg-legend" class="legend"></div>
-        <div id="arg-chart" class="dotplot"></div>
-      </section>
       <div class="grid-2">
         <section class="panel">
           <h3 class="panel-title">Best games you've played</h3>
@@ -330,6 +327,12 @@
           <div id="hours-chart" class="bars"></div>
         </section>
       </div>
+      <section class="panel">
+        <h3 class="panel-title">Biggest arguments</h3>
+        <p class="panel-sub">Games you played where the gap between the highest and lowest score was 2 or more.</p>
+        <div id="arg-legend" class="legend"></div>
+        <div id="arg-chart" class="dotplot"></div>
+      </section>
     </section>
 
     <!-- ══════════════ GROUP ══════════════ -->

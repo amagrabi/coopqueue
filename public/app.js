@@ -20,9 +20,18 @@ const state = {
 };
 
 /* Fixed categorical slots, assigned by position in the member list. Colour
-   follows the person, never their rank, so filtering never repaints anyone. */
-const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)',
-                'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
+   follows the person, never their rank, so filtering never repaints anyone.
+
+   The ORDER is not 1..8 and that is the point. Taking the palette in numeric
+   order gave a four-person group blue/orange/aqua/yellow, and orange vs yellow
+   measures ΔE 33.9 to normal vision but only 9.2 under deuteranopia — which is
+   why they read as the same colour to some people. This order was picked by
+   exhaustive search over the eight validated hues, maximising the worst pairwise
+   CIELAB ΔE across normal, deuteranopic and protanopic simulation, so that every
+   prefix is the best available for that group size. Four people now get a worst
+   pair of ΔE 25.1 instead of 9.2. Re-run the search before reordering. */
+const SERIES = ['var(--series-1)', 'var(--series-4)', 'var(--series-5)', 'var(--series-8)',
+                'var(--series-2)', 'var(--series-6)', 'var(--series-3)', 'var(--series-7)'];
 const colorOf = (steamId) => {
   const i = state.members.findIndex((m) => m.steam_id === steamId);
   return i >= 0 && i < SERIES.length ? SERIES[i] : 'var(--text-muted)';
@@ -367,7 +376,11 @@ function wireOnce() {
 
   $('#lib-search').addEventListener('input', renderLibrary);
   $('#lib-status').addEventListener('change', renderLibrary);
-  $('#lib-sort').addEventListener('change', renderLibrary);
+  $('#lib-sort').addEventListener('change', () => {
+    libSort = null;              // dropdown wins again; clears the column arrow
+    renderLibHead();
+    renderLibrary();
+  });
   $('#lib-mine').addEventListener('change', renderLibrary);
   $('#lib-score').addEventListener('change', renderLibrary);
   $('#lib-played').addEventListener('change', renderLibrary);
@@ -380,6 +393,8 @@ function wireOnce() {
   });
   $('#browse-sort').addEventListener('change', () => renderBrowse(true));
   $('#browse-fits').addEventListener('change', () => renderBrowse(true));
+  // Re-render only; the server result is unchanged, this filter is client-side.
+  $('#browse-hide-pooled').addEventListener('change', () => renderBrowse(false));
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
 
   let searchTimer;
@@ -501,7 +516,7 @@ function metaChips(g) {
   else                            chips.push(`<span class="chip">player count unknown</span>`);
   if (g.price)        chips.push(`<span class="chip">${esc(g.price)}</span>`);
   if (g.release_date) chips.push(`<span class="chip">${esc(g.release_date)}</span>`);
-  if (g.metacritic)   chips.push(`<span class="chip">MC ${g.metacritic}</span>`);
+  if (g.metacritic)   chips.push(`<span class="chip" title="Metacritic critic score out of 100">Metacritic ${g.metacritic}</span>`);
   // Steam's own verdict, from the catalogue. Worth showing next to the group's
   // score: it is the outside view, on a far larger sample than four friends.
   if (g.steam_review_hint) {
@@ -579,12 +594,59 @@ function renderNext() {
 }
 
 /* ══════════════════════════════ LIBRARY ═══════════════════════════════ */
+/**
+ * Column sort, layered over the sort dropdown rather than replacing it. Clicking
+ * a header takes over; picking from the dropdown hands control back. Text columns
+ * open A–Z, numeric ones open highest-first, because that is what you want on the
+ * first click in each case.
+ */
+let libSort = null;   // { key, dir } — null means the dropdown is in charge
+
+const LIB_COLUMNS = () => [
+  { key: 'name',     label: 'Game',     cls: 'c-name', type: 'text', title: 'Game title' },
+  { key: 'genre',    label: 'Genre',    cls: '',       type: 'text' },
+  { key: 'status',   label: 'Status',   cls: '',       type: 'text' },
+  { key: 'players',  label: 'Players',  cls: 'c-num',  type: 'num',
+    title: 'Max simultaneous online co-op players' },
+  ...state.members.map((m) => ({
+    key: `p:${m.steam_id}`, label: m.short_name, cls: 'c-p', type: 'num',
+    color: colorOf(m.steam_id), title: `${m.short_name}'s own score` })),
+  { key: 'raw',      label: 'Avg',      cls: 'c-num',  type: 'num',
+    title: 'Plain mean of the scores given' },
+  { key: 'weighted', label: 'Weighted', cls: 'c-num',  type: 'num',
+    title: 'Each score first converted to a z-score against that person\'s own '
+         + 'average and spread, so a 7 from a harsh rater outranks a 7 from a '
+         + 'generous one, then pulled toward the group mean by n/(n+1.6) so a '
+         + 'game with one vote cannot top the list. This is what Play next ranks by.' },
+  { key: 'hours',    label: 'Hrs',      cls: 'c-num',  type: 'num',
+    title: 'Hours logged for this game, entered by hand' },
+];
+
+const libValue = (g, key) => {
+  if (key === 'players') return g.max_players;
+  if (key === 'status')  return STATUS_LABEL[g.status];
+  if (key.startsWith('p:')) return g.votes[key.slice(2)];
+  return g[key];
+};
+
 function renderLibHead() {
-  $('#lib-head').innerHTML =
-    `<th class="c-name">Game</th><th>Genre</th><th>Status</th><th class="c-num">Players</th>` +
-    state.members.map((m) =>
-      `<th class="c-p" style="color:${colorOf(m.steam_id)}">${esc(m.short_name)}</th>`).join('') +
-    `<th class="c-num">Avg</th><th class="c-num">Weighted</th><th class="c-num">Hrs</th>`;
+  $('#lib-head').innerHTML = LIB_COLUMNS().map((c) => {
+    const active = libSort?.key === c.key;
+    const arrow = active ? (libSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="${c.cls} th-sort${active ? ' is-sorted' : ''}" data-sort="${esc(c.key)}"
+      ${c.color ? `style="color:${c.color}"` : ''}
+      ${c.title ? `title="${esc(c.title)}"` : ''}>${esc(c.label)}${arrow}</th>`;
+  }).join('');
+
+  $$('#lib-head .th-sort').forEach((th) => th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    const col = LIB_COLUMNS().find((c) => c.key === key);
+    libSort = libSort?.key === key
+      ? { key, dir: libSort.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: col.type === 'text' ? 'asc' : 'desc' };
+    renderLibHead();
+    renderLibrary();
+  }));
 }
 
 /**
@@ -636,20 +698,41 @@ function renderLibrary() {
     return true;
   });
 
-  rows.sort({
-    weighted: (a, b) => (b.weighted ?? -1) - (a.weighted ?? -1),
-    name:     (a, b) => a.name.localeCompare(b.name),
-    spread:   (a, b) => (b.spread ?? -1) - (a.spread ?? -1),
-    hours:    (a, b) => (b.hours ?? -1) - (a.hours ?? -1),
-    votes:    (a, b) => a.n - b.n,
-  }[sort]);
+  if (libSort) {
+    // Missing values always sink, whichever direction — a blank is not "smallest",
+    // it is absent, and floating blanks to the top of an ascending sort makes the
+    // table useless for exactly the question you asked it.
+    const { key, dir } = libSort;
+    const flip = dir === 'asc' ? 1 : -1;
+    rows.sort((a, b) => {
+      const x = libValue(a, key), y = libValue(b, key);
+      const xm = x == null || x === '', ym = y == null || y === '';
+      if (xm && ym) return a.name.localeCompare(b.name);
+      if (xm) return 1;
+      if (ym) return -1;
+      return (typeof x === 'number' && typeof y === 'number'
+        ? x - y
+        : String(x).localeCompare(String(y))) * flip;
+    });
+  } else {
+    rows.sort({
+      weighted: (a, b) => (b.weighted ?? -1) - (a.weighted ?? -1),
+      name:     (a, b) => a.name.localeCompare(b.name),
+      spread:   (a, b) => (b.spread ?? -1) - (a.spread ?? -1),
+      hours:    (a, b) => (b.hours ?? -1) - (a.hours ?? -1),
+      votes:    (a, b) => a.n - b.n,
+    }[sort]);
+  }
 
   $('#lib-table tbody').innerHTML = rows.map((g) => `
     <tr data-id="${g.id}">
-      <td class="c-name cell-strong">${esc(g.name)}${
-        g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}</td>
+      <td class="c-name cell-strong">
+        <span class="lib-game">${g.header_image
+          ? `<img class="lib-art" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
+          : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
+        g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}</span></td>
       <td>${esc(g.genre || '—')}</td>
-      <td><span class="status-tag">${STATUS_LABEL[g.status]}</span></td>
+      <td><span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span></td>
       <td class="c-num">${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
@@ -946,10 +1029,30 @@ async function renderBrowse(reset) {
   }
 
   const pooled = new Set(state.games.map((g) => g.steam_appid).filter(Boolean));
-  $('#browse-status').textContent =
-    `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}.`;
 
-  $('#browse-grid').innerHTML = browse.items.map((g) => {
+  // Filtered here rather than server-side on purpose: /api/coop knows nothing
+  // about groups, and teaching it would put pool membership behind an endpoint
+  // that deliberately has no tenancy check. The cost is that a page of 24 can
+  // come back shorter, so the count says how many were hidden instead of leaving
+  // you wondering where they went.
+  const hidePooled = $('#browse-hide-pooled').checked;
+  const shown = hidePooled ? browse.items.filter((g) => !pooled.has(g.appid)) : browse.items;
+  const hiddenCount = browse.items.length - shown.length;
+
+  $('#browse-status').textContent =
+    `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}`
+    + (hiddenCount ? `, ${hiddenCount} on this page already in your pool` : '') + '.';
+
+  if (!shown.length) {
+    $('#browse-grid').innerHTML = '';
+    $('#browse-status').textContent = hidePooled
+      ? 'Everything on this page is already in your pool — load more, or untick the filter.'
+      : 'Nothing in the catalogue matches that.';
+    $('#browse-more').hidden = !browse.hasMore;
+    return;
+  }
+
+  $('#browse-grid').innerHTML = shown.map((g) => {
     const inPool = pooled.has(g.appid);
     const cap = g.max_players
       ? `${g.max_players}p co-op`

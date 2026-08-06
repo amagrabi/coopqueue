@@ -496,3 +496,25 @@ td.miss { color: #4a4a47; }
 
 /* Divider between the group's settings and the viewer's own preferences. */
 .settings-rule { border: 0; border-top: 1px solid var(--border); margin: 20px 0 14px; }
+
+/* ── library: sortable headers, status colour, thumbnails ───────────────── */
+.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+.th-sort:hover { color: var(--text-primary); }
+.th-sort.is-sorted { color: var(--text-primary); }
+
+/* Status at a glance. Hues reuse the validated semantic tokens rather than new
+   ones: backlog is deliberately neutral, since most of the library is backlog and
+   colouring it would just add noise. */
+.status-playing  { background: rgba(57,135,229,.14);  border-color: rgba(57,135,229,.45);  color: #a8cbf5; }
+.status-finished { background: rgba(12,163,12,.14);   border-color: rgba(12,163,12,.45);   color: #8fe08f; }
+.status-dropped  { background: rgba(208,59,59,.13);   border-color: rgba(208,59,59,.42);   color: #f0a3a3; }
+.status-sampled  { background: rgba(250,178,25,.12);  border-color: rgba(250,178,25,.40);  color: #f2d79a; }
+
+/* Steam header art is a 460x215 banner, so the thumbnail keeps that ratio — a
+   square crop cuts the logo off on most games and reads as a smudge. */
+.lib-game { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.lib-art {
+  flex: 0 0 auto; width: 46px; height: 21px; border-radius: 3px;
+  object-fit: cover; background: var(--surface-2); display: block;
+}
+.lib-art-none { border: 1px solid var(--border); }
