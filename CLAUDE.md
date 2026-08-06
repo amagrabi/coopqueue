@@ -60,6 +60,8 @@ npm run crawl:coop -- --pages 8 --out migrations/002-coop-seed.sql
 node scripts/seed-player-caps.mjs --from migrations/002-coop-seed.sql \
                                  --out migrations/003-player-caps.sql
 
+node scripts/validate-palette.mjs      # re-check player-colour separation (invariant 4)
+
 cd crawler && npx wrangler deploy      # the 15-min cron catalogue crawler
 cd crawler && npx wrangler tail        # watch cron runs live
 ```
@@ -96,10 +98,20 @@ Steam's store endpoints throttle at roughly 200 requests / 5 min *per IP*, and
 Workers egress from a shared pool — this cache is the only reason the site can
 have more than a handful of groups.
 
-**4. Colours come from the validated palette in `styles.css`.** The eight
-`--series-*` values clear CVD separation, normal-vision separation and 3:1
-contrast against the `#1a1a19` surface. Do not pick new ones by eye; if you need
-more, re-run a palette validator rather than guessing.
+**4. Colours come from the validated palette in `styles.css`, and the ORDER they
+are handed out in matters as much as the values.** The eight `--series-*` values
+clear 3:1 contrast against the `#1a1a19` surface. They do **not** all clear CVD
+separation from each other — measured, the worst pair is ΔE 2.2 under
+deuteranopia, so the palette is safe for a handful of series and not for eight.
+
+`SERIES` in `app.js` therefore hands them out in a non-numeric order chosen by
+exhaustive search, maximising the worst pairwise CIELAB ΔE across normal,
+deuteranopic and protanopic simulation, so that each prefix is the best available
+for that group size. Numeric order gave a four-person group blue/orange/aqua/
+yellow, where orange vs yellow is ΔE 33.9 normally but **9.2** under
+deuteranopia — two people whose columns looked identical to some readers. The
+current order scores 25.1 for four. Re-run that search before reordering or adding
+hues; do not pick by eye.
 
 **5. `public/vendor/hls.min.js` is the one vendored dependency — keep it that
 way, and keep it the FULL build.** "No dependencies at runtime" held until Steam
