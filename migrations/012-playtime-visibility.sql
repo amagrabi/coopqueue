@@ -1,4 +1,4 @@
--- CoopQ migration 012 — distinguish a hidden library from hidden playtime.
+-- CoopQueue migration 012 — distinguish a hidden library from hidden playtime.
 --
 --   npm run db:migrate -- --file=./migrations/012-playtime-visibility.sql
 --

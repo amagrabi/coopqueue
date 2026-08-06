@@ -1,4 +1,4 @@
--- CoopQ migration 006 — incremental crawl support.
+-- CoopQueue migration 006 — incremental crawl support.
 --
 --   npm run db:migrate -- --file=./migrations/006-crawl-state.sql
 --

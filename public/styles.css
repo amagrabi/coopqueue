@@ -1,5 +1,5 @@
 /* ============================================================================
-   CoopQ — dark-first UI.
+   CoopQueue — dark-first UI.
    Chart colours come from a validated categorical palette: the four player
    hues clear the CVD-separation, normal-vision and 3:1 contrast gates against
    the #1a1a19 surface. Do not re-pick them by eye.
@@ -125,7 +125,7 @@ kbd {
    reserved before it loads and stops the topbar reflowing. */
 .brand { display: inline-flex; align-items: center; flex: none; text-decoration: none; }
 .brand-logo { display: block; height: 26px; width: auto; }
-.landing-top .brand-logo { height: 30px; }
+.landing-top .brand-logo { height: clamp(38px, 5.2vw, 54px); }
 /* On a narrow phone the wordmark competes with the group switcher and the tab row
    for one line. The controller alone is still recognisable, so crop to it rather
    than shrinking the whole lockup into illegibility. */
@@ -317,9 +317,12 @@ td.miss { color: #4a4a47; }
 
 /* horizontal bars — 4px rounded data end, 2px gap, recessive track */
 .bars { display: grid; gap: 9px; }
-.bar-row { display: grid; grid-template-columns: 130px 1fr 44px; gap: 10px; align-items: center; font-size: 13px; }
+.bar-row { display: grid; grid-template-columns: minmax(120px, 44%) 1fr 44px; gap: 10px; align-items: center; font-size: 13px; }
 .bar-label { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-track { height: 18px; background: var(--gridline); border-radius: 4px; overflow: hidden; }
+/* "didn't play" sits beside the scores but is not one — muted and italic so it
+   reads as absence rather than as a very low rating. */
+.other-out { color: var(--text-muted); font-style: italic; }
 .bar-fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--series-1); transition: width .3s; }
 .bar-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bar-row[data-tone="good"] .bar-fill { background: var(--good); }
@@ -445,7 +448,7 @@ td.miss { color: #4a4a47; }
   .main { padding: 18px 14px 60px; }
   .rate-body { padding: 18px; }
   .rate-head h2 { font-size: 21px; }
-  .bar-row { grid-template-columns: 92px 1fr 40px; }
+  .bar-row { grid-template-columns: minmax(92px, 50%) 1fr 40px; }
   .dot-row { grid-template-columns: 110px 1fr 30px; }
   .dot-axis { margin-left: 122px; margin-right: 42px; }
   .detail-row2 { grid-template-columns: 1fr; }
@@ -628,9 +631,3 @@ tr.is-archived td { opacity: .55; }
 .est { color: var(--text-muted); border-bottom: 1px dotted var(--baseline); cursor: help; }
 .pt-fix { display: block; margin-top: 3px; }
 
-/* A one-line kicker above the headline: someone landing here cold should know
-   what kind of product this is before reading a sentence. */
-.hero-kicker {
-  margin: 0 0 10px; font-size: 13px; font-weight: 650; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--series-1);
-}

@@ -39,8 +39,7 @@
   </header>
 
   <div class="hero">
-    <p class="hero-kicker">For groups who play co-op together</p>
-    <h1>Stop arguing about which co-op game to play next.</h1>
+    <h1>Find the next co-op game to play with your friends.</h1>
     <p class="hero-sub">
       Everyone rates what you've played and what they want to play. The site ranks the backlog and
       works out which games your whole group can <em>actually</em> play together — before someone
@@ -198,7 +197,7 @@
 
       <article id="queue-card" class="rate-card" hidden>
         <div class="rate-media">
-          <video id="rate-video" controls preload="none" playsinline></video>
+          <video id="rate-video" controls muted playsinline preload="metadata"></video>
           <img id="rate-image" alt="">
           <div id="rate-notrailer" class="no-trailer" hidden></div>
         </div>
@@ -228,9 +227,10 @@
             <div class="rate-actions">
               <button class="btn btn-primary btn-lg" id="btn-save">Save &amp; next</button>
               <button class="btn btn-ghost" id="btn-skip">No opinion</button>
+              <button class="btn btn-ghost" id="btn-notplayed" hidden>I didn't play this</button>
               <a class="btn btn-ghost" id="btn-store" target="_blank" rel="noopener" hidden>Steam page ↗</a>
             </div>
-            <p class="kbd-hint"><kbd>1</kbd>–<kbd>9</kbd> <kbd>0</kbd>=10 to rate · <kbd>←</kbd><kbd>→</kbd> nudge · <kbd>Enter</kbd> save · <kbd>S</kbd> skip</p>
+            <p class="kbd-hint"><kbd>1</kbd>–<kbd>9</kbd> <kbd>0</kbd>=10 to rate · <kbd>←</kbd><kbd>→</kbd> nudge · <kbd>Enter</kbd> save · <kbd>S</kbd> skip · <kbd>N</kbd> didn't play</p>
           </div>
         </div>
       </article>

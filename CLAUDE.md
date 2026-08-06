@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 94 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 103 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -100,7 +100,7 @@ node scripts/validate-palette.mjs      # re-check player-colour separation (inva
 # apart; reclassify needs no network at all, it re-derives the flag from stored tags.
 node scripts/backfill-tags.mjs --out migrations/015-steam-tags.sql
 node scripts/backfill-tags.mjs --all   # re-read every row, not just untagged ones
-node scripts/reclassify-coop.mjs --out migrations/016-reclassify.sql
+node scripts/reclassify-coop.mjs --out migrations/017-reclassify.sql
 
 cd crawler && npx wrangler deploy      # the hourly cron catalogue crawler
 cd crawler && npx wrangler tail        # watch cron runs live
@@ -270,6 +270,12 @@ crawler will never retry it.
   first lines of its description. The media children are pinned with
   `position: absolute` and the box clips; do not "simplify" that back to flow
   layout.
+- **Autoplay needs a `canplay` retry, not just a `play()` call.** Trailers autoplay
+  muted (every browser blocks unmuted autoplay). hls.js attaches its buffer
+  asynchronously, so the `play()` immediately after `attachTrailer` usually lands at
+  `readyState 0` and rejects — which presents exactly like a blocked autoplay: muted,
+  loaded, paused at 0:00. `playTrailer` therefore retries once on `canplay`. The mute
+  choice is remembered for the session, so unmuting once carries through the queue.
 - **Do not trust `canPlayType` for HLS.** Chromium answers
   `canPlayType('application/vnd.apple.mpegurl')` with `"maybe"` — truthy — while
   being completely unable to play HLS. `attachTrailer()` therefore tries
@@ -361,7 +367,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-94/94 assertions pass. `npm run test:ui` does **not** run on macOS: it
+103/103 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -524,6 +530,26 @@ Ten assertions cover it, four of them the attacks that matter: commenting on,
 reading, and deleting another group's thread by guessing a game id, and that the
 thread never returns a foreign row.
 
+## "I didn't play this"
+
+`skips.not_played` (migration 016) separates two answers the queue used to conflate:
+**"no opinion"** (I was there, nothing to say) and **"I didn't play this"** (I wasn't
+in that session). A group of four often plays as two or three, and without the
+distinction the people who sat a game out looked like they were failing to rate it.
+
+Both hide the card, which is why it is a column on `skips` rather than a second table
+needing the same cascade, tenancy filter and group-scoped delete for one bit.
+
+The bit is load-bearing in exactly one place: **a game you sat out leaves your own
+coverage denominator.** "No opinion" deliberately does not — it is still a game you
+could rate. That means coverage denominators are now per person, in three places that
+must agree: `stats.js`, `renderMyCoverage()` and the Group tab's leaderboard. Seven
+assertions cover it, including that "no opinion" leaves the percentage alone and that
+a mis-click is fixable by re-posting.
+
+Only offered in **Played** mode. In Want-to-play mode the question is interest, not
+memory, so "I didn't play it" is not an answer to anything.
+
 ## Blind rating
 
 `groups.blind_rating` (migration 013) hides everyone else's scores in the rating
@@ -564,6 +590,21 @@ Unknown, SpaceCraft). Two changes fixed it:
   like "Multiplayer" stay, because they sit on nearly every row and so contribute
   almost equally to every candidate and cannot reorder anything.
 - `TAG_MIN_GAMES` is **3**. At 2, a coincidence reads as a taste.
+
+A third guard, added after reading the live output again: **tag preferences are
+weighted by inverse document frequency**. Without it every tag on a candidate counts
+equally, so the common ones win by sheer commonness — "Exploration" and "Open World"
+outvoted "Souls-like" and put four driving simulators (Euro Truck, American Truck,
+SnowRunner, Need for Speed Payback) in group 1's top ten, for a group whose single
+strongest signal is Souls-likes. `log(N/df)` is 0 for a tag on every row and grows as
+a tag gets rarer, so specific tags decide the order and generic ones only break ties.
+Afterwards the top of the list is Stranger of Paradise, ELDEN RING NIGHTREIGN, Nioh 3,
+Rise of the Ronin and CODE VEIN, and the driving sims are gone.
+
+`NON_TASTE` also covers **camera perspective** ("Third Person" scored +0.29 and was
+dragging in racing games) and **PvP genres**, which are incoherent as a reason for a
+suggestion in a catalogue already filtered to co-op — "Wingspan — matches your taste
+for Building and PvP" was a real card.
 
 Afterwards the same group's top tags are Souls-like, Action RPG, Building and Open
 World (that last on 22 games), and the suggestions are recognisable: Stormworks,
@@ -626,10 +667,10 @@ The source image had a generator watermark in its bottom-right corner. It sits
 outside the lockup's bounding box, so the tight crop removes it — but check for one
 when regenerating from a new source.
 
-**The name is inconsistent and that is not yet decided.** The logo reads "Coop
-Queue", the host is `coopqueue.pages.dev`, and this file and parts of the UI still
-say "CoopQ". `<title>`, the manifest and the OG tags now say "CoopQueue" to match
-the logo and the domain. Ask before making a wholesale rename.
+**The name is settled: CoopQueue.** It matches the logo and the host, and the old
+"CoopQ" is gone from every comment, file header and user-agent string. The three
+`g4m1ng` identifiers are untouched and still deliberate — see The name at the top of
+this file.
 
 ## Vocabulary
 

@@ -1,4 +1,4 @@
--- CoopQ migration 001 — the global co-op library.
+-- CoopQueue migration 001 — the global co-op library.
 --
 -- Additive and idempotent on purpose. schema.sql begins with DROP TABLE and so
 -- can never be re-run against a live database; anything that has to reach

@@ -53,7 +53,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 94 assertions — ALWAYS before a deploy
+npm test          # 103 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 

@@ -1,4 +1,4 @@
--- CoopQ migration 005 — pre-assigned identities.
+-- CoopQueue migration 005 — pre-assigned identities.
 --
 --   npm run db:migrate -- --file=./migrations/005-seed-assignments.sql
 --

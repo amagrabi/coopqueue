@@ -1,4 +1,4 @@
--- CoopQ — pre-assigned identities for group 1 (g4m1ng).
+-- CoopQueue — pre-assigned identities for group 1 (g4m1ng).
 --
 --   npm run db:migrate -- --file=./migrations/007-friend-assignments.sql
 --

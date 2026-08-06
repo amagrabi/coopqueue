@@ -26,7 +26,7 @@ export async function onRequestGet({ env, data }) {
         WHERE m.group_id = ? ORDER BY m.short_name COLLATE NOCASE`
     ).bind(gid).all(),
     env.DB.prepare(
-      `SELECT s.game_id, s.steam_id FROM skips s
+      `SELECT s.game_id, s.steam_id, s.not_played FROM skips s
          JOIN games g ON g.id = s.game_id
         WHERE g.group_id = ? AND g.archived_at IS NULL`
     ).bind(gid).all(),
@@ -48,12 +48,24 @@ export async function onRequestGet({ env, data }) {
   const scored = games.map((g) => ({ ...g, ...scoreGame(byGame.get(g.id) || []) }));
   const played = scored.filter((g) => PLAYED.has(g.status) && g.n > 0);
 
+  /* Coverage is per person, and so is the denominator. A game somebody sat out is
+     one they cannot rate, so it comes out of THEIR total rather than counting
+     against them — otherwise a group of four that often plays as three reads as
+     three apathetic members. "No opinion" is not the same thing and still counts. */
+  const satOut = new Map();
+  for (const s of skips) {
+    if (!s.not_played) continue;
+    satOut.set(s.steam_id, (satOut.get(s.steam_id) || 0) + 1);
+  }
+
   const people = members.map((u) => {
     const c = cal.get(u.steam_id);
     const mine = ratings.filter((r) => r.steam_id === u.steam_id);
+    const denom = games.length - (satOut.get(u.steam_id) || 0);
     return {
       steamId: u.steam_id, name: u.short_name, avatar: u.avatar, count: mine.length,
-      coverage: games.length ? Math.round((mine.length / games.length) * 100) : 0,
+      notPlayed: satOut.get(u.steam_id) || 0,
+      coverage: denom > 0 ? Math.round((mine.length / denom) * 100) : 0,
       mean: r2(c?.mean), sd: r2(c?.sd),
       min: mine.length ? Math.min(...mine.map((m) => m.score)) : null,
       max: mine.length ? Math.max(...mine.map((m) => m.score)) : null,

@@ -1,4 +1,4 @@
--- CoopQ migration 009 — archiving instead of deleting.
+-- CoopQueue migration 009 — archiving instead of deleting.
 --
 --   npm run db:migrate -- --file=./migrations/009-archive.sql
 --

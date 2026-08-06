@@ -1,5 +1,5 @@
 /**
- * CoopQ catalogue crawler — a cron Worker, separate from the Pages project.
+ * CoopQueue catalogue crawler — a cron Worker, separate from the Pages project.
  *
  * It has to be a Worker: Pages Functions cannot carry Cron Triggers, so a
  * scheduled job cannot live in functions/. It binds the same D1 database, so

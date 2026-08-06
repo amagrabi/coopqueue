@@ -1,4 +1,4 @@
--- CoopQ migration 004 — a sortable release timestamp.
+-- CoopQueue migration 004 — a sortable release timestamp.
 --
 -- Steam's release_date is a human-readable string ('16 May, 2011'), and sorting
 -- it as text is not chronological: it groups by day-of-month, so "Newest" put

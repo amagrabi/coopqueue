@@ -1,4 +1,4 @@
--- CoopQ migration 014 — user tags, and a co-op flag we can filter on.
+-- CoopQueue migration 014 — user tags, and a co-op flag we can filter on.
 --
 --   npm run db:migrate -- --file=./migrations/014-tags.sql
 --

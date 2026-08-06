@@ -22,7 +22,7 @@ Live at <https://coopqueue.pages.dev>.
 ## Before you finish
 
 ```bash
-npm test                 # 94 assertions — MUST pass before any deploy
+npm test                 # 103 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -87,6 +87,9 @@ its numbers in `CLAUDE.md`.
   worst case alone picks two reddish hues and reintroduces the original complaint.
 - **`POP_WEIGHT = 0.02`** in `lib/recommend.js`. Larger and the popularity tiebreak
   reorders genuine matches, making the displayed fit column non-monotonic.
+- **Tag preferences are IDF-weighted, and `NON_TASTE` is a stoplist.** Without both,
+  common tags outvote specific ones and shipping-state tags read as taste — real
+  output had four driving simulators above a Souls-like for a Souls-like group.
 - **`hls.min.js` must stay the FULL build.** The light build parses but cannot play
   Steam's separate audio rendition, so trailers run silently.
 - **Scoring is the plain mean.** A calibrated-and-shrunk score existed and was

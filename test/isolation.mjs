@@ -723,6 +723,106 @@ await check('deleting one group leaves the other untouched', async () => {
   return g1 > 0 || 'group 1 lost its games when group 2 was deleted';
 });
 
+console.log('\n"I didn\'t play this"');
+
+const skipRoute = await import(path.join(SITE, 'functions/api/g/[slug]/skip.js'));
+const statsRoute = await import(path.join(SITE, 'functions/api/g/[slug]/stats.js'));
+
+await check('"no opinion" and "didn\'t play" both leave the queue', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: true }), env, data });
+  const q = await (await skipRoute.onRequestGet({ env, data })).json();
+  return !q.queue.includes(g.id) || 'a game marked not-played stayed in the queue';
+});
+
+await check('they are stored as different answers, not the same one', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const [a, b] = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 2 OFFSET 1').all();
+  await skipRoute.onRequestPost({ request: req({ gameId: a.id, notPlayed: true }), env, data });
+  await skipRoute.onRequestPost({ request: req({ gameId: b.id }), env, data });
+  const rows = sqlite.prepare(
+    'SELECT game_id, not_played FROM skips WHERE steam_id=? AND game_id IN (?,?)').all(ALICE, a.id, b.id);
+  const byId = Object.fromEntries(rows.map((r) => [r.game_id, r.not_played]));
+  return (byId[a.id] === 1 && byId[b.id] === 0) || `got ${JSON.stringify(byId)}`;
+});
+
+await check('a mis-click is fixable — re-posting updates the flag', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 3').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: true }), env, data });
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: false }), env, data });
+  const row = sqlite.prepare('SELECT not_played FROM skips WHERE steam_id=? AND game_id=?').get(ALICE, g.id);
+  return row.not_played === 0 || `stuck at ${row.not_played}`;
+});
+
+await check('a game you sat out leaves YOUR coverage denominator', async () => {
+  /* The whole point of the distinction. Alice's percentage must rise when a game
+     she did not play is excluded, while the group's game count is unchanged. */
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  sqlite.exec(`DELETE FROM skips WHERE steam_id='${ALICE}'`);
+  // Alice needs a numerator: at 0 ratings the percentage is 0 whatever the
+  // denominator does, which would let a broken implementation pass.
+  const rated = sqlite.prepare(
+    'SELECT id FROM games WHERE group_id=1 AND archived_at IS NULL LIMIT 20').all();
+  for (const g of rated) {
+    sqlite.prepare('INSERT OR IGNORE INTO ratings (game_id, steam_id, score) VALUES (?,?,8)')
+      .run(g.id, ALICE);
+  }
+  const before = (await (await statsRoute.onRequestGet({ env, data })).json())
+    .people.find((p) => p.steamId === ALICE);
+
+  const unrated = sqlite.prepare(
+    `SELECT id FROM games WHERE group_id=1 AND archived_at IS NULL
+       AND id NOT IN (SELECT game_id FROM ratings WHERE steam_id=?) LIMIT 12`).all(ALICE);
+  for (const g of unrated) {
+    await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: true }), env, data });
+  }
+  const after = (await (await statsRoute.onRequestGet({ env, data })).json())
+    .people.find((p) => p.steamId === ALICE);
+
+  sqlite.exec(`DELETE FROM skips WHERE steam_id='${ALICE}'`);
+  sqlite.exec(`DELETE FROM ratings WHERE steam_id='${ALICE}'`);
+  return (after.coverage > before.coverage && after.count === before.count
+          && after.notPlayed === unrated.length)
+    || `coverage ${before.coverage}->${after.coverage}, count ${before.count}->${after.count}, notPlayed ${after.notPlayed}`;
+});
+
+await check('"no opinion" does NOT change the denominator', async () => {
+  // It means "I was there and have nothing to say", which is still unrated.
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  sqlite.exec(`DELETE FROM skips WHERE steam_id='${ALICE}'`);
+  const before = (await (await statsRoute.onRequestGet({ env, data })).json())
+    .people.find((p) => p.steamId === ALICE);
+  const unrated = sqlite.prepare(
+    `SELECT id FROM games WHERE group_id=1 AND archived_at IS NULL
+       AND id NOT IN (SELECT game_id FROM ratings WHERE steam_id=?) LIMIT 12`).all(ALICE);
+  for (const g of unrated) {
+    await skipRoute.onRequestPost({ request: req({ gameId: g.id }), env, data });
+  }
+  const after = (await (await statsRoute.onRequestGet({ env, data })).json())
+    .people.find((p) => p.steamId === ALICE);
+  sqlite.exec(`DELETE FROM skips WHERE steam_id='${ALICE}'`);
+  return after.coverage === before.coverage || `coverage moved ${before.coverage}->${after.coverage}`;
+});
+
+await check('cannot mark a game in another group as not played', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await skipRoute.onRequestPost({ request: req({ gameId: 5000, notPlayed: true }), env, data });
+  const leaked = sqlite.prepare('SELECT COUNT(*) AS n FROM skips WHERE game_id=5000').get().n;
+  return (r.status === 404 && leaked === 0) || `status ${r.status}, rows ${leaked}`;
+});
+
+await check('the library reports who sat each game out', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 5').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: true }), env, data });
+  const body = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const row = body.games.find((x) => x.id === g.id);
+  sqlite.exec(`DELETE FROM skips WHERE steam_id='${ALICE}'`);
+  return row.notPlayed.includes(ALICE) || `notPlayed was ${JSON.stringify(row.notPlayed)}`;
+});
+
 console.log('\nBlind rating (an owner-only group rule)');
 
 await check('blind rating is off by default', async () => {
@@ -897,6 +997,47 @@ await check('release state and price model are not tastes', async () => {
   const leaked = named.filter((t) => tags.includes(t));
   return (out.games[0].fit === null && !leaked.length)
     || `fit ${out.games[0].fit}, stoplisted tags surfaced: ${JSON.stringify(leaked)}`;
+});
+
+await check('a rare tag outweighs several common ones', async () => {
+  /* Without IDF, every tag on a candidate counts equally and the generic ones win
+     by commonness. On real data "Exploration" and "Open World" outvoted
+     "Souls-like" and put four driving simulators in group 1's top ten. */
+  const history = [
+    { appid: 11, score: 10 }, { appid: 12, score: 10 }, { appid: 13, score: 10 },  // Souls-like: adored
+    { appid: 14, score: 7 }, { appid: 15, score: 7 }, { appid: 16, score: 7 },     // Open World: mildly warm
+    { appid: 17, score: 5 },
+  ];
+  const tagsFor = new Map([
+    [11, ['Souls-like', 'Open World']], [12, ['Souls-like', 'Open World']], [13, ['Souls-like', 'Open World']],
+    [14, ['Open World']], [15, ['Open World']], [16, ['Open World']], [17, ['Puzzle']],
+  ]);
+  // "Open World" is on almost every candidate, so it says nothing; "Souls-like" is
+  // on one and is the whole signal. The specific match must win.
+  const common = Array.from({ length: 12 }, (_, i) => ({ appid: 100 + i, tags: '["Open World"]' }));
+  const out = recommend([...common, { appid: 1, tags: '["Souls-like","Open World"]' }], history, tagsFor);
+  return (out.games[0].appid === 1 && out.games[0].why[0] === 'Souls-like')
+    || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
+});
+
+await check('camera angle and PvP are not tastes', async () => {
+  /* "Third Person" scored +0.29 on real data and dragged in racing games for a
+     group that likes Souls-likes. PvP is excluded too: the catalogue is filtered to
+     co-op, so "matches your taste for PvP" is an incoherent reason to show a card. */
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
+    { appid: 14, score: 4 }, { appid: 15, score: 4 }, { appid: 16, score: 4 },
+  ];
+  const tags = ['Third Person', 'PvP'];
+  const out = recommend(
+    [{ appid: 1, tags: JSON.stringify(tags) }],
+    history,
+    new Map([[11, tags], [12, tags], [13, tags],
+             [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']]]),
+  );
+  const leaked = [...out.likes, ...out.dislikes].map((l) => l.tag).filter((t) => tags.includes(t));
+  return (out.games[0].fit === null && !leaked.length)
+    || `fit ${out.games[0].fit}, surfaced ${JSON.stringify(leaked)}`;
 });
 
 await check('the order never contradicts the fit it displays', async () => {

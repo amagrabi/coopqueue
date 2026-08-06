@@ -10,7 +10,7 @@ import { getAppDetails, parseAppId, searchStore } from '../../../../../lib/steam
 export async function onRequestGet({ env, data }) {
   const gid = data.group.group_id;
 
-  const [gamesRes, ratingsRes, membersRes] = await Promise.all([
+  const [gamesRes, ratingsRes, membersRes, notPlayedRes] = await Promise.all([
     // LEFT JOIN the global catalogue for Steam's own review verdict and count.
     // Left, not inner: a hand-added game may have no catalogue row, and it must
     // still appear. The group's own columns win — a group can correct a player
@@ -31,6 +31,14 @@ export async function onRequestGet({ env, data }) {
         WHERE m.group_id = ?
         ORDER BY m.short_name COLLATE NOCASE`
     ).bind(gid).all(),
+    // Who sat a game out. Needed client-side for coverage — a game you did not
+    // play is not one you failed to rate — so it travels with the library rather
+    // than costing a second round trip.
+    env.DB.prepare(
+      `SELECT s.game_id, s.steam_id FROM skips s
+         JOIN games g ON g.id = s.game_id
+        WHERE g.group_id = ? AND s.not_played = 1`
+    ).bind(gid).all(),
   ]);
 
   const ratings = ratingsRes.results || [];
@@ -44,6 +52,12 @@ export async function onRequestGet({ env, data }) {
     byGame.get(r.game_id).push(r);
   }
 
+  const satOut = new Map();
+  for (const s of notPlayedRes.results || []) {
+    if (!satOut.has(s.game_id)) satOut.set(s.game_id, []);
+    satOut.get(s.game_id).push(s.steam_id);
+  }
+
   const need = data.group.max_players;
   const games = (gamesRes.results || []).map((g) => {
     const votes = byGame.get(g.id) || [];
@@ -52,6 +66,7 @@ export async function onRequestGet({ env, data }) {
       votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
       comments: votes.filter((v) => v.comment).map((v) => ({ steamId: v.steam_id, comment: v.comment })),
       ...scoreGame(votes),
+      notPlayed: satOut.get(g.id) || [],
       viability: viability(g, need),
     };
   });

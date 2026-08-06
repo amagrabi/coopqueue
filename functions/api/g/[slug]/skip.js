@@ -13,9 +13,19 @@ export async function onRequestGet({ env, data }) {
   return json({ queue: (rows.results || []).map((r) => r.id) });
 }
 
-/** "Seen it, no opinion" — hides it from my queue without faking a score. */
+/**
+ * Take a game off my queue without faking a score. Two different statements:
+ *
+ *   notPlayed: false — "no opinion". I was there, I just have nothing to say.
+ *   notPlayed: true  — "I didn't play this one". A group of four often plays as
+ *                      two or three, and the people who sat it out cannot rate it.
+ *
+ * Only the second changes anything beyond the queue: it removes the game from that
+ * person's coverage denominator, so a 3-of-4 session stops reading as apathy from
+ * the fourth. Re-posting updates the flag, so a mis-click is fixable from the UI.
+ */
 export async function onRequestPost({ request, env, data }) {
-  const { gameId } = await body(request);
+  const { gameId, notPlayed } = await body(request);
   const id = Number(gameId);
   if (!Number.isInteger(id)) return bad('bad gameId');
 
@@ -23,8 +33,10 @@ export async function onRequestPost({ request, env, data }) {
     .bind(id, data.group.group_id).first();
   if (!exists) return bad('no such game', 404);
 
-  await env.DB.prepare('INSERT OR IGNORE INTO skips (game_id, steam_id) VALUES (?, ?)')
-    .bind(id, data.user.steam_id).run();
+  await env.DB.prepare(
+    `INSERT INTO skips (game_id, steam_id, not_played) VALUES (?, ?, ?)
+     ON CONFLICT(game_id, steam_id) DO UPDATE SET not_played = excluded.not_played`
+  ).bind(id, data.user.steam_id, notPlayed ? 1 : 0).run();
   return json({ ok: true });
 }
 

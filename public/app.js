@@ -1,5 +1,5 @@
 /* ============================================================================
-   CoopQ — client. No framework, no build step: edit, push, done.
+   CoopQueue — client. No framework, no build step: edit, push, done.
    Routing is hash-based (#/g/<slug>/<view>) so the whole thing stays a static
    file with no server-side rewrite rules.
    ========================================================================== */
@@ -109,6 +109,33 @@ function detachTrailer(video) {
   if (hls) { hls.destroy(); hls = null; }
   video.removeAttribute('src');
   video.load();
+}
+
+/* Trailers autoplay, and every browser only allows that while muted. The choice
+   is remembered for the session rather than per card, so unmuting once carries
+   through the rest of the queue instead of making you reach for the speaker on
+   every game. Deliberately not persisted: it is a per-sitting decision, and
+   surprising someone with sound on a fresh visit is worse than one extra click. */
+let trailerMuted = true;
+
+/** Start a trailer, degrading to muted rather than leaving a card sitting paused. */
+function playTrailer(video) {
+  video.muted = trailerMuted;
+  const start = () => video.play().catch(() => {
+    // Unmuted playback needs a user gesture the page may not have had yet; a
+    // muted retry is what the autoplay policy actually permits.
+    if (video.muted) return;
+    video.muted = true;
+    video.play().catch(() => { /* nothing left to try — the poster still shows */ });
+  });
+
+  start();
+  /* ...and again when there is actually something to play. hls.js attaches its
+     buffer asynchronously, so this first call usually lands at readyState 0 and
+     rejects — which looked exactly like a blocked autoplay: muted, loaded, paused
+     at 0:00. One `canplay` retry is the difference between the trailer running and
+     the card sitting still. */
+  video.addEventListener('canplay', start, { once: true });
 }
 
 /** Attach `url` to `video`; false means this browser cannot play it at all. */
@@ -378,7 +405,10 @@ function wireOnce() {
     state.qIndex = 0;
     renderQueue();
   }));
-  $('#btn-skip').addEventListener('click', skipGame);
+  $('#btn-skip').addEventListener('click', () => skipGame(false));
+  $('#btn-notplayed').addEventListener('click', () => skipGame(true));
+  // Unmuting one trailer means you want sound for the rest of the sitting.
+  $('#rate-video').addEventListener('volumechange', (e) => { trailerMuted = e.target.muted; });
 
   $('#lib-search').addEventListener('input', renderLibrary);
   $('#lib-status').addEventListener('change', renderLibrary);
@@ -434,7 +464,8 @@ function onKey(e) {
     $('#score-out').textContent = fmt(range.value, 1);
     e.preventDefault();
   } else if (e.key === 'Enter') { saveRating(); e.preventDefault(); }
-  else if (e.key.toLowerCase() === 's') { skipGame(); e.preventDefault(); }
+  else if (e.key.toLowerCase() === 's') { skipGame(false); e.preventDefault(); }
+  else if (e.key.toLowerCase() === 'n' && state.rateMode === 'played') { skipGame(true); e.preventDefault(); }
 }
 
 const gameById = (id) => state.games.find((g) => g.id === id);
@@ -505,6 +536,9 @@ function renderQueue() {
   $('#rate-ask').textContent = state.rateMode === 'played'
     ? 'How good was it? Rate what you have already played, while you still remember.'
     : 'How much do you want to play this? These are the ones that decide what comes next.';
+  // Only meaningful for games the group has finished: you cannot "not have played"
+  // something nobody has played yet, where the question is interest, not memory.
+  $('#btn-notplayed').hidden = state.rateMode !== 'played';
 
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
@@ -531,6 +565,7 @@ function renderQueue() {
     video.poster = g.header_image || '';
     video.hidden = false; image.hidden = true; note.hidden = true;
     media.classList.remove('is-blank');
+    playTrailer(video);
   } else if (g.header_image) {
     detachTrailer(video); video.hidden = true;
     image.src = g.header_image; image.hidden = false;
@@ -560,6 +595,9 @@ function renderQueue() {
   $('#rate-notes').textContent = caveat;
 
   const others = Object.entries(g.votes).filter(([id]) => id !== state.me.steamId);
+  const satOut = (g.notPlayed || []).filter((id) => id !== state.me.steamId)
+    .map((id) => `<span class="other-vote other-out"><i class="dot" style="background:${colorOf(id)}"></i>${esc(nameOf(id))} didn't play</span>`)
+    .join('');
   if (state.group.blindRating) {
     // Say that opinions exist without revealing them, so the queue still tells
     // you whether you are the first to look at this.
@@ -574,6 +612,8 @@ function renderQueue() {
         ).join('')
       : '<span class="other-vote" style="color:var(--text-muted)">Nobody else has rated this yet</span>';
   }
+  // Who sat it out is not a score, so it shows even under blind rating.
+  $('#rate-others').innerHTML += satOut;
 
   // The slider normally opens on the group's current average, which is a second
   // and less obvious source of anchoring: hiding the numbers but still starting
@@ -626,13 +666,23 @@ async function saveRating() {
   finally { $('#btn-save').disabled = false; }
 }
 
-async function skipGame() {
+/**
+ * Take the current card off my queue. `notPlayed` distinguishes "I wasn't part of
+ * this one" from "no opinion" — only the first removes the game from my coverage
+ * denominator, so it has to update the local copy too or the bar above the queue
+ * disagrees with the server until the next reload.
+ */
+async function skipGame(notPlayed = false) {
   const g = currentCard();
   if (!g) return;
   try {
-    await gapi('/skip', { method: 'POST', body: { gameId: g.id } });
+    await gapi('/skip', { method: 'POST', body: { gameId: g.id, notPlayed } });
+    if (notPlayed && !(g.notPlayed || []).includes(state.me.steamId)) {
+      g.notPlayed = [...(g.notPlayed || []), state.me.steamId];
+    }
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
+    renderMyCoverage();
     renderQueue();
   } catch (e) { toast(e.message); }
 }
@@ -739,10 +789,13 @@ function renderLibHead() {
 function renderMyCoverage() {
   const box = $('#my-coverage');
   const active = activeGames();
-  const total = active.length;
+  // Games I marked "didn't play" leave my denominator entirely — I cannot rate
+  // a session I wasn't in, so counting them would be a debt I can never clear.
+  const mine = active.filter((g) => !(g.notPlayed || []).includes(state.me.steamId));
+  const total = mine.length;
   if (!total) { box.hidden = true; return; }
 
-  const rated = active.filter((g) => g.votes[state.me.steamId] != null).length;
+  const rated = mine.filter((g) => g.votes[state.me.steamId] != null).length;
   const pct = Math.round((rated / total) * 100);
   const left = total - rated;
 
@@ -960,14 +1013,18 @@ async function renderMembers() {
   const isOwner = d.group.role === 'owner';
 
   /* ── coverage leaderboard ──────────────────────────────────────────────── */
-  const total = activeGames().length;
+  const active = activeGames();
   const ranked = d.members
-    .map((m) => ({ ...m, pct: total ? Math.round((m.ratings / total) * 100) : 0 }))
+    .map((m) => {
+      // Per-person denominator: everyone has their own set of games they sat out.
+      const total = active.filter((g) => !(g.notPlayed || []).includes(m.steam_id)).length;
+      return { ...m, total, pct: total ? Math.round((m.ratings / total) * 100) : 0 };
+    })
     .sort((a, b) => b.pct - a.pct || a.short_name.localeCompare(b.short_name));
 
   $('#coverage-bars').innerHTML = ranked.map((m) => `
     <div class="bar-row">
-      <div class="bar-label">${esc(m.short_name)} <span class="bar-sub">${m.ratings}/${total}</span></div>
+      <div class="bar-label">${esc(m.short_name)} <span class="bar-sub">${m.ratings}/${m.total}</span></div>
       <div class="bar-track">
         <div class="bar-fill" style="width:${m.pct}%;background:${colorOf(m.steam_id)}"></div>
       </div>

@@ -1,4 +1,4 @@
--- CoopQ — Cloudflare D1 schema (multi-tenant)
+-- CoopQueue — Cloudflare D1 schema (multi-tenant)
 -- Apply with:  npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
 --
 -- Tenancy model: everything a group owns hangs off groups.id. A person is one
@@ -227,6 +227,10 @@ CREATE TABLE seed_assignments (
 CREATE TABLE skips (
   game_id    INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   steam_id   TEXT    NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+  -- 1 = "I wasn't part of this one", not "no opinion". A group of four does not
+  -- always play as four, and the difference matters: a game you did not play
+  -- comes out of YOUR coverage denominator instead of counting as unrated.
+  not_played INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
 );

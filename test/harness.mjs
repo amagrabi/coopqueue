@@ -194,12 +194,19 @@ function libraryFor(gid, need) {
   const cal = calibrate(ratings), glob = globalStats(ratings);
   const byGame = new Map();
   for (const r of ratings) { if (!byGame.has(r.game_id)) byGame.set(r.game_id, []); byGame.get(r.game_id).push(r); }
+  const satOut = new Map();
+  for (const s2 of q(`SELECT s.game_id, s.steam_id FROM skips s JOIN games g ON g.id=s.game_id
+                       WHERE g.group_id=? AND s.not_played=1`, gid)) {
+    if (!satOut.has(s2.game_id)) satOut.set(s2.game_id, []);
+    satOut.get(s2.game_id).push(s2.steam_id);
+  }
   return {
     ratings, cal, glob, members, byGame,
     games: games.map((g) => {
       const votes = byGame.get(g.id) || [];
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
-               comments: [], ...scoreGame(votes), viability: viability(g, need) };
+               comments: [], ...scoreGame(votes), notPlayed: satOut.get(g.id) || [],
+               viability: viability(g, need) };
     }),
   };
 }
@@ -466,9 +473,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (sub === '/skip' && req.method === 'POST') {
-      const { gameId } = await readBody(req);
+      const { gameId, notPlayed } = await readBody(req);
       if (!one('SELECT 1 AS x FROM games WHERE id=? AND group_id=?', gameId, gid)) return send(res, 404, { error: 'no such game' });
-      db.prepare('INSERT OR IGNORE INTO skips (game_id, steam_id) VALUES (?,?)').run(gameId, ME);
+      db.prepare(`INSERT INTO skips (game_id, steam_id, not_played) VALUES (?,?,?)
+                  ON CONFLICT(game_id, steam_id) DO UPDATE SET not_played = excluded.not_played`)
+        .run(gameId, ME, notPlayed ? 1 : 0);
       return send(res, 200, { ok: true });
     }
     if (sub === '/members' && req.method === 'GET') {

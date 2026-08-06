@@ -1,4 +1,4 @@
--- CoopQ migration 011 — Steam playtime, and an estimate of group co-op hours.
+-- CoopQueue migration 011 — Steam playtime, and an estimate of group co-op hours.
 --
 --   npm run db:migrate -- --file=./migrations/011-playtime.sql
 --

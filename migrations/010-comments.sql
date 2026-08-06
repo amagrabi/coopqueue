@@ -1,4 +1,4 @@
--- CoopQ migration 010 — a comment thread per game.
+-- CoopQueue migration 010 — a comment thread per game.
 --
 --   npm run db:migrate -- --file=./migrations/010-comments.sql
 --

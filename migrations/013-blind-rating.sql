@@ -1,4 +1,4 @@
--- CoopQ migration 013 — hiding other people's ratings is a group rule, not a taste.
+-- CoopQueue migration 013 — hiding other people's ratings is a group rule, not a taste.
 --
 --   npm run db:migrate -- --file=./migrations/013-blind-rating.sql
 --
