@@ -50,7 +50,7 @@ export async function onRequestGet({ env, data }) {
       ...g,
       votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
       comments: votes.filter((v) => v.comment).map((v) => ({ steamId: v.steam_id, comment: v.comment })),
-      ...scoreGame(votes, cal, glob),
+      ...scoreGame(votes),
       viability: viability(g, need),
     };
   });

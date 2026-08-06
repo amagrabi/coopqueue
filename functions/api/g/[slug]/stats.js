@@ -33,7 +33,7 @@ export async function onRequestGet({ env, data }) {
     byGame.get(r.game_id).push(r);
   }
 
-  const scored = games.map((g) => ({ ...g, ...scoreGame(byGame.get(g.id) || [], cal, glob) }));
+  const scored = games.map((g) => ({ ...g, ...scoreGame(byGame.get(g.id) || []) }));
   const played = scored.filter((g) => PLAYED.has(g.status) && g.n > 0);
 
   const people = members.map((u) => {
@@ -80,8 +80,8 @@ export async function onRequestGet({ env, data }) {
         id: g.id, name: g.name, spread: g.spread,
         votes: Object.fromEntries((byGame.get(g.id) || []).map((v) => [v.steam_id, v.score])),
       })),
-    topRated: played.slice().sort((a, b) => b.weighted - a.weighted).slice(0, 10)
-      .map((g) => ({ id: g.id, name: g.name, raw: g.raw, weighted: g.weighted, n: g.n })),
+    topRated: played.slice().sort((a, b) => b.raw - a.raw).slice(0, 10)
+      .map((g) => ({ id: g.id, name: g.name, raw: g.raw, n: g.n })),
     mostHours: games.filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8)
       .map((g) => ({ id: g.id, name: g.name, hours: g.hours })),
   });

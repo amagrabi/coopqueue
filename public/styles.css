@@ -518,3 +518,20 @@ td.miss { color: #4a4a47; }
   object-fit: cover; background: var(--surface-2); display: block;
 }
 .lib-art-none { border: 1px solid var(--border); }
+
+/* ── rate queue: which question am I being asked ────────────────────────── */
+.rate-modes { max-width: 900px; margin: 0 auto 16px; }
+.segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px;
+             background: var(--surface-1); border: 1px solid var(--border); }
+.seg {
+  font: inherit; font-size: 13.5px; font-weight: 550; padding: 7px 15px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+}
+.seg:hover:not(:disabled) { color: var(--text-primary); background: var(--surface-2); }
+.seg.is-on { background: var(--surface-2); color: var(--text-primary); }
+.seg:disabled { opacity: .4; cursor: default; }
+.rate-ask { margin: 10px 0 0; font-size: 13.5px; color: var(--text-secondary); }
+/* Already-owned search hits stay readable but clearly not actionable. */
+.add-hit.is-have { opacity: .65; cursor: default; }
+.add-hit.is-have:hover { background: var(--surface-2); }

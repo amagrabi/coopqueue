@@ -141,10 +141,14 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
   with `mode=check_authentication`. Nothing in the callback URL is trusted before
   that returns `is_valid:true`. Removing that check makes login trivially
   forgeable.
-- **Scoring** (`lib/score.js`) does two things: per-person z-score calibration
-  (a 7 from a generous rater ≠ a 7 from a harsh one), then shrinkage toward the
-  group mean by `n / (n + SHRINKAGE_K)` so thinly-voted games can't top the
-  ranking. `SHRINKAGE_K = 0` disables shrinkage.
+- **Scoring is the plain mean, on purpose.** `scoreGame()` returns the average
+  and the vote count, nothing cleverer. There used to be a calibrated-and-shrunk
+  "weighted" score and the owner removed it: a rating is a judgement, not a
+  measurement to be corrected, somebody who has only given 8-10 may simply have
+  played good games and may hand the next one a 4, and the number was impossible
+  to reconstruct from the column beside it. `n` is surfaced instead, so thin
+  evidence is visible rather than silently discounted. `calibrate()` survives but
+  only *describes* people on the Stats page — it decides no ranking.
 - **Seed identities** are rows like `seed:1:ama` in both `users` and
   `memberships` with `is_seed = 1`. `claim.js` repoints their ratings onto a real
   SteamID64 and deletes the placeholder. Order matters in that batch: the real

@@ -16,6 +16,7 @@ const state = {
   model: { mean: 7.26, sd: 1.29 },
   queue: [],
   qIndex: 0,
+  rateMode: 'played',   // 'played' | 'want' — see renderQueue
   view: 'queue',
 };
 
@@ -372,6 +373,11 @@ function wireOnce() {
 
   $('#score-range').addEventListener('input', (e) => { $('#score-out').textContent = fmt(e.target.value, 1); });
   $('#btn-save').addEventListener('click', saveRating);
+  $$('#rate-modes .seg').forEach((b) => b.addEventListener('click', () => {
+    state.rateMode = b.dataset.mode;
+    state.qIndex = 0;
+    renderQueue();
+  }));
   $('#btn-skip').addEventListener('click', skipGame);
 
   $('#lib-search').addEventListener('input', renderLibrary);
@@ -427,22 +433,69 @@ function onKey(e) {
 const gameById = (id) => state.games.find((g) => g.id === id);
 
 /* ══════════════════════════════ RATE ══════════════════════════════════ */
+/**
+ * The queue asks two unrelated questions — "how good was it?" of games you have
+ * played, and "how much do you want to play this?" of ones you have not — and a
+ * silently mixed list is why that is confusing. They are split into modes, and
+ * Played is the default whenever it has anything in it: it is the smaller set and
+ * the more perishable, because memory of a game fades in a way that curiosity
+ * about one does not.
+ *
+ * Partitioned on the client from data it already has. The queue endpoint returns
+ * ids and the library carries each game's status, so this needed no new API.
+ */
+const PLAYED_STATUS = new Set(['finished', 'dropped', 'sampled']);
+const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
+
+function queuesByMode() {
+  const out = { played: [], want: [] };
+  for (const id of state.queue) {
+    const g = gameById(id);
+    if (g) out[modeOf(g)].push(id);
+  }
+  return out;
+}
+
 function renderQueue() {
-  const empty = !state.queue.length;
+  const byMode = queuesByMode();
+
+  // Default to whichever mode has work, preferring Played. Also auto-advances
+  // when the mode you were in empties, so the queue never looks broken.
+  if (!byMode[state.rateMode]?.length) {
+    state.rateMode = byMode.played.length ? 'played' : 'want';
+    state.qIndex = 0;
+  }
+  const queue = byMode[state.rateMode];
+
+  const modes = $('#rate-modes');
+  modes.hidden = !(byMode.played.length || byMode.want.length);
+  $('#mode-played-n').textContent = byMode.played.length || '';
+  $('#mode-want-n').textContent = byMode.want.length || '';
+  $$('#rate-modes .seg').forEach((b) => {
+    const on = b.dataset.mode === state.rateMode;
+    b.setAttribute('aria-selected', String(on));
+    b.classList.toggle('is-on', on);
+    b.disabled = !byMode[b.dataset.mode].length;
+  });
+  $('#rate-ask').textContent = state.rateMode === 'played'
+    ? 'How good was it? Rate what you have already played, while you still remember.'
+    : 'How much do you want to play this? These are the ones that decide what comes next.';
+
+  const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
   $('#queue-card').hidden = empty;
   if (empty) return;
 
-  if (state.qIndex >= state.queue.length) state.qIndex = 0;
-  const g = gameById(state.queue[state.qIndex]);
-  if (!g) { state.queue.splice(state.qIndex, 1); return renderQueue(); }
+  if (state.qIndex >= queue.length) state.qIndex = 0;
+  const g = gameById(queue[state.qIndex]);
+  if (!g) { state.queue = state.queue.filter((id) => id !== queue[state.qIndex]); return renderQueue(); }
 
   $('#rate-title').textContent = g.name;
-  $('#rate-pos').textContent = `${state.qIndex + 1} of ${state.queue.length} left`;
+  $('#rate-pos').textContent = `${state.qIndex + 1} of ${queue.length} left`;
   $('#rate-desc').textContent = g.short_description || '';
-  $('#score-hint').textContent = g.status === 'backlog'
-    ? 'how much do you want to play this?'
-    : 'how good was it?';
+  $('#score-hint').textContent = state.rateMode === 'played'
+    ? 'how good was it?'
+    : 'how much do you want to play this?';
 
   const video = $('#rate-video');
   const image = $('#rate-image');
@@ -527,14 +580,17 @@ function metaChips(g) {
   return chips.join('');
 }
 
+/** The game on screen. qIndex indexes the ACTIVE MODE's queue, not state.queue. */
+const currentCard = () => gameById(queuesByMode()[state.rateMode]?.[state.qIndex]);
+
 async function saveRating() {
-  const g = gameById(state.queue[state.qIndex]);
+  const g = currentCard();
   if (!g) return;
   const score = Number($('#score-range').value);
   $('#btn-save').disabled = true;
   try {
     await gapi('/rate', { method: 'POST', body: { gameId: g.id, score } });
-    state.queue.splice(state.qIndex, 1);
+    state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     g.votes[state.me.steamId] = score;
     renderMyCoverage();   // the bar should move on every save, that is the point
@@ -546,11 +602,11 @@ async function saveRating() {
 }
 
 async function skipGame() {
-  const g = gameById(state.queue[state.qIndex]);
+  const g = currentCard();
   if (!g) return;
   try {
     await gapi('/skip', { method: 'POST', body: { gameId: g.id } });
-    state.queue.splice(state.qIndex, 1);
+    state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     renderQueue();
   } catch (e) { toast(e.message); }
@@ -560,13 +616,13 @@ async function skipGame() {
 function renderNext() {
   const need = state.group.maxPlayers;
   $('#next-sub').textContent =
-    `Backlog games ranked by weighted score — calibrated for how each of you uses the scale, and pulled ` +
+    `Backlog games ranked by the group's average score. ` +
     `toward the middle when only one person has voted. Anything that can't fit ${need} players is flagged.`;
 
   const backlog = state.games.filter((g) => g.status === 'backlog' && g.n > 0);
   const hide = $('#hide-unviable').checked;
-  const playable = backlog.filter((g) => g.viability.ok !== false).sort((a, b) => b.weighted - a.weighted);
-  const blocked  = backlog.filter((g) => g.viability.ok === false).sort((a, b) => b.weighted - a.weighted);
+  const playable = backlog.filter((g) => g.viability.ok !== false).sort((a, b) => b.raw - a.raw);
+  const blocked  = backlog.filter((g) => g.viability.ok === false).sort((a, b) => b.raw - a.raw);
 
   $('#next-list').innerHTML = playable.map((g, i) => `
     <li class="rank-row" data-id="${g.id}">
@@ -576,7 +632,7 @@ function renderNext() {
         <div class="rank-meta">${metaChips(g)}${
           g.n === 1 ? '<span class="chip chip-warn">only 1 vote</span>' : ''}</div>
       </div>
-      <div class="rank-score"><b>${fmt(g.weighted)}</b><span>${g.n} vote${g.n === 1 ? '' : 's'} · avg ${fmt(g.raw, 1)}</span></div>
+      <div class="rank-score"><b>${fmt(g.raw, 1)}</b><span>${g.n} vote${g.n === 1 ? '' : 's'}</span></div>
     </li>`).join('') || '<p class="view-sub">Nothing rated in the backlog yet — go rate some games.</p>';
 
   $('#unviable-block').innerHTML = (hide || !blocked.length)
@@ -585,7 +641,7 @@ function renderNext() {
        <p>Verified player caps. They stay on the list so nobody re-suggests them.</p>
        ${blocked.map((g) => `
          <div class="unviable-row" data-id="${g.id}">
-           <span><strong>${esc(g.name)}</strong> · ${fmt(g.weighted)}</span>
+           <span><strong>${esc(g.name)}</strong> · ${fmt(g.raw, 1)}</span>
            <span class="why">${esc(g.viability.reason || `caps at ${g.max_players}`)}</span>
          </div>`).join('')}`;
 
@@ -612,12 +668,11 @@ const LIB_COLUMNS = () => [
     key: `p:${m.steam_id}`, label: m.short_name, cls: 'c-p', type: 'num',
     color: colorOf(m.steam_id), title: `${m.short_name}'s own score` })),
   { key: 'raw',      label: 'Avg',      cls: 'c-num',  type: 'num',
-    title: 'Plain mean of the scores given' },
-  { key: 'weighted', label: 'Weighted', cls: 'c-num',  type: 'num',
-    title: 'Each score first converted to a z-score against that person\'s own '
-         + 'average and spread, so a 7 from a harsh rater outranks a 7 from a '
-         + 'generous one, then pulled toward the group mean by n/(n+1.6) so a '
-         + 'game with one vote cannot top the list. This is what Play next ranks by.' },
+    title: 'The group\'s score: the plain mean of what people gave it. '
+         + 'Read it next to Votes — a 9.0 from one person is not a 9.0 from four.' },
+  { key: 'n',        label: 'Votes',    cls: 'c-num',  type: 'num',
+    title: 'How many of you have scored this. A high average from one person is '
+         + 'thin evidence; this is the column that tells you so.' },
   { key: 'hours',    label: 'Hrs',      cls: 'c-num',  type: 'num',
     title: 'Hours logged for this game, entered by hand' },
 ];
@@ -681,15 +736,14 @@ function renderLibrary() {
   const minScore = Number($('#lib-score').value) || 0;
   const played = $('#lib-played').value;
 
-  // `weighted` is the calibrated, shrunk group score, so filtering on it asks
-  // "would the group actually pick this", not "did somebody once type a 9".
+  // Filters on the group average — the same number the table and Play next show.
   // Unclaimed seed identities count as voters — their imported ratings are real
   // scores, so a game they rated is not missing anyone's opinion.
   const voters = state.members.length;
   const rows = state.games.filter((g) => {
     if (status && g.status !== status) return false;
     if (q && !g.name.toLowerCase().includes(q) && !(g.genre || '').toLowerCase().includes(q)) return false;
-    if (minScore && !(g.weighted >= minScore)) return false;
+    if (minScore && !(g.raw >= minScore)) return false;
     if (played === 'yes' && !(g.hours > 0)) return false;
     if (played === 'no' && g.hours > 0) return false;
     if (mine === 'unrated' && g.votes[state.me.steamId] != null) return false;
@@ -716,7 +770,7 @@ function renderLibrary() {
     });
   } else {
     rows.sort({
-      weighted: (a, b) => (b.weighted ?? -1) - (a.weighted ?? -1),
+      best:     (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
       name:     (a, b) => a.name.localeCompare(b.name),
       spread:   (a, b) => (b.spread ?? -1) - (a.spread ?? -1),
       hours:    (a, b) => (b.hours ?? -1) - (a.hours ?? -1),
@@ -738,8 +792,8 @@ function renderLibrary() {
         const v = g.votes[m.steam_id];
         return v == null ? '<td class="c-p miss">·</td>' : `<td class="c-p">${fmt(v, 1)}</td>`;
       }).join('')}
-      <td class="c-num">${fmt(g.raw, 1)}</td>
-      <td class="c-num cell-strong">${fmt(g.weighted)}</td>
+      <td class="c-num cell-strong">${fmt(g.raw, 1)}</td>
+      <td class="c-num">${g.n || '–'}</td>
       <td class="c-num">${g.hours ? fmt(g.hours, 0) : '–'}</td>
     </tr>`).join('');
 
@@ -757,7 +811,7 @@ async function renderStats() {
     ${tile(s.totals.finished, 'finished together')}
     ${tile(s.totals.hours.toLocaleString(), 'hours logged', 'only where someone filled it in')}
     ${tile(s.totals.ratings, 'ratings given')}
-    ${tile(fmt(s.totals.groupMean, 2), 'group baseline', 'the weighted score pulls toward this')}
+    ${tile(fmt(s.totals.groupMean, 2), 'group average', 'across every score anyone has given')}
     ${tile(s.totals.unviableBacklog, 'backlog games we cannot play', `fewer than ${s.totals.maxPlayers} co-op slots`, true)}`;
 
   $('#people-list').innerHTML = s.people.map((p) => `
@@ -788,7 +842,7 @@ async function renderStats() {
         </div>`).join('') + '<div class="dot-axis"><span>1</span><span>4</span><span>7</span><span>10</span></div>'
     : '<p class="panel-sub">Nothing to argue about yet — you need three people to rate the same finished game.</p>';
 
-  $('#top-chart').innerHTML = barChart(s.topRated.map((g) => ({ label: g.name, value: g.weighted })), 10);
+  $('#top-chart').innerHTML = barChart(s.topRated.map((g) => ({ label: g.name, value: g.raw })), 10);
   $('#hours-chart').innerHTML = barChart(
     s.mostHours.map((g) => ({ label: g.name, value: g.hours })),
     Math.max(...s.mostHours.map((g) => g.hours), 1), () => '', 0);
@@ -956,13 +1010,22 @@ async function runSearch(term) {
     const { results } = await api(`/api/steam/search?q=${encodeURIComponent(term.trim())}`);
     if (!results.length) { $('#add-status').textContent = 'No matches on Steam.'; $('#add-results').innerHTML = ''; return; }
     $('#add-status').textContent = '';
-    $('#add-results').innerHTML = results.map((r) => `
-      <button class="add-hit" data-appid="${r.appid}">
+    // Whether it is already on the list is the first thing you want to know here;
+    // finding out by getting a 409 after clicking Add is a poor substitute.
+    const byAppid = new Map(state.games.filter((g) => g.steam_appid).map((g) => [g.steam_appid, g]));
+    $('#add-results').innerHTML = results.map((r) => {
+      const have = byAppid.get(r.appid);
+      return `
+      <button class="add-hit${have ? ' is-have' : ''}" data-appid="${r.appid}" ${have ? 'disabled' : ''}>
         <img src="${esc(r.image || '')}" alt="" loading="lazy">
         <span><b>${esc(r.name)}</b><br><span>${esc(r.price || '')} ${esc(r.release || '')}</span></span>
-        <span class="chip">Add</span>
-      </button>`).join('');
-    $$('#add-results .add-hit').forEach((b) => b.addEventListener('click', () => addGame(b.dataset.appid, b)));
+        ${have
+          ? `<span class="chip chip-good">already in ${esc(STATUS_LABEL[have.status] || 'your library')}</span>`
+          : '<span class="chip">Add</span>'}
+      </button>`;
+    }).join('');
+    $$('#add-results .add-hit:not([disabled])').forEach((b) =>
+      b.addEventListener('click', () => addGame(b.dataset.appid, b)));
   } catch (e) { $('#add-status').textContent = e.message; }
 }
 

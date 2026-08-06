@@ -16,7 +16,10 @@ does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
 ## What it does
 
 **Rate.** A queue of everything you personally haven't scored yet, one card at a
-time, with the Steam trailer embedded. Keyboard-driven: `1`–`9` (`0` = 10),
+time, with the Steam trailer embedded. It is split into two modes, because it asks
+two different questions: **Played** ("how good was it?") and **Want to play**
+("how much do you want to play this?"). Played comes first — it is the smaller set
+and the more perishable, since memory fades. Keyboard-driven: `1`–`9` (`0` = 10),
 `←` `→` to nudge by half a point, `Enter` to save and advance, `S` to skip.
 Forty unrated games takes about three minutes.
 
@@ -49,16 +52,17 @@ that drives the viability check.
 
 ### The scoring model
 
-Two corrections, both in [`lib/score.js`](lib/score.js):
+The group's score is the **plain average**, shown next to the number of votes.
 
-1. **Calibration.** Each rating becomes a z-score against that person's own mean
-   and spread, so a 7 from a generous rater and a 7 from a harsh one aren't
-   treated as the same signal.
-2. **Shrinkage.** A 9.0 from one person is weaker evidence than a 7.5 from four,
-   so the group score is pulled toward the overall mean by `n / (n + 1.6)`. One
-   vote keeps ~38% of its distance from the mean; four keep ~71%.
+That is a deliberate choice rather than a shortcut. An earlier version calibrated
+each rating against that person's own history and shrank thin results toward the
+group mean. It was removed: a rating is a judgement, not a measurement needing
+correction — somebody who has only ever given 8s and 9s may simply have played
+good games, and may well give the next one a 4. And a score you cannot reconstruct
+from the column beside it is a poor way to settle an argument.
 
-Set `SHRINKAGE_K = 0` to turn shrinkage off.
+Thin evidence is shown rather than corrected for: a 9.0 with one vote sits next to
+a **1** in the Votes column, and the Library sorts by it.
 
 ### The viability check
 

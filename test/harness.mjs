@@ -126,7 +126,7 @@ function libraryFor(gid, need) {
     games: games.map((g) => {
       const votes = byGame.get(g.id) || [];
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
-               comments: [], ...scoreGame(votes, cal, glob), viability: viability(g, need) };
+               comments: [], ...scoreGame(votes), viability: viability(g, need) };
     }),
   };
 }
@@ -275,8 +275,8 @@ const server = http.createServer(async (req, res) => {
         genres: [...gmap.entries()].map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) })).sort((a, b) => b.avg - a.avg),
         arguments: played.filter((g) => g.n >= 3 && g.spread >= 2).sort((a, b) => b.spread - a.spread).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, spread: g.spread, votes: g.votes })),
-        topRated: played.slice().sort((a, b) => b.weighted - a.weighted).slice(0, 10)
-          .map((g) => ({ id: g.id, name: g.name, raw: g.raw, weighted: g.weighted, n: g.n })),
+        topRated: played.slice().sort((a, b) => b.raw - a.raw).slice(0, 10)
+          .map((g) => ({ id: g.id, name: g.name, raw: g.raw, n: g.n })),
         mostHours: L.games.filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8)
           .map((g) => ({ id: g.id, name: g.name, hours: g.hours })),
       });
