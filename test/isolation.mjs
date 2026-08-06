@@ -380,6 +380,77 @@ await check('auto-claim refuses to merge an existing rating history', async () =
     || `merged=${JSON.stringify(merged)} patIntact=${!!patIntact}`;
 });
 
+console.log('\nArchiving');
+
+await check('removing a game archives it and keeps every rating', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  sqlite.exec(`INSERT OR REPLACE INTO ratings (game_id, steam_id, score) VALUES (${g.id},'${ALICE}',8)`);
+  const before = sqlite.prepare('SELECT COUNT(*) AS n FROM ratings WHERE game_id=?').get(g.id).n;
+
+  const r = await gameIdRoute.onRequestDelete({ params: { id: String(g.id) }, env, data });
+  if (r.status !== 200) return `expected 200, got ${r.status}`;
+
+  const row = sqlite.prepare('SELECT archived_at FROM games WHERE id=?').get(g.id);
+  const after = sqlite.prepare('SELECT COUNT(*) AS n FROM ratings WHERE game_id=?').get(g.id).n;
+  return (row && row.archived_at != null && after === before)
+    || `archived_at=${row?.archived_at} ratings ${before}->${after}`;
+});
+
+await check('an archived game leaves the rating queue', async () => {
+  const skip = await import(path.join(SITE, 'functions/api/g/[slug]/skip.js'));
+  const archived = sqlite.prepare('SELECT id FROM games WHERE group_id=1 AND archived_at IS NOT NULL').get();
+  const { data } = await ctxFor(MALLORY, 'g4m1ng');   // someone who has not rated it
+  const body = await (await skip.onRequestGet({ env, data })).json();
+  return !body.queue.includes(archived.id) || 'archived game still offered in the queue';
+});
+
+await check('an archived game leaves the stats', async () => {
+  const statsRoute = await import(path.join(SITE, 'functions/api/g/[slug]/stats.js'));
+  const archived = sqlite.prepare('SELECT id, name FROM games WHERE group_id=1 AND archived_at IS NOT NULL').get();
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const body = await (await statsRoute.onRequestGet({ env, data })).json();
+  // By id, not by name: "Sea of Thieves" is a substring of "Sea of Thieves:
+  // Monkey Island", so a text search reports a false positive against a game that
+  // is not archived at all.
+  const ids = [...(body.topRated || []), ...(body.mostHours || []), ...(body.arguments || [])]
+    .map((x) => x.id);
+  if (ids.includes(archived.id)) return `archived game id ${archived.id} still in stats lists`;
+  const rated = body.people.reduce((a, p) => a + p.count, 0);
+  const expected = sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
+      WHERE g.group_id=1 AND g.archived_at IS NULL`).get().n;
+  return rated === expected || `people counts total ${rated}, expected ${expected}`;
+});
+
+await check('restoring brings the game and its ratings back', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const archived = sqlite.prepare('SELECT id FROM games WHERE group_id=1 AND archived_at IS NOT NULL').get();
+  const ratings = sqlite.prepare('SELECT COUNT(*) AS n FROM ratings WHERE game_id=?').get(archived.id).n;
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(archived.id) }, request: req({ archived: false }), env, data });
+  if (r.status !== 200) return `expected 200, got ${r.status}`;
+  const row = sqlite.prepare('SELECT archived_at FROM games WHERE id=?').get(archived.id);
+  const after = sqlite.prepare('SELECT COUNT(*) AS n FROM ratings WHERE game_id=?').get(archived.id).n;
+  return (row.archived_at === null && after === ratings)
+    || `archived_at=${row.archived_at} ratings ${ratings}->${after}`;
+});
+
+await check('archiving cannot reach a game in another group', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gameIdRoute.onRequestDelete({ params: { id: '5000' }, env, data });
+  const row = sqlite.prepare('SELECT archived_at FROM games WHERE id=5000').get();
+  return (r.status === 404 && row.archived_at == null) || `status ${r.status}, archived_at ${row.archived_at}`;
+});
+
+await check('there is no hard delete: the row survives a remove', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 AND archived_at IS NULL LIMIT 1').get();
+  await gameIdRoute.onRequestDelete({ params: { id: String(g.id) }, env, data });
+  const still = sqlite.prepare('SELECT COUNT(*) AS n FROM games WHERE id=?').get(g.id).n;
+  return still === 1 || 'the row was actually deleted';
+});
+
 console.log('\nGroup rename & deletion');
 
 // Carol owns her own group and is NOT in group 1, so she cannot see that a group

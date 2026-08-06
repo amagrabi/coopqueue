@@ -364,6 +364,22 @@ privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
    spreadsheet it ranged from 89% to 27% per person.
 5. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
+## Archiving, not deleting
+
+Removing a game sets `games.archived_at` instead of deleting the row. Any member
+can do it, and that is only safe *because* it destroys nothing: a real DELETE
+cascades away every rating anyone gave the game, and ratings are the one thing here
+that cannot be recreated. Archived games drop out of the rating queue, Play next,
+the stats and coverage denominators, and reappear under Library → Archived, where
+restoring clears the column and brings the whole history back.
+
+There is deliberately **no hard-delete endpoint for a game**. If a group genuinely
+wants data gone, deleting the group does that and says so plainly.
+
+Anything counting the library must filter on `archived_at IS NULL` — the queue,
+stats, coverage bars and Play next all do, and `isActive()` / `activeGames()` in
+`app.js` exist so the client cannot forget.
+
 ## Vocabulary
 
 One word per concept, because two words for one thing is how a UI stops making

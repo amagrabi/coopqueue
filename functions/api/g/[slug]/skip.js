@@ -5,6 +5,7 @@ export async function onRequestGet({ env, data }) {
   const rows = await env.DB.prepare(
     `SELECT g.id FROM games g
       WHERE g.group_id = ?2
+        AND g.archived_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM ratings r WHERE r.game_id = g.id AND r.steam_id = ?1)
         AND NOT EXISTS (SELECT 1 FROM skips  s WHERE s.game_id = g.id AND s.steam_id = ?1)
       ORDER BY CASE g.status WHEN 'backlog' THEN 0 ELSE 1 END, g.name COLLATE NOCASE`

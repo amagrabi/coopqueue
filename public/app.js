@@ -390,6 +390,7 @@ function wireOnce() {
   $('#lib-mine').addEventListener('change', renderLibrary);
   $('#lib-score').addEventListener('change', renderLibrary);
   $('#lib-played').addEventListener('change', renderLibrary);
+  $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
 
   let browseTimer;
@@ -449,6 +450,10 @@ const gameById = (id) => state.games.find((g) => g.id === id);
  * Partitioned on the client from data it already has. The queue endpoint returns
  * ids and the library carries each game's status, so this needed no new API.
  */
+/** Archived games are out of everything except the Library's archived filter. */
+const isActive = (g) => !g.archived_at;
+const activeGames = () => state.games.filter(isActive);
+
 const PLAYED_STATUS = new Set(['finished', 'dropped', 'sampled']);
 const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
 
@@ -456,7 +461,7 @@ function queuesByMode() {
   const out = { played: [], want: [] };
   for (const id of state.queue) {
     const g = gameById(id);
-    if (g) out[modeOf(g)].push(id);
+    if (g && isActive(g)) out[modeOf(g)].push(id);
   }
   return out;
 }
@@ -624,7 +629,7 @@ function renderNext() {
     `Backlog games ranked by the group's average score. ` +
     `toward the middle when only one person has voted. Anything that can't fit ${need} players is flagged.`;
 
-  const backlog = state.games.filter((g) => g.status === 'backlog' && g.n > 0);
+  const backlog = activeGames().filter((g) => g.status === 'backlog' && g.n > 0);
   const hide = $('#hide-unviable').checked;
   const playable = backlog.filter((g) => g.viability.ok !== false).sort((a, b) => b.raw - a.raw);
   const blocked  = backlog.filter((g) => g.viability.ok === false).sort((a, b) => b.raw - a.raw);
@@ -717,10 +722,11 @@ function renderLibHead() {
  */
 function renderMyCoverage() {
   const box = $('#my-coverage');
-  const total = state.games.length;
+  const active = activeGames();
+  const total = active.length;
   if (!total) { box.hidden = true; return; }
 
-  const rated = state.games.filter((g) => g.votes[state.me.steamId] != null).length;
+  const rated = active.filter((g) => g.votes[state.me.steamId] != null).length;
   const pct = Math.round((rated / total) * 100);
   const left = total - rated;
 
@@ -740,12 +746,17 @@ function renderLibrary() {
   const mine = $('#lib-mine').value;
   const minScore = Number($('#lib-score').value) || 0;
   const played = $('#lib-played').value;
+  const archived = $('#lib-archived').value;
 
   // Filters on the group average — the same number the table and Play next show.
   // Unclaimed seed identities count as voters — their imported ratings are real
   // scores, so a game they rated is not missing anyone's opinion.
   const voters = state.members.length;
   const rows = state.games.filter((g) => {
+    // Archived is the first gate: an archived game should not show up in a status
+    // or score filter unless it was explicitly asked for.
+    if (archived === 'active' && g.archived_at) return false;
+    if (archived === 'archived' && !g.archived_at) return false;
     if (status && g.status !== status) return false;
     if (q && !g.name.toLowerCase().includes(q) && !(g.genre || '').toLowerCase().includes(q)) return false;
     if (minScore && !(g.raw >= minScore)) return false;
@@ -784,14 +795,16 @@ function renderLibrary() {
   }
 
   $('#lib-table tbody').innerHTML = rows.map((g) => `
-    <tr data-id="${g.id}">
+    <tr data-id="${g.id}"${g.archived_at ? ' class="is-archived"' : ''}>
       <td class="c-name cell-strong">
         <span class="lib-game">${g.header_image
           ? `<img class="lib-art" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}</span></td>
       <td>${esc(g.genre || '—')}</td>
-      <td><span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span></td>
+      <td>${g.archived_at
+        ? '<span class="status-tag status-archived">Archived</span>'
+        : `<span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span>`}</td>
       <td class="c-num">${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
@@ -876,7 +889,7 @@ async function renderMembers() {
   const isOwner = d.group.role === 'owner';
 
   /* ── coverage leaderboard ──────────────────────────────────────────────── */
-  const total = state.games.length;
+  const total = activeGames().length;
   const ranked = d.members
     .map((m) => ({ ...m, pct: total ? Math.round((m.ratings / total) * 100) : 0 }))
     .sort((a, b) => b.pct - a.pct || a.short_name.localeCompare(b.short_name));
@@ -1304,7 +1317,9 @@ function openDetail(id) {
         <button class="btn btn-primary" id="d-save">Save changes</button>
         ${g.steam_appid ? `<a class="btn btn-ghost" target="_blank" rel="noopener"
             href="https://store.steampowered.com/app/${g.steam_appid}">Steam page ↗</a>` : ''}
-        <button class="btn btn-ghost" id="d-delete" style="margin-left:auto;color:var(--critical)">Delete</button>
+        ${g.archived_at
+          ? `<button class="btn btn-ghost" id="d-restore" style="margin-left:auto">Restore to library</button>`
+          : `<button class="btn btn-ghost" id="d-archive" style="margin-left:auto;color:var(--critical)">Remove from library</button>`}
       </div>
     </div>`;
 
@@ -1331,13 +1346,34 @@ function openDetail(id) {
     } catch (e) { toast(e.message); }
   });
 
-  $('#d-delete').addEventListener('click', async () => {
-    if (!confirm(`Delete ${g.name} and every rating for it?`)) return;
-    try {
-      await gapi(`/games/${id}`, { method: 'DELETE' });
-      await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Deleted');
-    } catch (e) { toast(e.message); }
-  });
+  // Removing archives rather than deletes, so the confirmation can promise the
+  // ratings survive — which is the difference that makes this safe for any member
+  // to do. Saying "delete" here when nothing is deleted would be a lie that stops
+  // people tidying up at all.
+  if (g.archived_at) {
+    $('#d-restore').addEventListener('click', async () => {
+      try {
+        await gapi(`/games/${id}`, { method: 'PATCH', body: { archived: false } });
+        await loadGroup(); $('#detail-dialog').close(); setView(state.view);
+        toast(`${g.name} is back, with every rating it had`);
+      } catch (e) { toast(e.message); }
+    });
+  } else {
+    $('#d-archive').addEventListener('click', async () => {
+      const n = Object.keys(g.votes).length;
+      const kept = n ? `Its ${n} rating${n === 1 ? '' : 's'} are kept` : 'Nothing is deleted';
+      if (!confirm(`Remove ${g.name} from the library?\n\n`
+        + `${kept}, and it drops out of the rating queue and Play next. `
+        + `You can restore it any time from Library → Archived.`)) return;
+      try {
+        const r = await gapi(`/games/${id}`, { method: 'DELETE' });
+        await loadGroup(); $('#detail-dialog').close(); setView(state.view);
+        toast(r.keptRatings
+          ? `Archived ${r.name} — ${r.keptRatings} ratings kept`
+          : `Archived ${r.name}`);
+      } catch (e) { toast(e.message); }
+    });
+  }
 
   $('#detail-dialog').showModal();
 }

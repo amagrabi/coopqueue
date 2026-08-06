@@ -134,6 +134,10 @@ CREATE TABLE games (
   notes             TEXT,
   added_by          TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
   enriched_at       INTEGER,
+  -- NULL means active. Removing a game archives it rather than deleting it, so
+  -- the ratings survive and restoring brings everything back. Mirrors
+  -- migrations/009-archive.sql.
+  archived_at       INTEGER,
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   UNIQUE (group_id, steam_appid)              -- one copy per group; NULLs exempt
 );
@@ -170,6 +174,7 @@ CREATE TABLE skips (
 );
 
 CREATE INDEX idx_games_group     ON games(group_id, status);
+CREATE INDEX idx_games_active    ON games(group_id, archived_at);
 CREATE INDEX idx_ratings_game    ON ratings(game_id);
 CREATE INDEX idx_ratings_user    ON ratings(steam_id);
 CREATE INDEX idx_memberships_usr ON memberships(steam_id);

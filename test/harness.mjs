@@ -210,6 +210,24 @@ const server = http.createServer(async (req, res) => {
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
+    const gm2 = sub.match(/^\/games\/(\d+)$/);
+    if (gm2 && req.method === 'DELETE') {
+      const id = Number(gm2[1]);
+      const row = one('SELECT name, archived_at FROM games WHERE id=? AND group_id=?', id, gid);
+      if (!row) return send(res, 404, { error: 'no such game' });
+      const kept = one('SELECT COUNT(*) AS n FROM ratings WHERE game_id=?', id).n;
+      db.prepare('UPDATE games SET archived_at=unixepoch() WHERE id=? AND group_id=?').run(id, gid);
+      return send(res, 200, { ok: true, name: row.name, archived: true, keptRatings: kept });
+    }
+    if (gm2 && req.method === 'PATCH') {
+      const id = Number(gm2[1]);
+      const b = await readBody(req);
+      if ('archived' in b) {
+        db.prepare('UPDATE games SET archived_at=? WHERE id=? AND group_id=?')
+          .run(b.archived ? Math.floor(Date.now() / 1000) : null, id, gid);
+      }
+      return send(res, 200, { ok: true });
+    }
     if (sub === '/group' && req.method === 'DELETE') {
       if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can delete the group' });
       const b = await readBody(req);
@@ -239,6 +257,7 @@ const server = http.createServer(async (req, res) => {
     if (sub === '/skip' && req.method === 'GET') {
       return send(res, 200, { queue: q(
         `SELECT g.id FROM games g WHERE g.group_id=?2
+           AND g.archived_at IS NULL
            AND NOT EXISTS (SELECT 1 FROM ratings r WHERE r.game_id=g.id AND r.steam_id=?1)
            AND NOT EXISTS (SELECT 1 FROM skips s WHERE s.game_id=g.id AND s.steam_id=?1)
          ORDER BY CASE g.status WHEN 'backlog' THEN 0 ELSE 1 END, g.name COLLATE NOCASE`,

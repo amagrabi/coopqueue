@@ -12,6 +12,13 @@ export async function onRequestPatch({ params, request, env, data }) {
   const patch = await body(request);
   const sets = [];
   const vals = [];
+
+  // Archive state is a boolean over the wire and a timestamp in the column, so it
+  // cannot ride along in EDITABLE with the plain passthrough fields.
+  if ('archived' in patch) {
+    sets.push('archived_at = ?');
+    vals.push(patch.archived ? Math.floor(Date.now() / 1000) : null);
+  }
   for (const k of EDITABLE) {
     if (!(k in patch)) continue;
     if (k === 'status' && !STATUSES.includes(patch[k])) return bad(`status must be one of ${STATUSES.join(', ')}`);
@@ -32,13 +39,35 @@ export async function onRequestPatch({ params, request, env, data }) {
   return json({ ok: true, game: row });
 }
 
+/**
+ * "Remove" a game — which archives it rather than deleting it.
+ *
+ * Any member can do this, and that is only safe because it destroys nothing. A
+ * real DELETE cascades away every rating anyone ever gave the game, and ratings
+ * are the one thing in here that cannot be recreated; making tidying-up a
+ * destructive act any of four people can take is a bad trade. Archiving drops it
+ * out of the queue, Play next, coverage and the default Library view, and
+ * restoring brings the whole history back untouched.
+ *
+ * There is deliberately no hard-delete endpoint. If a group truly wants the data
+ * gone, deleting the group does that and says so.
+ */
 export async function onRequestDelete({ params, env, data }) {
   const id = Number(params.id);
   if (!Number.isInteger(id)) return bad('bad id');
-  const res = await env.DB.prepare('DELETE FROM games WHERE id = ? AND group_id = ?')
-    .bind(id, data.group.group_id).run();
-  if (!res.meta.changes) return bad('no such game', 404);
-  return json({ ok: true });
+
+  const gid = data.group.group_id;
+  const game = await env.DB.prepare(
+    `SELECT g.name, g.archived_at,
+            (SELECT COUNT(*) FROM ratings r WHERE r.game_id = g.id) AS ratings
+       FROM games g WHERE g.id = ? AND g.group_id = ?`
+  ).bind(id, gid).first();
+  if (!game) return bad('no such game', 404);
+  if (game.archived_at) return json({ ok: true, name: game.name, alreadyArchived: true });
+
+  await env.DB.prepare('UPDATE games SET archived_at = unixepoch() WHERE id = ? AND group_id = ?')
+    .bind(id, gid).run();
+  return json({ ok: true, name: game.name, archived: true, keptRatings: game.ratings });
 }
 
 /** Link (or relink) a game to a Steam appid to pull in art and a trailer. */

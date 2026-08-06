@@ -9,10 +9,16 @@ export async function onRequestGet({ env, data }) {
   const need = data.group.max_players;
 
   const [gamesRes, ratingsRes, membersRes] = await Promise.all([
-    env.DB.prepare('SELECT id, name, genre, status, hours, max_players FROM games WHERE group_id = ?').bind(gid).all(),
+    // Archived games are out of the stats too: they are no longer part of what
+    // the group is choosing between, and leaving them in would quietly inflate
+    // coverage denominators and genre averages.
+    env.DB.prepare(
+      'SELECT id, name, genre, status, hours, max_players FROM games WHERE group_id = ? AND archived_at IS NULL'
+    ).bind(gid).all(),
     env.DB.prepare(
       `SELECT r.game_id, r.steam_id, r.score FROM ratings r
-         JOIN games g ON g.id = r.game_id WHERE g.group_id = ?`
+         JOIN games g ON g.id = r.game_id
+        WHERE g.group_id = ? AND g.archived_at IS NULL`
     ).bind(gid).all(),
     env.DB.prepare(
       `SELECT m.steam_id, m.short_name, u.avatar FROM memberships m

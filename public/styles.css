@@ -554,3 +554,6 @@ td.miss { color: #4a4a47; }
 .danger > strong { color: #f0a3a3; font-size: 14px; }
 .btn-danger { background: var(--critical); border-color: transparent; color: #fff; }
 .btn-danger:hover { background: #e05252; }
+/* Archived rows stay legible but visibly not part of the active library. */
+.status-archived { background: var(--surface-2); color: var(--text-muted); }
+tr.is-archived td { opacity: .55; }
