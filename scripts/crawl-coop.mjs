@@ -34,6 +34,10 @@
  * re-crawl must never flatten that work.
  */
 import { writeFileSync } from 'node:fs';
+import {
+  UA, searchUrl, detailsUrl, reviewsUrl,
+  parseSearchItems, shapeDetails, parseReviews, OBVIOUS_NON_GAME,
+} from '../lib/coop.js';
 
 const args = process.argv.slice(2);
 const arg = (name, dflt) => {
@@ -55,86 +59,30 @@ const CATEGORY_ONLINE_COOP = 38;
 // throttled halfway produces a half-empty catalogue with no error to explain it.
 const GAP_MS = 1700;
 
-const UA = { 'user-agent': 'CoopQ (co-op game tracker)' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sq = (v) =>
   v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`;
 const num = (v) => (v === null || v === undefined || Number.isNaN(Number(v)) ? 'NULL' : Number(v));
 
-/** Entries that are obviously not games, skipped before spending an appdetails call. */
-const OBVIOUS_NON_GAME = /\b(soundtrack|ost|art\s?book|demo|season pass|upgrade pack)\b/i;
 
-const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-              jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
-/**
- * Steam's release_date is a display string ('16 May, 2011'). Sorting it as text
- * is not chronological — it groups by day-of-month — so the browse "Newest" sort
- * needs a real timestamp alongside it. Unparseable values ('Coming soon') are
- * null, which sorts last.
- */
-function releaseTs(s) {
-  if (!s) return null;
-  const t = s.trim();
-  let m = /^(\d{1,2})\s+([A-Za-z]{3})[a-z]*,?\s+(\d{4})$/.exec(t);
-  if (m && MON[m[2].toLowerCase()] != null) {
-    return Math.floor(Date.UTC(+m[3], MON[m[2].toLowerCase()], +m[1]) / 1000);
-  }
-  m = /^([A-Za-z]{3})[a-z]*\s+(\d{4})$/.exec(t);           // 'Mar 2026'
-  if (m && MON[m[1].toLowerCase()] != null) {
-    return Math.floor(Date.UTC(+m[2], MON[m[1].toLowerCase()], 1) / 1000);
-  }
-  m = /^(?:Q[1-4]\s+)?(\d{4})$/.exec(t);                    // 'Q1 2026', '2026'
-  if (m) return Math.floor(Date.UTC(+m[1], 0, 1) / 1000);
-  return null;
-}
 
 async function searchPage(start) {
-  const url = 'https://store.steampowered.com/search/results/'
-    + `?query&category2=${CATEGORY_ONLINE_COOP}&filter=${DISCOVER}&json=1`
-    + `&cc=${CC}&l=english&start=${start}&count=${PER_PAGE}`;
-  const r = await fetch(url, { headers: UA });
+  const r = await fetch(searchUrl({ start, count: PER_PAGE, cc: CC, filter: DISCOVER }), { headers: UA });
   if (!r.ok) throw new Error(`search start=${start} failed: HTTP ${r.status}`);
-  const j = await r.json();
-  return (j.items || []).map((it) => {
-    // The search payload carries no appid; it is only present in the capsule URL.
-    const m = /\/apps\/(\d+)\//.exec(it.logo || '');
-    return m ? { appid: Number(m[1]), name: it.name } : null;
-  }).filter(Boolean);
+  return parseSearchItems(await r.json());
 }
 
 async function details(appid) {
-  const url = `https://store.steampowered.com/api/appdetails?appids=${appid}&cc=${CC}&l=english`;
-  const r = await fetch(url, { headers: UA });
+  const r = await fetch(detailsUrl(appid, CC), { headers: UA });
   if (!r.ok) return null;
-  const j = await r.json().catch(() => null);
-  const entry = j?.[String(appid)];
-  if (!entry?.success || !entry.data) return null;
-  const d = entry.data;
-  if (d.type !== 'game') return { rejected: d.type || 'unknown' };
-  return {
-    name: d.name,
-    header_image: (d.header_image || '').replace(/^http:/, 'https:') || null,
-    short_description: (d.short_description || '').replace(/<[^>]*>/g, '').trim() || null,
-    genre: d.genres?.[0]?.description || null,
-    price: d.is_free ? 'Free' : (d.price_overview?.final_formatted || null),
-    release_date: d.release_date?.date || null,
-    release_ts: releaseTs(d.release_date?.date),
-    metacritic: d.metacritic?.score ?? null,
-    coop_categories: (d.categories || [])
-      .map((c) => c.description)
-      .filter((c) => /co-?op|multi-?player/i.test(c)),
-  };
+  return shapeDetails(appid, await r.json().catch(() => null));
 }
 
 /** True popularity. The search endpoint cannot give this; only appreviews can. */
 async function reviewCount(appid) {
-  const url = `https://store.steampowered.com/appreviews/${appid}`
-    + '?json=1&num_per_page=0&language=all&purchase_type=all';
-  const r = await fetch(url, { headers: UA });
+  const r = await fetch(reviewsUrl(appid), { headers: UA });
   if (!r.ok) return null;
-  const j = await r.json().catch(() => null);
-  const s = j?.query_summary;
-  return s ? { total: s.total_reviews ?? 0, desc: s.review_score_desc || null } : null;
+  return parseReviews(await r.json().catch(() => null));
 }
 
 const rows = [];
@@ -192,15 +140,15 @@ const sql = `-- CoopQ — global co-op catalogue, crawled from Steam.
 -- refreshes metadata and popularity.
 
 ${rows.map((g) => `INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, release_ts, metacritic, coop_categories, crawled_at)
-VALUES (${num(g.appid)}, ${sq(g.name)}, ${num(g.rank)}, ${sq(g.review_hint)},
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (${num(g.appid)}, ${sq(g.name)}, ${num(g.rank)}, ${num(g.reviews)}, ${sq(g.review_hint)},
         ${sq(g.header_image)}, ${sq(g.short_description)}, ${sq(g.genre)}, ${sq(g.price)},
         ${sq(g.release_date)}, ${num(g.release_ts)}, ${num(g.metacritic)},
         ${sq(JSON.stringify(g.coop_categories))}, unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
   release_ts = excluded.release_ts,

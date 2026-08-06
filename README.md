@@ -136,7 +136,7 @@ display names and avatars; skip it and people show up as `Player 1234`.
 ### Deploying from GitHub instead
 
 For a real product you probably want pushes to deploy themselves. After running
-`npm run setup` once, go to Workers & Pages → **g4m1ng** → Settings → Builds,
+`npm run setup` once, go to Workers & Pages → **coopqueue** → Settings → Builds,
 connect the GitHub repo, set the build command to nothing and the output
 directory to `public`. Every push to `main` then deploys, and pull requests get
 preview URLs. The D1 binding comes from the committed `wrangler.toml`; secrets
@@ -149,12 +149,12 @@ stay in the dashboard.
 
 ```bash
 npx wrangler login
-npx wrangler pages project create g4m1ng --production-branch main
+npx wrangler pages project create coopqueue --production-branch main
 npx wrangler d1 create g4m1ng            # paste the id into wrangler.toml
 npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
 npx wrangler d1 execute g4m1ng --remote --file=./seed.sql      # optional
-openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name g4m1ng
-npx wrangler pages secret put STEAM_API_KEY --project-name g4m1ng
+openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name coopqueue
+npx wrangler pages secret put STEAM_API_KEY --project-name coopqueue
 npm run deploy
 ```
 
@@ -166,7 +166,7 @@ Imported games have names but no Steam links, so the queue has no trailers for
 them yet. Sign in, open your group, and:
 
 ```bash
-curl -X POST https://YOUR-SITE.pages.dev/api/g/g4m1ng/enrich \
+curl -X POST https://coopqueue.pages.dev/api/g/g4m1ng/enrich \
      -H "Cookie: g4_session=..."   # copy from browser devtools
 ```
 
@@ -176,7 +176,7 @@ is 0. Anything in `needsReview` you link by hand: open the game in the Library
 and paste its store URL. Being conservative here is deliberate; a wrong appid
 means the wrong trailer plays in the queue.
 
-For a custom domain, add it under Workers & Pages → g4m1ng → Custom domains.
+For a custom domain, add it under Workers & Pages → coopqueue → Custom domains.
 Cloudflare charges nothing for the hosting; you just pay a registrar for the
 domain (~€10/year).
 

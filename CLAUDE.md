@@ -6,22 +6,26 @@ obvious from the code and the state the project is in.
 
 ## The name
 
-The product is **CoopQ**. Almost every `g4m1ng` left in this repo is deliberate
-and must not be "tidied up" — they are three different identifiers that happen to
-share the old name:
+The product is **CoopQ**, live at **<https://coopqueue.pages.dev>**. The Pages
+project is `coopqueue`; the old `g4m1ng` project has been deleted and that URL is
+gone. `coopq.pages.dev` was not available — `*.pages.dev` names are globally
+unique across all Cloudflare accounts, and `coopq` is taken by someone else.
 
-- the **Cloudflare Pages project** and the **D1 database**, both `g4m1ng`
-  (`wrangler.toml`, the `db:*` scripts). Pages projects cannot be renamed; doing
-  it means a new project, re-adding secrets and rebinding D1, and it kills
-  `g4m1ng.pages.dev`. Attach a custom domain instead and treat the `pages.dev`
-  host as an implementation detail.
+Every remaining `g4m1ng` in this repo is deliberate and must not be "tidied up".
+They are three unrelated identifiers that happen to share the old name:
+
+- the **D1 database**, still `g4m1ng` (`wrangler.toml`, `crawler/wrangler.toml`,
+  the `db:*` scripts). D1 has no rename, and the name is cosmetic — bindings
+  resolve by `database_id`. Renaming would mean creating a database and migrating
+  every row for no gain.
 - the **session cookie** `g4_session` (`lib/auth.js`). Renaming it signs everyone
   out for no benefit.
 - **group 1's slug and name**, which is genuinely what those four friends call
   themselves — nothing to do with the product name.
 
-Only branding was renamed: page title, the two `.brand` elements, the Steam
-user-agent, `package.json` name, README title.
+Deleting a Pages project does **not** touch D1: they are separate resources, and
+the row counts were identical either side of the deletion. A custom domain is
+still the right long-term answer; then the `pages.dev` host stops mattering.
 
 ## What this is
 
@@ -42,7 +46,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 28 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 33 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -51,6 +55,9 @@ npm run db:migrate -- --file=./migrations/001-coop-apps.sql   # apply one migrat
 npm run crawl:coop -- --pages 8 --out migrations/002-coop-seed.sql
 node scripts/seed-player-caps.mjs --from migrations/002-coop-seed.sql \
                                  --out migrations/003-player-caps.sql
+
+cd crawler && npx wrangler deploy      # the 15-min cron catalogue crawler
+cd crawler && npx wrangler tail        # watch cron runs live
 ```
 
 **`schema.sql` can never be applied to a live database** — it opens with
@@ -186,12 +193,20 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
 
 ## State
 
-**Live at <https://g4m1ng.pages.dev>** (Cloudflare account
-amadeus.magrabi@googlemail.com, D1 `g4m1ng` = `f16e7e1e-e2c3-463b-b1e4-158bc961de92`,
-committed into `wrangler.toml`). `SESSION_SECRET` and `STEAM_API_KEY` are set on
-the **production** environment only; the preview environment has neither, so a
-preview deploy boots with no session support. `ALLOWED_STEAM_IDS` is unset, so
-anyone can sign in and create their own groups.
+**Live at <https://coopqueue.pages.dev>** (Cloudflare account
+amadeus.magrabi@googlemail.com, Pages project `coopqueue`, D1 `g4m1ng` =
+`f16e7e1e-e2c3-463b-b1e4-158bc961de92`, committed into `wrangler.toml`).
+`SESSION_SECRET` and `STEAM_API_KEY` are set on the **production** environment
+only; the preview environment has neither, so a preview deploy boots with no
+session support. `ALLOWED_STEAM_IDS` is unset, so anyone can sign in and create
+their own groups.
+
+A second Worker, **`coopq-crawler`** (`crawler/`), binds the same D1 and keeps the
+catalogue fresh on a 15-minute Cron Trigger. It is a Worker and not a Pages
+Function because **Pages Functions cannot carry Cron Triggers**. Registering any
+cron also requires the account to have a workers.dev subdomain, which is created
+by opening the Workers page in the dashboard once — until that happens the script
+uploads but the schedule is rejected with error 10063.
 
 Group 1 `g4m1ng` holds 114 games (92 seeded + 22 recommendations) and 232
 ratings. **Ama is claimed** by SteamID64 `76561198049961191` (owner, 77 ratings
@@ -270,6 +285,21 @@ Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/
 UI (**done**) → crawl cron → Steam playtime/achievements → recent-releases button
 → comments. Note the Steam stats step depends on every member setting Steam
 privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
+
+## Backups and data safety
+
+- **Deploying never touches data.** `wrangler pages deploy` and
+  `wrangler deploy` ship code only. The row counts were identical either side of
+  deleting an entire Pages project.
+- **The one real danger is `schema.sql`**, which opens with `DROP TABLE`.
+  `npm run db:init` against production wipes everything. Use `migrations/`.
+- **D1 Time Travel** gives point-in-time restore for the last 30 days, on the
+  free plan, with nothing to configure:
+  `wrangler d1 time-travel info g4m1ng` prints the current bookmark, and
+  `wrangler d1 time-travel restore g4m1ng --timestamp=<ISO>` rewinds. This is the
+  real safety net, and it covers the wipe case above.
+- **`npm run db:backup`** writes a full `.sql` dump locally, also free. Worth
+  doing before any migration, since Time Travel cannot outlive its 30-day window.
 
 ## Next up, roughly in value order
 

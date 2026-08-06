@@ -1,4 +1,5 @@
 import { json, bad, body } from '../../../lib/http.js';
+import { applySeedAssignment } from '../../../lib/groups.js';
 
 /** Join a group with an invite code. Idempotent: re-joining is a no-op. */
 export async function onRequestPost({ request, env, data }) {
@@ -27,5 +28,15 @@ export async function onRequestPost({ request, env, data }) {
     ).bind(group.id, data.user.steam_id, (data.user.display_name || 'Player').slice(0, 16)).run();
   }
 
-  return json({ ok: true, slug: group.slug, name: group.name, alreadyMember: !!already });
+  // Strictly after the membership insert: repointing ratings onto an account with
+  // no membership row trips D1's foreign keys. A no-op unless the owner
+  // pre-assigned this SteamID64 an identity, in which case the person skips the
+  // "which one are you?" prompt entirely.
+  const claimed = await applySeedAssignment(env.DB, group.id, data.user.steam_id);
+
+  return json({
+    ok: true, slug: group.slug, name: group.name,
+    alreadyMember: !!already,
+    claimedAs: claimed || null,
+  });
 }

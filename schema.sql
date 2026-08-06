@@ -5,6 +5,7 @@
 -- row in users (keyed by their SteamID64) and can belong to any number of
 -- groups; their display name and role are per-group, held on memberships.
 
+DROP TABLE IF EXISTS seed_assignments;
 DROP TABLE IF EXISTS skips;
 DROP TABLE IF EXISTS ratings;
 DROP TABLE IF EXISTS games;
@@ -132,6 +133,20 @@ CREATE TABLE ratings (
   comment    TEXT,
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
+);
+
+-- Pre-assigned identities: an owner can decide in advance that a SteamID64 is
+-- "Leo", so that friend signs in and lands as Leo without seeing the claim
+-- prompt. Keyed on SteamID64 because persona names are mutable and not unique,
+-- and a vanity URL only exists if the person set one. Mirrors
+-- migrations/005-seed-assignments.sql.
+CREATE TABLE seed_assignments (
+  group_id      INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  steam_id      TEXT    NOT NULL,
+  seed_steam_id TEXT    NOT NULL,
+  note          TEXT,
+  created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (group_id, steam_id)
 );
 
 -- "I looked at it and have no opinion" — keeps the queue from re-showing it.

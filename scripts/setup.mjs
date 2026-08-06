@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOML = path.join(ROOT, 'wrangler.toml');
-const PROJECT = 'g4m1ng';
+const PROJECT = 'coopqueue';
 const DB_NAME = 'g4m1ng';
 const BRANCH = 'main';
 

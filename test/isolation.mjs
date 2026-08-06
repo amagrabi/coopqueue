@@ -276,6 +276,75 @@ await check('a pooled game lands only in the pooling group', async () => {
   return (mine.length === 1 && foreign.length === 0) || `mine:${mine.length} foreign:${foreign.length}`;
 });
 
+console.log('\nPre-assigned identities');
+
+const { applySeedAssignment } = await import(path.join(SITE, 'lib/groups.js'));
+const claimRoute = await import(path.join(SITE, 'functions/api/g/[slug]/claim.js'));
+
+const LEO_REAL = '76561198000000777';
+const NOBODY   = '76561198000000888';
+sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${LEO_REAL}','Leo IRL'),('${NOBODY}','Nobody')`);
+
+await check('a pre-assigned SteamID64 is auto-claimed on joining', async () => {
+  const before = sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
+      WHERE g.group_id=1 AND r.steam_id='seed:1:leo'`).get().n;
+  if (!before) return 'fixture: seed:1:leo has no ratings to move';
+
+  sqlite.exec(`INSERT INTO seed_assignments (group_id, steam_id, seed_steam_id)
+               VALUES (1,'${LEO_REAL}','seed:1:leo')`);
+  // The membership must exist first — repointing onto a non-member trips the FK.
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (1,'${LEO_REAL}','Leo IRL','member')`);
+
+  const name = await applySeedAssignment(DB, 1, LEO_REAL);
+  if (name !== 'Leo') return `expected 'Leo', got ${JSON.stringify(name)}`;
+
+  const after = sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
+      WHERE g.group_id=1 AND r.steam_id=?`).get(LEO_REAL).n;
+  const placeholderGone = !sqlite.prepare(
+    `SELECT 1 FROM memberships WHERE group_id=1 AND steam_id='seed:1:leo'`).get();
+  return (after === before && placeholderGone)
+    || `moved ${after}/${before}, placeholder gone: ${placeholderGone}`;
+});
+
+await check('applying the same assignment twice is a harmless no-op', async () => {
+  const again = await applySeedAssignment(DB, 1, LEO_REAL);
+  return again === null || `re-claimed as ${again}`;
+});
+
+await check('an assignment in one group never fires in another', async () => {
+  // Mallory's group has its own membership for this person but no assignment.
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (2,'${LEO_REAL}','Leo IRL','member')`);
+  const leaked = await applySeedAssignment(DB, 2, LEO_REAL);
+  return leaked === null || `CROSS-GROUP ASSIGNMENT FIRED: ${leaked}`;
+});
+
+await check('someone with no assignment is left to the claim screen', async () => {
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (1,'${NOBODY}','Nobody','member')`);
+  const auto = await applySeedAssignment(DB, 1, NOBODY);
+  if (auto !== null) return `auto-claimed ${auto} without an assignment`;
+  const { data } = await ctxFor(NOBODY, 'g4m1ng');
+  const body = await (await claimRoute.onRequestGet({ env, data })).json();
+  return (body.canClaim && body.unclaimed.length > 0)
+    || `canClaim=${body.canClaim} unclaimed=${body.unclaimed.length}`;
+});
+
+await check('auto-claim refuses to merge an existing rating history', async () => {
+  const game = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get().id;
+  sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (${game},'${NOBODY}',7)`);
+  sqlite.exec(`INSERT INTO seed_assignments (group_id, steam_id, seed_steam_id)
+               VALUES (1,'${NOBODY}','seed:1:pat')`);
+  const merged = await applySeedAssignment(DB, 1, NOBODY);
+  const patIntact = sqlite.prepare(
+    `SELECT 1 FROM memberships WHERE group_id=1 AND steam_id='seed:1:pat'`).get();
+  return (merged === null && !!patIntact)
+    || `merged=${JSON.stringify(merged)} patIntact=${!!patIntact}`;
+});
+
 console.log('\nScoring & viability');
 const { viability } = await import(path.join(SITE, 'lib/score.js'));
 

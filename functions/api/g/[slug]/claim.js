@@ -1,4 +1,5 @@
 import { json, bad, body } from '../../../../lib/http.js';
+import { applySeedAssignment, claimSeedIdentity } from '../../../../lib/groups.js';
 
 /**
  * Take over a placeholder member: move every rating and skip from
@@ -11,44 +12,29 @@ export async function onRequestPost({ request, env, data }) {
 
   if (!/^seed:\d+:[a-z0-9_-]+$/i.test(seedId || '')) return bad('bad seed id');
 
-  const seed = await env.DB.prepare(
-    'SELECT steam_id, short_name, role FROM memberships WHERE group_id = ? AND steam_id = ? AND is_seed = 1'
-  ).bind(gid, seedId).first();
-  if (!seed) return bad('that identity has already been claimed', 409);
-
-  const mine = await env.DB.prepare(
+  // The repoint itself lives in lib/groups.js because the pre-assignment path
+  // performs exactly the same steps, and the order is foreign-key sensitive.
+  const already = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id = r.game_id
       WHERE g.group_id = ? AND r.steam_id = ?`
   ).bind(gid, data.user.steam_id).first();
-  if ((mine?.n ?? 0) > 0) {
+  if ((already?.n ?? 0) > 0) {
     return bad('you already have ratings in this group — claiming would merge two histories', 409);
   }
 
-  // The real membership row exists already (it is how the caller got in here),
-  // so the ratings can be repointed without tripping the foreign key.
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE ratings SET steam_id = ? WHERE steam_id = ?
-         AND game_id IN (SELECT id FROM games WHERE group_id = ?)`
-    ).bind(data.user.steam_id, seedId, gid),
-    env.DB.prepare(
-      `UPDATE skips SET steam_id = ? WHERE steam_id = ?
-         AND game_id IN (SELECT id FROM games WHERE group_id = ?)`
-    ).bind(data.user.steam_id, seedId, gid),
-    env.DB.prepare('UPDATE games SET added_by = ? WHERE added_by = ? AND group_id = ?')
-      .bind(data.user.steam_id, seedId, gid),
-    env.DB.prepare('UPDATE memberships SET short_name = ?, role = ? WHERE group_id = ? AND steam_id = ?')
-      .bind(seed.short_name, seed.role, gid, data.user.steam_id),
-    env.DB.prepare('DELETE FROM memberships WHERE group_id = ? AND steam_id = ?').bind(gid, seedId),
-    // The placeholder user row is only ever used by this one group.
-    env.DB.prepare('DELETE FROM users WHERE steam_id = ?').bind(seedId),
-  ]);
+  const shortName = await claimSeedIdentity(env.DB, gid, data.user.steam_id, seedId);
+  if (!shortName) return bad('that identity has already been claimed', 409);
 
-  return json({ ok: true, shortName: seed.short_name });
+  return json({ ok: true, shortName });
 }
 
 /** Which placeholder identities are still unclaimed in this group. */
 export async function onRequestGet({ env, data }) {
+  // Idempotent, and a no-op unless this person was pre-assigned an identity that
+  // is still unclaimed. Doing it here means it also catches somebody who joined
+  // before the owner set the assignment up.
+  await applySeedAssignment(env.DB, data.group.group_id, data.user.steam_id);
+
   const mine = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id = r.game_id
       WHERE g.group_id = ? AND r.steam_id = ?`
