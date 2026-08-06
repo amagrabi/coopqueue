@@ -219,6 +219,44 @@ const server = http.createServer(async (req, res) => {
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
+    if (sub.startsWith('/comments')) {
+      const inGroup = (id) => one('SELECT id FROM games WHERE id=? AND group_id=?', id, gid);
+      if (req.method === 'GET') {
+        const id = Number(url.searchParams.get('gameId'));
+        if (!inGroup(id)) return send(res, 404, { error: 'no such game' });
+        const rows = q(`SELECT c.id, c.steam_id, c.body, c.created_at, m.short_name, u.avatar
+                          FROM comments c
+                          LEFT JOIN memberships m ON m.group_id=c.group_id AND m.steam_id=c.steam_id
+                          LEFT JOIN users u ON u.steam_id=c.steam_id
+                         WHERE c.game_id=? AND c.group_id=? ORDER BY c.created_at, c.id`, id, gid);
+        return send(res, 200, {
+          comments: rows.map((c) => ({
+            id: c.id, steamId: c.steam_id, name: c.short_name || 'Someone who left',
+            avatar: c.avatar, body: c.body, createdAt: c.created_at, mine: c.steam_id === ME,
+          })),
+        });
+      }
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        if (!inGroup(Number(b.gameId))) return send(res, 404, { error: 'no such game' });
+        const text = String(b.body || '').trim();
+        if (!text) return send(res, 400, { error: 'write something first' });
+        db.prepare('INSERT INTO comments (group_id, game_id, steam_id, body) VALUES (?,?,?,?)')
+          .run(gid, Number(b.gameId), ME, text);
+        return send(res, 201, { ok: true });
+      }
+      if (req.method === 'DELETE') {
+        const b = await readBody(req);
+        const row = one('SELECT steam_id FROM comments WHERE id=? AND group_id=?', Number(b.id), gid);
+        if (!row) return send(res, 404, { error: 'no such comment' });
+        if (row.steam_id !== ME && ctx.role !== 'owner') {
+          return send(res, 403, { error: 'you can only delete your own comments' });
+        }
+        db.prepare('DELETE FROM comments WHERE id=? AND group_id=?').run(Number(b.id), gid);
+        return send(res, 200, { ok: true });
+      }
+    }
+
     const gm2 = sub.match(/^\/games\/(\d+)$/);
     if (gm2 && req.method === 'DELETE') {
       const id = Number(gm2[1]);

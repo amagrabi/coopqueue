@@ -45,7 +45,8 @@ sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALU
 const DB = makeDB(sqlite);
 const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
-const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute] = await Promise.all([
+const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
+       commentsRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -54,6 +55,7 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/groups/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/members.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/group.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/comments.js')),
 ]);
 
 const user = (id) => sqlite.prepare('SELECT * FROM users WHERE steam_id=?').get(id);
@@ -378,6 +380,107 @@ await check('auto-claim refuses to merge an existing rating history', async () =
     `SELECT 1 FROM memberships WHERE group_id=1 AND steam_id='seed:1:pat'`).get();
   return (merged === null && !!patIntact)
     || `merged=${JSON.stringify(merged)} patIntact=${!!patIntact}`;
+});
+
+console.log('\nComments');
+
+const getReq = (url) => new Request(url);
+const delReq = (b) => new Request('https://x/', { method: 'DELETE', body: JSON.stringify(b) });
+
+await check('a member can post a comment on their own group\'s game', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const r = await commentsRoute.onRequestPost({
+    request: req({ gameId: g.id, body: 'worth a Wednesday' }), env, data });
+  if (r.status !== 201) return `expected 201, got ${r.status}`;
+  const row = sqlite.prepare('SELECT group_id, steam_id, body FROM comments WHERE game_id=?').get(g.id);
+  return (row && row.group_id === 1 && row.steam_id === ALICE)
+    || `row ${JSON.stringify(row)}`;
+});
+
+await check('CANNOT comment on another group\'s game by guessing its id', async () => {
+  // Game 5000 belongs to Mallory's group. Alice is a legitimate member of hers.
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await commentsRoute.onRequestPost({
+    request: req({ gameId: 5000, body: 'pwned' }), env, data });
+  const leaked = sqlite.prepare('SELECT COUNT(*) AS n FROM comments WHERE game_id=5000').get().n;
+  return (r.status === 404 && leaked === 0) || `status ${r.status}, rows ${leaked}`;
+});
+
+await check('CANNOT read another group\'s comment thread', async () => {
+  // Seed a comment on Mallory's game directly, then have Alice ask for it.
+  sqlite.exec(`INSERT INTO comments (group_id, game_id, steam_id, body)
+               VALUES (2, 5000, '${MALLORY}', 'mallory secret plan')`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await commentsRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/comments?gameId=5000'), env, data });
+  if (r.status !== 404) return `expected 404, got ${r.status}`;
+  const text = await r.text();
+  return !text.includes('mallory secret plan') || 'LEAKED another group\'s comment';
+});
+
+await check('the thread returns only this group\'s comments', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const body = await (await commentsRoute.onRequestGet({
+    request: getReq(`https://x/api/g/g4m1ng/comments?gameId=${g.id}`), env, data })).json();
+  const foreign = body.comments.filter((c) => c.body === 'mallory secret plan');
+  return foreign.length === 0 || 'foreign comment appeared in the thread';
+});
+
+await check('you can delete your own comment', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const c = sqlite.prepare(`SELECT id FROM comments WHERE group_id=1 AND steam_id='${ALICE}'`).get();
+  const r = await commentsRoute.onRequestDelete({ request: delReq({ id: c.id }), env, data });
+  const gone = !sqlite.prepare('SELECT 1 FROM comments WHERE id=?').get(c.id);
+  return (r.status === 200 && gone) || `status ${r.status}, gone ${gone}`;
+});
+
+await check('a plain member cannot delete someone else\'s comment', async () => {
+  // Mallory is a plain member of group 1 (she joined with the invite code above).
+  sqlite.exec(`INSERT INTO comments (group_id, game_id, steam_id, body)
+               SELECT 1, id, '${ALICE}', 'alice says hi' FROM games WHERE group_id=1 LIMIT 1`);
+  const c = sqlite.prepare(`SELECT id FROM comments WHERE body='alice says hi'`).get();
+  const { data } = await ctxFor(MALLORY, 'g4m1ng');
+  const r = await commentsRoute.onRequestDelete({ request: delReq({ id: c.id }), env, data });
+  const still = !!sqlite.prepare('SELECT 1 FROM comments WHERE id=?').get(c.id);
+  return (r.status === 403 && still) || `status ${r.status}, still ${still}`;
+});
+
+await check('the owner can delete anyone\'s comment', async () => {
+  const c = sqlite.prepare(`SELECT id FROM comments WHERE body='alice says hi'`).get();
+  const { data } = await ctxFor(ALICE, 'g4m1ng');   // Alice owns group 1
+  const r = await commentsRoute.onRequestDelete({ request: delReq({ id: c.id }), env, data });
+  return r.status === 200 || `status ${r.status}`;
+});
+
+await check('CANNOT delete a comment in another group', async () => {
+  const c = sqlite.prepare(`SELECT id FROM comments WHERE body='mallory secret plan'`).get();
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await commentsRoute.onRequestDelete({ request: delReq({ id: c.id }), env, data });
+  const still = !!sqlite.prepare('SELECT 1 FROM comments WHERE id=?').get(c.id);
+  return (r.status === 404 && still) || `status ${r.status}, still ${still}`;
+});
+
+await check('an empty comment is refused', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const r = await commentsRoute.onRequestPost({ request: req({ gameId: g.id, body: '   ' }), env, data });
+  return r.status === 400 || `expected 400, got ${r.status}`;
+});
+
+await check('comments go with the game when the group is deleted', async () => {
+  // Cascade check: group -> games -> comments, plus the direct group_id FK.
+  const n = sqlite.prepare('SELECT COUNT(*) AS n FROM comments WHERE group_id=2').get().n;
+  if (!n) return 'fixture: group 2 has no comments to cascade';
+  sqlite.exec('DELETE FROM groups WHERE id=2');
+  const left = sqlite.prepare('SELECT COUNT(*) AS n FROM comments WHERE group_id=2').get().n;
+  sqlite.exec(`INSERT INTO groups (id, slug, name, invite_code, max_players)
+               VALUES (2,'mallorys','Mallorys Crew','MALLORY123',4)`);
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (2,'${MALLORY}','Mallory','owner')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, status) VALUES (5000,2,'Mallory Secret','backlog')`);
+  return left === 0 || `${left} comments survived the group deletion`;
 });
 
 console.log('\nArchiving');

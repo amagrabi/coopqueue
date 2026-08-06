@@ -72,6 +72,16 @@ function toast(msg) {
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
+/** Rough relative time. Comment threads read better in "2 days ago" than dates. */
+const when = (epoch) => {
+  const secs = Math.max(0, Math.floor(Date.now() / 1000) - Number(epoch || 0));
+  const steps = [[60, 'just now'], [3600, 'm'], [86400, 'h'], [604800, 'd']];
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  if (secs < 2592000) return `${Math.floor(secs / 86400)}d ago`;
+  return new Date(Number(epoch) * 1000).toLocaleDateString();
+};
 /** 1029444 -> "1.0M". Steam review counts run to seven figures. */
 const compact = (n) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : String(n);
@@ -1348,10 +1358,11 @@ function openDetail(id) {
           <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
         </div>
       </div>
+      ${g.notes ? `
       <div class="detail-field">
-        <label for="d-notes">Notes</label>
-        <input id="d-notes" class="input" value="${esc(g.notes || '')}" placeholder="anything the others should know">
-      </div>
+        <label>Note from the spreadsheet</label>
+        <p class="imported-note">${esc(g.notes)}</p>
+      </div>` : ''}
       ${g.steam_appid ? '' : `
         <div class="detail-field">
           <label for="d-link">Link to Steam (paste a store URL or appid)</label>
@@ -1360,6 +1371,19 @@ function openDetail(id) {
             <button class="btn" id="d-linkbtn">Link</button>
           </div>
         </div>`}
+
+      <section class="thread">
+        <h4 class="thread-title">Comments</h4>
+        <div id="d-comments" class="thread-list">
+          <p class="panel-sub" style="margin:0">Loading…</p>
+        </div>
+        <div class="thread-new">
+          <textarea id="d-comment" class="input" rows="2" maxlength="2000"
+                    placeholder="Worth playing? Anything the others should know?"></textarea>
+          <button class="btn btn-primary" id="d-comment-add">Post</button>
+        </div>
+        <p id="d-comment-status" class="add-status"></p>
+      </section>
 
       <div class="detail-actions">
         <button class="btn btn-primary" id="d-save">Save changes</button>
@@ -1378,7 +1402,6 @@ function openDetail(id) {
         max_players: $('#d-players').value === '' ? null : Number($('#d-players').value),
         genre: $('#d-genre').value.trim() || null,
         hours: $('#d-hours').value === '' ? null : Number($('#d-hours').value),
-        notes: $('#d-notes').value.trim() || null,
       }});
       await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Saved');
     } catch (e) { toast(e.message); }
@@ -1423,7 +1446,61 @@ function openDetail(id) {
     });
   }
 
+  loadComments(id);
+  $('#d-comment-add').addEventListener('click', () => postComment(id));
+  // Cmd/Ctrl+Enter posts, so a keyboard-driven queue stays keyboard-driven.
+  $('#d-comment').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postComment(id); }
+  });
+
   $('#detail-dialog').showModal();
+}
+
+/** Fetched per game rather than bundled into the library payload — see the route. */
+async function loadComments(gameId) {
+  const box = $('#d-comments');
+  try {
+    const { comments } = await gapi(`/comments?gameId=${gameId}`);
+    box.innerHTML = comments.length
+      ? comments.map((c) => `
+        <article class="comment">
+          <div class="comment-head">
+            <i class="dot" style="background:${colorOf(c.steamId)}"></i>
+            <strong>${esc(c.name)}</strong>
+            <time>${when(c.createdAt)}</time>
+            ${c.mine || state.group.role === 'owner'
+              ? `<button class="btn-x" data-del-comment="${c.id}" title="Delete">✕</button>` : ''}
+          </div>
+          <p>${esc(c.body)}</p>
+        </article>`).join('')
+      : '<p class="panel-sub" style="margin:0">No comments yet. Say something.</p>';
+
+    $$('#d-comments [data-del-comment]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('Delete this comment?')) return;
+      try {
+        await gapi('/comments', { method: 'DELETE', body: { id: Number(b.dataset.delComment) } });
+        loadComments(gameId);
+      } catch (e) { toast(e.message); }
+    }));
+  } catch (e) {
+    box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+  }
+}
+
+async function postComment(gameId) {
+  const el = $('#d-comment');
+  const text = el.value.trim();
+  if (!text) { $('#d-comment-status').textContent = 'Write something first.'; return; }
+  const btn = $('#d-comment-add');
+  btn.disabled = true;
+  try {
+    await gapi('/comments', { method: 'POST', body: { gameId, body: text } });
+    el.value = '';
+    $('#d-comment-status').textContent = '';
+    await loadComments(gameId);
+  } catch (e) {
+    $('#d-comment-status').textContent = e.message;
+  } finally { btn.disabled = false; }
 }
 
 boot();

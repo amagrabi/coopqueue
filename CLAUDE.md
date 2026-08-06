@@ -364,6 +364,24 @@ privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
    spreadsheet it ranged from 89% to 27% per person.
 5. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
+## Comments
+
+One thread per game, in `comments`. It replaced the single `notes` textarea, which
+was one shared line whoever edited last overwrote. `games.notes` is **kept and
+still shown read-only** as "Note from the spreadsheet": it holds imported text
+nobody here wrote and nobody should be credited with.
+
+`comments.group_id` is denormalised even though `game_id` implies it, so the
+invariant-2 filter is a single-table predicate rather than a join somebody
+eventually forgets. Deleting is yours-or-owner. The thread is fetched per game
+rather than bundled into the library payload, which is loaded once and filtered
+client-side — shipping every comment for every game would grow that for a thread
+almost nobody has open.
+
+Ten assertions cover it, four of them the attacks that matter: commenting on,
+reading, and deleting another group's thread by guessing a game id, and that the
+thread never returns a foreign row.
+
 ## Archiving, not deleting
 
 Removing a game sets `games.archived_at` instead of deleting the row. Any member

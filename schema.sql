@@ -5,6 +5,7 @@
 -- row in users (keyed by their SteamID64) and can belong to any number of
 -- groups; their display name and role are per-group, held on memberships.
 
+DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS seed_assignments;
 DROP TABLE IF EXISTS skips;
 DROP TABLE IF EXISTS ratings;
@@ -150,6 +151,21 @@ CREATE TABLE ratings (
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
 );
+
+-- One comment thread per game. group_id is denormalised on purpose: invariant 2
+-- wants every statement below the tenancy boundary to filter on group_id, and a
+-- column beats a join somebody will forget. Mirrors migrations/010-comments.sql.
+CREATE TABLE comments (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  game_id    INTEGER NOT NULL REFERENCES games(id)  ON DELETE CASCADE,
+  steam_id   TEXT    NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+  body       TEXT    NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX idx_comments_game  ON comments(game_id, created_at);
+CREATE INDEX idx_comments_group ON comments(group_id);
 
 -- Pre-assigned identities: an owner can decide in advance that a SteamID64 is
 -- "Leo", so that friend signs in and lands as Leo without seeing the claim
