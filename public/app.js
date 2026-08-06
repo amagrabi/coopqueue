@@ -81,16 +81,26 @@ function detachTrailer(video) {
 /** Attach `url` to `video`; false means this browser cannot play it at all. */
 function attachTrailer(video, url) {
   detachTrailer(video);
-  if (!/\.m3u8(\?|$)/i.test(url) || video.canPlayType('application/vnd.apple.mpegurl')) {
+  if (!/\.m3u8(\?|$)/i.test(url)) {           // a progressive file needs no help
     video.src = url;
     return true;
   }
+  // hls.js is tried BEFORE native playback, and the order matters. Chromium
+  // answers canPlayType('application/vnd.apple.mpegurl') with "maybe" — truthy —
+  // while being unable to play HLS at all, so native support cannot be trusted
+  // wherever MSE exists. iOS Safari is the mirror image: no MSE for hls.js to
+  // use, but genuine native HLS. Trusting canPlayType first silently produces a
+  // video that never starts in exactly the browsers this group uses.
   if (window.Hls?.isSupported()) {
     // A rating card is a glance, not a sitting — a short buffer keeps the queue
     // snappy and avoids pulling megabytes for a game about to be skipped.
     hls = new window.Hls({ maxBufferLength: 12, maxMaxBufferLength: 30 });
     hls.loadSource(url);
     hls.attachMedia(video);
+    return true;
+  }
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
     return true;
   }
   return false;
