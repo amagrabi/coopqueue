@@ -70,6 +70,15 @@ db.exec(`UPDATE games SET steam_appid = 105600
                        ORDER BY CASE status WHEN 'backlog' THEN 0 ELSE 1 END,
                                 name COLLATE NOCASE LIMIT 1)`);
 
+// A couple of collectively-shrugged-at games, so the "nobody has an opinion"
+// panel has something to show locally.
+db.exec(`INSERT OR IGNORE INTO skips (game_id, steam_id)
+         SELECT id, 'seed:1:leo' FROM games WHERE group_id=1
+          AND id NOT IN (SELECT game_id FROM ratings) LIMIT 3`);
+db.exec(`INSERT OR IGNORE INTO skips (game_id, steam_id)
+         SELECT id, 'seed:1:pat' FROM games WHERE group_id=1
+          AND id NOT IN (SELECT game_id FROM ratings) LIMIT 3`);
+
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -333,6 +342,74 @@ const server = http.createServer(async (req, res) => {
             min: mine.length ? Math.min(...mine.map((m) => m.score)) : null,
             max: mine.length ? Math.max(...mine.map((m) => m.score)) : null };
         }),
+        ...(() => {
+          // Mirrors the real handler's extra statistics closely enough to render.
+          const MIN_OVERLAP = 5, MIN_GENRE = 3;
+          const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
+          const scoreOf = new Map();
+          for (const r of L.ratings) scoreOf.set(`${r.game_id}:${r.steam_id}`, r.score);
+          const pairs = [];
+          for (let i = 0; i < L.members.length; i++) for (let j = i + 1; j < L.members.length; j++) {
+            const a = L.members[i], b = L.members[j];
+            let n = 0, sum = 0;
+            for (const g of L.games) {
+              const x = scoreOf.get(`${g.id}:${a.steam_id}`), y = scoreOf.get(`${g.id}:${b.steam_id}`);
+              if (x == null || y == null) continue;
+              n++; sum += Math.abs(x - y);
+            }
+            if (n >= MIN_OVERLAP) pairs.push({ a: a.short_name, b: b.short_name, n, gap: r2(sum / n) });
+          }
+          pairs.sort((x, y) => x.gap - y.gap);
+          const contrarian = L.members.map((u) => {
+            let n = 0, sum = 0;
+            for (const g of L.games) {
+              const mine = scoreOf.get(`${g.id}:${u.steam_id}`);
+              if (mine == null) continue;
+              const others = (L.byGame.get(g.id) || []).filter((v) => v.steam_id !== u.steam_id);
+              if (others.length < 2) continue;
+              const avg = others.reduce((a, v) => a + v.score, 0) / others.length;
+              n++; sum += Math.abs(mine - avg);
+            }
+            return { name: u.short_name, n, gap: n ? r2(sum / n) : null };
+          }).filter((x) => x.n >= MIN_OVERLAP).sort((a, b) => b.gap - a.gap);
+          const offbeat = [];
+          for (const u of L.members) {
+            const byGenre = new Map();
+            for (const g of L.games) {
+              if (!g.genre) continue;
+              const mine = scoreOf.get(`${g.id}:${u.steam_id}`);
+              if (mine == null) continue;
+              const others = (L.byGame.get(g.id) || []).filter((v) => v.steam_id !== u.steam_id);
+              if (!others.length) continue;
+              const avg = others.reduce((a, v) => a + v.score, 0) / others.length;
+              if (!byGenre.has(g.genre)) byGenre.set(g.genre, []);
+              byGenre.get(g.genre).push(mine - avg);
+            }
+            let worst = null;
+            for (const [genre, diffs] of byGenre) {
+              if (diffs.length < MIN_GENRE) continue;
+              const d = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+              if (!worst || Math.abs(d) > Math.abs(worst.diff)) worst = { genre, diff: r2(d), n: diffs.length };
+            }
+            if (worst) offbeat.push({ name: u.short_name, ...worst });
+          }
+          offbeat.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+          const skipCount = new Map();
+          for (const sk of q(`SELECT s.game_id FROM skips s JOIN games g ON g.id=s.game_id
+                               WHERE g.group_id=? AND g.archived_at IS NULL`, gid)) {
+            skipCount.set(sk.game_id, (skipCount.get(sk.game_id) || 0) + 1);
+          }
+          const shrugged = L.games
+            .map((g) => ({ id: g.id, name: g.name, skips: skipCount.get(g.id) || 0,
+                           votes: (L.byGame.get(g.id) || []).length }))
+            .filter((g) => g.skips >= 2 && g.votes === 0)
+            .sort((a, b) => b.skips - a.skips).slice(0, 8);
+          return {
+            pairs, contrarian, offbeat, shrugged,
+            tasteTwins: pairs[0] || null,
+            tasteOpposites: pairs.length > 1 ? pairs[pairs.length - 1] : null,
+          };
+        })(),
         genres: [...gmap.entries()].map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) })).sort((a, b) => b.avg - a.avg),
         arguments: played.filter((g) => g.n >= 3 && g.spread >= 2).sort((a, b) => b.spread - a.spread).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, spread: g.spread, votes: g.votes })),

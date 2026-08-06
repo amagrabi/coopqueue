@@ -861,6 +861,54 @@ async function renderStats() {
     : '<p class="panel-sub">Nothing to argue about yet — you need three people to rate the same finished game.</p>';
 
   $('#top-chart').innerHTML = barChart(s.topRated.map((g) => ({ label: g.name, value: g.raw })), 10);
+
+  /* ── who agrees with whom ───────────────────────────────────────────────── */
+  // Lower gap = more alike, so the bar is inverted: a long bar means agreement,
+  // which is the way round people expect to read it.
+  const maxGap = Math.max(1, ...s.pairs.map((p) => p.gap));
+  $('#pairs-chart').innerHTML = s.pairs.length
+    ? s.pairs.map((p) => `
+      <div class="bar-row">
+        <div class="bar-label">${esc(p.a)} &amp; ${esc(p.b)} <span class="bar-sub">${p.n}</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${Math.round((1 - p.gap / (maxGap * 1.15)) * 100)}%"></div>
+        </div>
+        <div class="c-num">${fmt(p.gap, 2)}</div>
+      </div>`).join('')
+    : '<p class="panel-sub" style="margin:0">Not enough overlap yet — five games rated by the same two people.</p>';
+
+  $('#twins-summary').innerHTML = [
+    s.tasteTwins ? `<div class="callout-stat"><span>Closest taste</span>
+      <strong>${esc(s.tasteTwins.a)} &amp; ${esc(s.tasteTwins.b)}</strong>
+      <span>${fmt(s.tasteTwins.gap, 2)} apart on average</span></div>` : '',
+    s.tasteOpposites ? `<div class="callout-stat"><span>Never let these two pick</span>
+      <strong>${esc(s.tasteOpposites.a)} &amp; ${esc(s.tasteOpposites.b)}</strong>
+      <span>${fmt(s.tasteOpposites.gap, 2)} apart on average</span></div>` : '',
+  ].join('');
+
+  /* ── who is out on a limb ───────────────────────────────────────────────── */
+  $('#contrarian-chart').innerHTML = s.contrarian.length
+    ? barChart(s.contrarian.map((c) => ({ label: c.name, value: c.gap })),
+               Math.max(1, ...s.contrarian.map((c) => c.gap)))
+    : '<p class="panel-sub" style="margin:0">Needs a few games where two others also voted.</p>';
+
+  $('#offbeat-list').innerHTML = s.offbeat.map((o) => `
+    <div class="callout-stat">
+      <span>${esc(o.name)} on ${esc(o.genre)}</span>
+      <strong>${o.diff > 0 ? '+' : ''}${fmt(o.diff, 1)}</strong>
+      <span>vs the others, over ${o.n} game${o.n === 1 ? '' : 's'}</span>
+    </div>`).join('');
+
+  /* ── nobody has an opinion ──────────────────────────────────────────────── */
+  $('#shrugged-list').innerHTML = s.shrugged.length
+    ? s.shrugged.map((g) => `
+        <button class="shrug" data-id="${g.id}">
+          <span>${esc(g.name)}</span>
+          <span class="chip">${g.skips} skipped it</span>
+        </button>`).join('')
+    : '<p class="panel-sub" style="margin:0">Nothing has been collectively shrugged at. Good sign.</p>';
+  $$('#shrugged-list .shrug').forEach((b) =>
+    b.addEventListener('click', () => openDetail(Number(b.dataset.id))));
   $('#hours-chart').innerHTML = barChart(
     s.mostHours.map((g) => ({ label: g.name, value: g.hours })),
     Math.max(...s.mostHours.map((g) => g.hours), 1), () => '', 0);
