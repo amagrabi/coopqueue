@@ -14,7 +14,8 @@
     "db:backup": "wrangler d1 export g4m1ng --remote --output=backup.sql",
     "db:migrate": "wrangler d1 execute g4m1ng --remote --yes",
     "crawl:coop": "node scripts/crawl-coop.mjs",
-    "deploy": "wrangler pages deploy",
+    "deploy": "wrangler pages deploy --branch main",
+    "deploy:preview": "wrangler pages deploy",
     "test": "node test/isolation.mjs",
     "test:ui": "node test/shots.mjs"
   },

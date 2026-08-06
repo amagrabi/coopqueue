@@ -50,7 +50,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 93 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 94 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -327,7 +327,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-93/93 assertions pass. `npm run test:ui` does **not** run on macOS: it
+94/94 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -515,9 +515,27 @@ data behind an endpoint with no tenancy check at all. Both routes select
 do not change when you switch sort order.
 
 How it ranks: per-tag preference is the group's mean score for library games
-carrying that tag minus the group's overall mean, shrunk by `n/(n+3)`. Tags seen
-fewer than twice are dropped, so one game cannot invent a taste. Below five rated
-games it does not pretend — it returns `basis: 'popularity'` and the UI says so.
+carrying that tag minus the group's overall mean, shrunk by `n/(n+3)`. Below five
+rated games it does not pretend — it returns `basis: 'popularity'` and the UI says
+so.
+
+**Two guards, both added because the first run against real data was bad.** With
+`TAG_MIN_GAMES = 2` and no stoplist, group 1's second-strongest "preference" came
+out as **Early Access** at +0.51 off three games, and it drove five of the top ten
+suggestions — a list of unreleased games nobody has heard of (Windrose, Species:
+Unknown, SpaceCraft). Two changes fixed it:
+
+- `NON_TASTE` drops tags describing how a game *ships* rather than how it plays:
+  Early Access, Free to Play and similar. Deliberately narrow — generic genre tags
+  like "Multiplayer" stay, because they sit on nearly every row and so contribute
+  almost equally to every candidate and cannot reorder anything.
+- `TAG_MIN_GAMES` is **3**. At 2, a coincidence reads as a taste.
+
+Afterwards the same group's top tags are Souls-like, Action RPG, Building and Open
+World (that last on 22 games), and the suggestions are recognisable: Stormworks,
+Stronghold Crusader, Nioh 3, ELDEN RING NIGHTREIGN. Check the output against real
+data after touching any of this — the tests cannot tell you the ranking is *useless*,
+only that it is self-consistent.
 The response carries `why` (the two tags that drove each card), `likes` and
 `dislikes`, and the UI shows all of them: a list labelled "recommended" that will
 not say why is asking for trust it has not earned.

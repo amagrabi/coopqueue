@@ -838,13 +838,16 @@ await check('a thin history is reported as popularity, not dressed up as taste',
 });
 
 await check('tags the group rates highly rank above tags it rates poorly', async () => {
+  // Three games per tag: TAG_MIN_GAMES is 3, because at 2 a coincidence reads as
+  // a taste — "Early Access" scored +0.51 off three games on real data.
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 },   // Survival: loved
-    { appid: 13, score: 3 }, { appid: 14, score: 3 },   // Racing: disliked
-    { appid: 15, score: 6 },
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },  // Survival: loved
+    { appid: 14, score: 3 }, { appid: 15, score: 3 }, { appid: 16, score: 3 },  // Racing: disliked
+    { appid: 17, score: 6 },
   ];
   const tagsFor = new Map([
-    [11, ['Survival']], [12, ['Survival']], [13, ['Racing']], [14, ['Racing']], [15, ['Puzzle']],
+    [11, ['Survival']], [12, ['Survival']], [13, ['Survival']],
+    [14, ['Racing']], [15, ['Racing']], [16, ['Racing']], [17, ['Puzzle']],
   ]);
   const out = recommend(
     [{ appid: 1, name: 'a racer', review_count: 5e5, tags: '["Racing"]' },
@@ -857,17 +860,43 @@ await check('tags the group rates highly rank above tags it rates poorly', async
     || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
 });
 
-await check('a tag seen once is ignored, so one game cannot define a taste', async () => {
+await check('a tag on fewer than three games cannot define a taste', async () => {
+  // Two games is a coincidence, not a preference — see TAG_MIN_GAMES.
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 5 }, { appid: 13, score: 5 },
-    { appid: 14, score: 5 }, { appid: 15, score: 5 },
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
+    { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 },
   ];
   const out = recommend(
     [{ appid: 1, tags: '["Roguelike"]' }],
     history,
-    new Map([[11, ['Roguelike']], [12, ['X']], [13, ['X']], [14, ['X']], [15, ['X']]]),
+    new Map([[11, ['Roguelike']], [12, ['Roguelike']],
+             [13, ['X']], [14, ['X']], [15, ['X']], [16, ['X']]]),
   );
-  return out.games[0].fit === null || `scored a one-game tag: ${out.games[0].fit}`;
+  return out.games[0].fit === null || `scored a two-game tag: ${out.games[0].fit}`;
+});
+
+await check('release state and price model are not tastes', async () => {
+  /* "Early Access" was group 1's second-strongest preference (+0.51 off three
+     games) and drove five of its top ten suggestions — a list of unreleased games
+     nobody has heard of. It describes how a game ships, not how it plays. */
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
+    { appid: 14, score: 4 }, { appid: 15, score: 4 }, { appid: 16, score: 4 },
+  ];
+  const tags = ['Early Access', 'Free to Play'];
+  const out = recommend(
+    [{ appid: 1, tags: JSON.stringify(tags) }],
+    history,
+    new Map([[11, tags], [12, tags], [13, tags],
+             [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']]]),
+  );
+  // "Puzzle" legitimately appears — it is a real tag on three rated games. The
+  // assertion is that the two shipping-state tags do not, and that a candidate
+  // carrying only those scores nothing at all.
+  const named = [...out.likes, ...out.dislikes].map((l) => l.tag);
+  const leaked = named.filter((t) => tags.includes(t));
+  return (out.games[0].fit === null && !leaked.length)
+    || `fit ${out.games[0].fit}, stoplisted tags surfaced: ${JSON.stringify(leaked)}`;
 });
 
 await check('the order never contradicts the fit it displays', async () => {
@@ -899,15 +928,16 @@ await check('the order never contradicts the fit it displays', async () => {
 
 await check('untasted candidates sort below every ranked one', async () => {
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
-    { appid: 14, score: 5 }, { appid: 15, score: 5 },
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
+    { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 },
   ];
   const out = recommend(
     // The unknown game is hugely more popular, and must still lose to a match.
     [{ appid: 1, review_count: 5e6, tags: '["Nothing We Have Played"]' },
      { appid: 2, review_count: 1, tags: '["Survival"]' }],
     history,
-    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Y']], [14, ['Y']], [15, ['Y']]]),
+    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Survival']],
+             [14, ['Y']], [15, ['Y']], [16, ['Y']]]),
   );
   return out.games[0].appid === 2 || `popularity beat a taste match: first ${out.games[0]?.appid}`;
 });
