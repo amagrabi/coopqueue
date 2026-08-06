@@ -37,17 +37,29 @@ They are three unrelated identifiers that happen to share the old name:
 The GitHub repository is **`amagrabi/coopqueue`** (private) and the local checkout is
 **`~/code/coopqueue`**, renamed from `~/code/g4m1ng` at the owner's request.
 
-That rename does break things, and the fix is one command. Git worktrees record
-absolute paths in both directions — the worktree's `.git` file points at
-`<main>/.git/worktrees/<name>`, and that directory's `gitdir` file points back — so
-after moving the checkout every worktree under `.claude/worktrees/` is detached until:
+That rename breaks the worktrees, and repairing them has one non-obvious step. Git
+records absolute paths in **both** directions — each worktree's `.git` file points at
+`<main>/.git/worktrees/<name>`, and that directory's `gitdir` file points back at the
+worktree — so after moving the checkout every worktree under `.claude/worktrees/`
+shows up as `prunable`.
+
+**Bare `git worktree repair` is not enough.** With no arguments it only fixes the main
+side; `git worktree list` still reports the old paths, still prunable. The moved
+worktrees have to be named explicitly:
 
 ```bash
-cd ~/code/coopqueue && git worktree repair
+cd ~/code/coopqueue
+git worktree repair .claude/worktrees/*        # the new paths, not bare `repair`
+git worktree list                              # verify: nothing says "prunable"
 ```
 
-Run it from the main checkout and it repairs every worktree at once. Nothing else in
-the repo hardcodes the path.
+Nothing else hardcodes the path — `git grep "code/g4m1ng"` finds only this note.
+
+One thing the rename does *not* carry over: Claude Code keys its per-project state
+(session transcripts, the memory directory) on the working-directory path, so anything
+from before the rename lives under `~/.claude/projects/-Users-amadeus-code-g4m1ng/`
+and a session started in the renamed directory will not see it. Nothing is lost, but
+nothing finds it automatically either.
 
 Deleting a Pages project does **not** touch D1: they are separate resources, and
 the row counts were identical either side of the deletion. A custom domain is
