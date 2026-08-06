@@ -210,6 +210,19 @@ const server = http.createServer(async (req, res) => {
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
+    if (sub === '/group' && req.method === 'DELETE') {
+      if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can delete the group' });
+      const b = await readBody(req);
+      if (String(b.confirmName || '').trim() !== ctx.name) {
+        return send(res, 400, { error: 'type the group name exactly to confirm' });
+      }
+      const counts = one(`SELECT (SELECT COUNT(*) FROM games WHERE group_id=?1) AS games,
+                                 (SELECT COUNT(*) FROM ratings r JOIN games g ON g.id=r.game_id
+                                   WHERE g.group_id=?1) AS ratings,
+                                 (SELECT COUNT(*) FROM memberships WHERE group_id=?1) AS members`, gid);
+      db.prepare('DELETE FROM groups WHERE id=?').run(gid);
+      return send(res, 200, { ok: true, deleted: counts });
+    }
     if (sub === '/games' && req.method === 'POST') {
       const b = await readBody(req);
       if (!b.manual) return send(res, 400, { error: 'the harness only implements manual adds' });

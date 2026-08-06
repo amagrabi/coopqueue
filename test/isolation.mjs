@@ -45,7 +45,7 @@ sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALU
 const DB = makeDB(sqlite);
 const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
-const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute] = await Promise.all([
+const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -53,6 +53,7 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/groups/join.js')),
   import(path.join(SITE, 'functions/api/groups/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/members.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/group.js')),
 ]);
 
 const user = (id) => sqlite.prepare('SELECT * FROM users WHERE steam_id=?').get(id);
@@ -377,6 +378,83 @@ await check('auto-claim refuses to merge an existing rating history', async () =
     `SELECT 1 FROM memberships WHERE group_id=1 AND steam_id='seed:1:pat'`).get();
   return (merged === null && !!patIntact)
     || `merged=${JSON.stringify(merged)} patIntact=${!!patIntact}`;
+});
+
+console.log('\nGroup rename & deletion');
+
+// Carol owns her own group and is NOT in group 1, so she cannot see that a group
+// called "g4m1ng" exists. Mallory is unusable for this: she joined group 1 in the
+// invite tests above, so a collision there is genuinely her own.
+const CAROL = '76561198000000444';
+sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${CAROL}','Carol')`);
+sqlite.exec(`INSERT INTO groups (id, slug, name, max_players) VALUES (300,'carols','Carols Crew',4)`);
+sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+             VALUES (300,'${CAROL}','Carol','owner')`);
+
+await check('renaming does NOT check global uniqueness (that would leak private groups)', async () => {
+  const { data } = await ctxFor(CAROL, 'carols');
+  const r = await membersRoute.onRequestPatch({ request: req({ name: 'g4m1ng' }), env, data });
+  const row = sqlite.prepare('SELECT name FROM groups WHERE id=300').get();
+  return (r.status === 200 && row.name === 'g4m1ng')
+    || `status ${r.status}, name ${row.name}`;
+});
+
+await check('renaming to a name YOU already use IS refused', async () => {
+  // Now Carol joins group 1, which is also called "g4m1ng". The clash is
+  // information she already has, so refusing it leaks nothing — and without the
+  // check her switcher would show two identical entries.
+  sqlite.exec(`UPDATE groups SET invite_code='CAROLJOIN9' WHERE id=1`);
+  await joinRoute.onRequestPost({ request: req({ code: 'CAROLJOIN9' }), env, data: { user: user(CAROL) } });
+  sqlite.exec(`UPDATE groups SET name='Carols Crew' WHERE id=300`);
+  const { data } = await ctxFor(CAROL, 'carols');
+  const r = await membersRoute.onRequestPatch({ request: req({ name: 'g4m1ng' }), env, data });
+  const row = sqlite.prepare('SELECT name FROM groups WHERE id=300').get();
+  return (r.status === 409 && row.name === 'Carols Crew')
+    || `status ${r.status}, name ${row.name}`;
+});
+
+await check('renaming never changes the slug, so invite links keep working', async () => {
+  const { data } = await ctxFor(MALLORY, 'mallorys');
+  await membersRoute.onRequestPatch({ request: req({ name: 'Totally New Name' }), env, data });
+  const row = sqlite.prepare('SELECT slug FROM groups WHERE id=2').get();
+  return row.slug === 'mallorys' || `slug changed to ${row.slug}`;
+});
+
+await check('a plain member cannot delete the group', async () => {
+  sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('76561198000000333','Rando')`);
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (2,'76561198000000333','Rando','member')`);
+  const { data } = await ctxFor('76561198000000333', 'mallorys');
+  const r = await groupRoute.onRequestDelete({ request: req({ confirmName: data.group.name }), env, data });
+  const still = sqlite.prepare('SELECT COUNT(*) AS n FROM groups WHERE id=2').get().n;
+  return (r.status === 403 && still === 1) || `status ${r.status}, groups ${still}`;
+});
+
+await check('deleting needs the group name typed exactly', async () => {
+  const { data } = await ctxFor(MALLORY, 'mallorys');
+  const r = await groupRoute.onRequestDelete({ request: req({ confirmName: 'wrong' }), env, data });
+  const still = sqlite.prepare('SELECT COUNT(*) AS n FROM groups WHERE id=2').get().n;
+  return (r.status === 400 && still === 1) || `status ${r.status}, groups ${still}`;
+});
+
+await check('the owner can delete it, and everything in it goes too', async () => {
+  const { data } = await ctxFor(MALLORY, 'mallorys');
+  const gamesBefore = sqlite.prepare('SELECT COUNT(*) AS n FROM games WHERE group_id=2').get().n;
+  if (!gamesBefore) return 'fixture: group 2 has no games to cascade';
+  const r = await groupRoute.onRequestDelete({ request: req({ confirmName: data.group.name }), env, data });
+  if (r.status !== 200) return `expected 200, got ${r.status}`;
+  const left = {
+    groups: sqlite.prepare('SELECT COUNT(*) AS n FROM groups WHERE id=2').get().n,
+    games: sqlite.prepare('SELECT COUNT(*) AS n FROM games WHERE group_id=2').get().n,
+    members: sqlite.prepare('SELECT COUNT(*) AS n FROM memberships WHERE group_id=2').get().n,
+  };
+  return (left.groups === 0 && left.games === 0 && left.members === 0)
+    || `left behind ${JSON.stringify(left)}`;
+});
+
+await check('deleting one group leaves the other untouched', async () => {
+  const g1 = sqlite.prepare('SELECT COUNT(*) AS n FROM games WHERE group_id=1').get().n;
+  return g1 > 0 || 'group 1 lost its games when group 2 was deleted';
 });
 
 console.log('\nScoring & viability');

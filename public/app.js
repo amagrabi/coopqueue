@@ -400,7 +400,7 @@ function wireOnce() {
   $('#browse-sort').addEventListener('change', () => renderBrowse(true));
   $('#browse-fits').addEventListener('change', () => renderBrowse(true));
   // Re-render only; the server result is unchanged, this filter is client-side.
-  $('#browse-hide-pooled').addEventListener('change', () => renderBrowse(false));
+  $('#browse-hide-owned').addEventListener('change', () => renderBrowse(false));
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
 
   $('#man-add').addEventListener('click', addManual);
@@ -947,6 +947,21 @@ async function renderMembers() {
     <p class="field-help">Games that can't fit this many get flagged on Play next.</p>
     <button class="btn btn-primary" id="s-save" style="margin-top:12px">Save</button>
 
+    ${isOwner ? `
+    <hr class="settings-rule">
+    <div class="danger">
+      <strong>Delete this group</strong>
+      <p class="field-help">Removes the group and everything in it — every game, every rating,
+        every member. There is no undo and no export. Archiving a single game is on its row in
+        the Library; this is for the whole group.</p>
+      <label class="field">
+        <span>Type <code>${esc(d.group.name)}</code> to confirm</span>
+        <input class="input" id="s-del-name" autocomplete="off" placeholder="${esc(d.group.name)}">
+      </label>
+      <button class="btn btn-danger" id="s-delete">Delete group permanently</button>
+      <p id="s-del-status" class="add-status"></p>
+    </div>` : ''}
+
     <hr class="settings-rule">
     <label class="toggle" for="s-hide-others">
       <input type="checkbox" id="s-hide-others" ${prefs.hideOthers ? 'checked' : ''}>
@@ -955,6 +970,27 @@ async function renderMembers() {
     <p class="field-help">Only affects you, and applies immediately — nothing to save.
       Also stops the slider from opening on the group's current average, which
       anchors you just as much as seeing the numbers.</p>`;
+
+  if (isOwner) $('#s-delete').addEventListener('click', async () => {
+    const typed = $('#s-del-name').value.trim();
+    if (typed !== d.group.name) {
+      $('#s-del-status').textContent = 'Type the group name exactly to confirm.';
+      return;
+    }
+    if (!confirm(`Delete "${d.group.name}" and every rating in it? This cannot be undone.`)) return;
+    $('#s-delete').disabled = true;
+    try {
+      const r = await gapi('/group', { method: 'DELETE', body: { confirmName: typed } });
+      toast(`Deleted ${d.group.name} — ${r.deleted.games} games, ${r.deleted.ratings} ratings`);
+      state.groups = (await api('/api/me')).groups;
+      state.group = null;
+      location.hash = '';
+      return boot();
+    } catch (e) {
+      $('#s-del-status').textContent = e.message;
+      $('#s-delete').disabled = false;
+    }
+  });
 
   $('#s-hide-others').addEventListener('change', (e) => {
     savePrefs({ hideOthers: e.target.checked });
@@ -1078,7 +1114,7 @@ async function addManual() {
 /* ══════════════════════════════ BROWSE ════════════════════════════════ */
 /**
  * The global catalogue. /api/coop is group-blind by design, so "already in your
- * pool" is worked out here by comparing appids against the group library the
+ * library" is worked out here by comparing appids against the group library the
  * client already holds — no group data crosses that endpoint.
  */
 const browse = { page: 0, items: [], hasMore: false };
@@ -1125,32 +1161,32 @@ async function renderBrowse(reset) {
     return;
   }
 
-  const pooled = new Set(state.games.map((g) => g.steam_appid).filter(Boolean));
+  const owned = new Set(state.games.map((g) => g.steam_appid).filter(Boolean));
 
   // Filtered here rather than server-side on purpose: /api/coop knows nothing
-  // about groups, and teaching it would put pool membership behind an endpoint
+  // about groups, and teaching it would put library membership behind an endpoint
   // that deliberately has no tenancy check. The cost is that a page of 24 can
   // come back shorter, so the count says how many were hidden instead of leaving
   // you wondering where they went.
-  const hidePooled = $('#browse-hide-pooled').checked;
-  const shown = hidePooled ? browse.items.filter((g) => !pooled.has(g.appid)) : browse.items;
+  const hideOwned = $('#browse-hide-owned').checked;
+  const shown = hideOwned ? browse.items.filter((g) => !owned.has(g.appid)) : browse.items;
   const hiddenCount = browse.items.length - shown.length;
 
   $('#browse-status').textContent =
     `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}`
-    + (hiddenCount ? `, ${hiddenCount} on this page already in your pool` : '') + '.';
+    + (hiddenCount ? `, ${hiddenCount} on this page already in your library` : '') + '.';
 
   if (!shown.length) {
     $('#browse-grid').innerHTML = '';
-    $('#browse-status').textContent = hidePooled
-      ? 'Everything on this page is already in your pool — load more, or untick the filter.'
+    $('#browse-status').textContent = hideOwned
+      ? 'Everything on this page is already in your library — load more, or untick the filter.'
       : 'Nothing in the catalogue matches that.';
     $('#browse-more').hidden = !browse.hasMore;
     return;
   }
 
   $('#browse-grid').innerHTML = shown.map((g) => {
-    const inPool = pooled.has(g.appid);
+    const inLibrary = owned.has(g.appid);
     const cap = g.max_players
       ? `${g.max_players}p co-op`
       : '<span class="chip">player count unverified</span>';
@@ -1168,39 +1204,39 @@ async function renderBrowse(reset) {
           ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
         </div>
         <div class="browse-act">
-          ${inPool
-            ? '<span class="chip chip-good">in your pool</span>'
-            : `<button class="btn btn-sm btn-primary" data-pool="${g.appid}">+ Add to pool</button>`}
+          ${inLibrary
+            ? '<span class="chip chip-good">in your library</span>'
+            : `<button class="btn btn-sm btn-primary" data-add="${g.appid}">+ Add to library</button>`}
         </div>
       </article>`;
   }).join('');
 
-  $$('#browse-grid [data-pool]').forEach((b) => b.addEventListener('click', () => poolGame(b)));
+  $$('#browse-grid [data-add]').forEach((b) => b.addEventListener('click', () => addFromCatalogue(b)));
   $('#browse-more').hidden = !browse.hasMore;
 }
 
-/** Add a catalogue game to this group's pool, carrying any verified player cap. */
-async function poolGame(btn) {
-  const appid = Number(btn.dataset.pool);
+/** Add a catalogue game to this group's library, carrying any verified player cap. */
+async function addFromCatalogue(btn) {
+  const appid = Number(btn.dataset.add);
   const entry = browse.items.find((g) => g.appid === appid);
   btn.disabled = true;
   btn.textContent = 'Adding…';
   try {
-    // Passing maxPlayers through means a pooled game arrives with a real cap
+    // Passing maxPlayers through means an added game arrives with a real cap
     // where one is known, so the viability check works without further input.
     const r = await gapi('/games', {
       method: 'POST',
       body: { input: String(appid), maxPlayers: entry?.max_players ?? null },
     });
     await loadGroup();
-    btn.outerHTML = '<span class="chip chip-good">in your pool</span>';
+    btn.outerHTML = '<span class="chip chip-good">in your library</span>';
     toast(entry?.max_players
       ? `Added ${r.name} — it's in everyone's rating queue now.`
       : `Added ${r.name}. Set its player count so we know if we can all play.`);
   } catch (e) {
     toast(e.message);
     btn.disabled = false;
-    btn.textContent = '+ Add to pool';
+    btn.textContent = '+ Add to library';
   }
 }
 

@@ -545,3 +545,12 @@ td.miss { color: #4a4a47; }
 .add-manual[open] > summary { margin-bottom: 10px; }
 .add-manual .field { margin-top: 10px; }
 .field-opt { color: var(--text-muted); font-weight: 400; }
+
+/* ── destructive actions ────────────────────────────────────────────────── */
+.danger {
+  border: 1px solid rgba(208,59,59,.42); border-radius: var(--radius);
+  padding: 14px 16px; background: rgba(208,59,59,.06);
+}
+.danger > strong { color: #f0a3a3; font-size: 14px; }
+.btn-danger { background: var(--critical); border-color: transparent; color: #fff; }
+.btn-danger:hover { background: #e05252; }

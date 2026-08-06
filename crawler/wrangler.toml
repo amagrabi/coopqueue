@@ -19,11 +19,18 @@ compatibility_date = "2026-08-01"
 # reachable from outside.
 workers_dev = false
 
-# Every 15 minutes. Each run makes roughly 30 Steam requests, far below Steam's
-# ~200 requests / 5 min per-IP throttle — which matters because Workers egress
-# from a shared pool and a burst would affect more than just this site.
+# Hourly, not nightly, and the reason is the platform rather than impatience: the
+# Workers free plan caps subrequests at 50 per invocation, so one run can only
+# touch ~13 games. A single nightly run would take almost a month to work through
+# a 337-game catalogue. Hourly gives a full refresh roughly every day at a quarter
+# of the request volume of the old */15 schedule — about 720 Steam requests a day,
+# far below the ~200 / 5 min per-IP throttle that matters because Workers egress
+# from a shared pool.
+#
+# Cron invocations themselves are free (100k/day), so frequency is a politeness
+# question about Steam, not a cost one.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["0 * * * *"]
 
 [[d1_databases]]
 binding = "DB"

@@ -46,6 +46,33 @@ export async function onRequestPatch({ request, env, data }) {
     if (!isOwner) return bad('only the group owner can rename the group', 403);
     const name = String(patch.name).trim().slice(0, 60);
     if (name.length < 2) return bad('group name is too short');
+
+    /* Group names are NOT globally unique, and must not be.
+     *
+     * Rejecting a name because some other group already holds it would turn this
+     * endpoint into an oracle for the existence of private groups — the exact
+     * thing the 404-not-403 tenancy boundary exists to prevent. You could sit
+     * here typing names and learn which ones are taken.
+     *
+     * The collision that actually hurts is the one within your own group list,
+     * where two identically-named groups make the switcher useless (this group
+     * shipped with two called "g4m1ng"). That is information the caller already
+     * has, so checking it leaks nothing. It is a 409 rather than a silent rename
+     * so the owner can pick something else.
+     *
+     * The slug is deliberately untouched by a rename, so URLs and invite links
+     * already handed out keep working.
+     */
+    const mine = await env.DB.prepare(
+      `SELECT g.name FROM groups g
+         JOIN memberships m ON m.group_id = g.id AND m.steam_id = ?
+        WHERE g.id <> ? AND g.name = ? COLLATE NOCASE`
+    ).bind(data.user.steam_id, gid, name).first();
+    if (mine) {
+      return bad(`you are already in another group called "${mine.name}" — `
+               + 'pick something else so you can tell them apart', 409);
+    }
+
     await env.DB.prepare('UPDATE groups SET name = ? WHERE id = ?').bind(name, gid).run();
   }
 

@@ -364,6 +364,25 @@ privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
    spreadsheet it ranged from 89% to 27% per person.
 5. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
+## Vocabulary
+
+One word per concept, because two words for one thing is how a UI stops making
+sense:
+
+- a group's collection of games is its **library** (the `games` table). "Pool" was
+  used interchangeably for a while and has been removed — it meant the same thing.
+- the global catalogue of co-op games on Steam is the **catalogue** (`coop_apps`),
+  surfaced in the UI as **Find games** rather than "Browse", which read as a
+  synonym for Library.
+
+**Group names are deliberately not globally unique.** Enforcing that would turn
+rename into an oracle for the existence of private groups, which is precisely what
+the 404-not-403 boundary prevents — you could sit typing names and learn which are
+taken. What *is* refused is a name colliding with another group **the caller is
+already in**: that is information they already have, and without the check their
+group switcher shows two identical entries. Renaming never touches the slug, so
+URLs and invite links already handed out keep working.
+
 ## Conventions
 
 - Comments explain *why*, not *what*. Several exist specifically to stop a future

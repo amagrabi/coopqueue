@@ -125,7 +125,7 @@
       <button class="tab" data-view="queue"   role="tab">Rate <span class="pill" id="queue-count"></span></button>
       <button class="tab" data-view="next"    role="tab">Play next</button>
       <button class="tab" data-view="library" role="tab">Library</button>
-      <button class="tab" data-view="browse"  role="tab">Browse</button>
+      <button class="tab" data-view="browse"  role="tab">Find games</button>
       <button class="tab" data-view="stats"   role="tab">Stats</button>
       <button class="tab" data-view="members" role="tab">Group</button>
     </nav>
@@ -291,10 +291,10 @@
     <section class="view" data-view="browse">
       <div class="view-head">
         <div>
-          <h2>Browse co-op games</h2>
-          <p class="view-sub">The most-reviewed online co-op games on Steam. Add the ones this group
-            might actually play — only games in your pool appear in anyone's rating queue, which is
-            what stops a big catalogue from burying the votes that matter.</p>
+          <h2>Find new games</h2>
+          <p class="view-sub">The most-played online co-op games on Steam. Add the ones this group
+            might actually play — only games in your library appear in anyone's rating queue, which
+            is what stops a big catalogue from burying the votes that matter.</p>
         </div>
         <div class="filters">
           <input id="browse-search" class="input" type="search" placeholder="Search the catalogue…" autocomplete="off">
@@ -307,7 +307,7 @@
             <input type="checkbox" id="browse-fits"> Only ones we can all play
           </label>
           <label class="toggle">
-            <input type="checkbox" id="browse-hide-pooled" checked> Hide games already in our pool
+            <input type="checkbox" id="browse-hide-owned" checked> Hide games we already have
           </label>
         </div>
       </div>
