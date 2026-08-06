@@ -315,6 +315,12 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<!-- Steam serves trailers only as segmented HLS now, which nothing but Safari
+     plays in a bare <video>. Vendored rather than pulled from a CDN so the site
+     stays a self-contained static bundle. Loaded before app.js but not deferred,
+     so window.Hls is defined by the time the first rating card renders; the
+     queue degrades to the header image if it is missing. -->
+<script src="/vendor/hls.light.min.js"></script>
 <script src="/app.js" type="module"></script>
 </body>
 </html>

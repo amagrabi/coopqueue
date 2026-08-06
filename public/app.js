@@ -64,16 +64,37 @@ const esc = (s) =>
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
 
 /**
- * Can a bare <video> actually play this URL? Steam serves most trailers as an
- * HLS manifest now, which only Safari handles without a streaming library, so
- * ask the browser rather than assuming. Progressive files always pass.
+ * Trailer playback. Steam retired progressive mp4s, so `trailer_url` is now
+ * almost always a segmented HLS manifest: Safari plays that natively, everything
+ * else needs hls.js. One <video> is reused for every card in the queue, so the
+ * previous player has to be torn down before the next attaches or the instances
+ * (and their buffers) pile up as you rate.
  */
-const playable = (url) => {
-  if (!/\.m3u8(\?|$)/i.test(url)) return true;
-  const v = document.createElement('video');
-  return !!(v.canPlayType('application/vnd.apple.mpegurl') ||
-            v.canPlayType('application/x-mpegURL'));
-};
+let hls = null;
+
+function detachTrailer(video) {
+  if (hls) { hls.destroy(); hls = null; }
+  video.removeAttribute('src');
+  video.load();
+}
+
+/** Attach `url` to `video`; false means this browser cannot play it at all. */
+function attachTrailer(video, url) {
+  detachTrailer(video);
+  if (!/\.m3u8(\?|$)/i.test(url) || video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    return true;
+  }
+  if (window.Hls?.isSupported()) {
+    // A rating card is a glance, not a sitting — a short buffer keeps the queue
+    // snappy and avoids pulling megabytes for a game about to be skipped.
+    hls = new window.Hls({ maxBufferLength: 12, maxMaxBufferLength: 30 });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    return true;
+  }
+  return false;
+}
 
 const show = (id) => {
   for (const s of ['landing', 'onboard', 'claim', 'app']) $('#' + s).hidden = s !== id;
@@ -367,27 +388,21 @@ function renderQueue() {
   const media = $('.rate-media');
   const note  = $('#rate-notrailer');
   video.pause();
-  if (g.trailer_url && playable(g.trailer_url)) {
-    video.src = g.trailer_url;
+  if (g.trailer_url && attachTrailer(video, g.trailer_url)) {
     video.poster = g.header_image || '';
     video.hidden = false; image.hidden = true; note.hidden = true;
     media.classList.remove('is-blank');
-  } else if (g.trailer_url && g.header_image) {
-    // Steam now serves most trailers only as an HLS stream, which Safari plays
-    // natively and Chrome/Firefox do not. Showing the art beats showing a video
-    // element that silently never starts.
-    video.removeAttribute('src'); video.hidden = true;
-    image.src = g.header_image; image.hidden = false;
-    note.hidden = false; note.textContent = 'Trailer needs Safari — Steam streams it as HLS';
-    media.classList.remove('is-blank');
   } else if (g.header_image) {
-    video.removeAttribute('src'); video.hidden = true;
+    detachTrailer(video); video.hidden = true;
     image.src = g.header_image; image.hidden = false;
-    note.hidden = false; note.textContent = 'No trailer on Steam';
+    note.hidden = false;
+    note.textContent = g.trailer_url
+      ? 'Trailer will not play in this browser'
+      : 'No trailer on Steam';
     media.classList.remove('is-blank');
   } else {
     // Not linked to Steam yet — a slim prompt beats a viewport-sized black box.
-    video.removeAttribute('src'); video.hidden = true; image.hidden = true;
+    detachTrailer(video); video.hidden = true; image.hidden = true;
     note.hidden = false;
     note.textContent = 'Not linked to Steam yet — open it from the Library and paste a store link for art and a trailer';
     media.classList.add('is-blank');

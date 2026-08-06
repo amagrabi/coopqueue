@@ -17,6 +17,7 @@
     "test:ui": "node test/shots.mjs"
   },
   "devDependencies": {
+    "hls.js": "^1.6.17",
     "wrangler": "^3.90.0"
   }
 }
