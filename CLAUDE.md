@@ -207,6 +207,45 @@ identity, `PATCH /api/g/:slug/members {invite:'on'}` to rotate the invite link,
 `/enrich`, and a trailer playing in the rating queue in **Chromium** — the
 browser that could not play one before hls.js.
 
+## The agreed v2 shape
+
+The pool model, decided with the owner: a **global** co-op library that is
+browsable and searchable, ranked by popularity; each group pulls games it cares
+about into its own pool, and **only pool games generate rating nudges**. That
+opt-in step is what stops a big library from destroying rating coverage — the
+denominator stays curated per group. New groups start empty; group 1 is
+pre-filled because its 114 games already are the pool.
+
+Mapping onto what exists: `games` is already per-group with
+`UNIQUE (group_id, steam_appid)`, so **it is the pool** — no new group-scoped
+table, and the tenancy boundary is untouched. What is missing is the global side,
+one table alongside `steam_apps`: `coop_apps(appid PK, name, popularity_rank,
+review_count, release_date, type, coop_categories, verified_max_players)`.
+
+Discovery is solved and verified against live Steam:
+`store.steampowered.com/search/results/?query&category2=38&sort_by=Reviews_DESC&json=1`
+paginates the co-op catalogue, 50 per page. Use `Reviews_DESC`, not
+`filter=topsellers` — the former returns the enduring co-op games (Stardew
+Valley, Portal 2, Vampire Survivors), the latter is promotion-weighted and
+includes unreleased titles. Popularity rank is just the crawl position.
+
+Two constraints to design around:
+
+- Results include DLC, demos and soundtracks, so each candidate needs a
+  `type == 'game'` check from `appdetails` — one throttled request each. A
+  library of a few thousand titles is therefore **a cron that fills in over
+  days, never a button**. Browsing stays instant because it reads `coop_apps`.
+- **`max_players` cannot come from the crawl** (invariant #6). A crawled library
+  is thousands of games whose player cap is unknown, which `viability()` will
+  report as unknown rather than blocked — honest, but it means the headline
+  feature is blank for new groups until a human fills it in. Open question:
+  leave unknown, or hand-seed caps for the top few hundred.
+
+Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/add
+UI → crawl cron → Steam playtime/achievements → recent-releases button →
+comments. Note the Steam stats step depends on every member setting Steam
+privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
+
 ## Next up, roughly in value order
 
 1. **Rate-limit writes.** Cloudflare Rate Limiting rules are free. Right now the
