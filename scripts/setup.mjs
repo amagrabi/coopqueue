@@ -139,6 +139,12 @@ async function main() {
         await yes('Import the 92-game g4m1ng group from the old spreadsheet?')) {
       wrangler(['d1', 'execute', DB_NAME, '--remote', '--yes', '--file', './seed.sql']);
       ok('Seed data imported (92 games, 232 ratings)');
+
+      if (existsSync(path.join(ROOT, 'recommendations.sql')) &&
+          await yes('Also add the 22 researched candidates to that group\'s backlog?')) {
+        wrangler(['d1', 'execute', DB_NAME, '--remote', '--yes', '--file', './recommendations.sql']);
+        ok('22 recommendations added — they land in everyone\'s rating queue');
+      }
     }
   }
 

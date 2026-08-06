@@ -226,7 +226,7 @@ lib/
   http.js      JSON responses, body parsing, score clamping
 public/        index.html · app.js · styles.css — no build step
 scripts/setup.mjs                one-command Cloudflare provisioning
-schema.sql · seed.sql
+schema.sql · seed.sql · recommendations.sql
 test/          harness.mjs · isolation.mjs · shots.mjs
 ```
 

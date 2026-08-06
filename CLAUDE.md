@@ -13,6 +13,10 @@ No framework, no bundler, no build step — edit a file and deploy.
 
 It started as a Google Sheet belonging to four friends (Ama, Leo, Pat, Dave)
 with 92 games and 232 ratings; `seed.sql` is that data, imported as group #1.
+`recommendations.sql` is a second optional import: 22 candidates researched
+against the group's demonstrated taste, with player counts verified against
+Steam and Co-Optimus rather than taken from store pages. Both are optional —
+skipping them gives you an empty instance.
 
 ## Commands
 
