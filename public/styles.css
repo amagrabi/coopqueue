@@ -593,3 +593,6 @@ tr.is-archived td { opacity: .55; }
 .btn-x:hover { background: var(--surface-2); color: var(--critical); }
 .thread-new { display: flex; gap: 8px; align-items: flex-start; }
 .thread-new textarea { flex: 1; resize: vertical; font-family: inherit; }
+/* An estimate is visually distinct from a number somebody typed. */
+.est { color: var(--text-muted); border-bottom: 1px dotted var(--baseline); cursor: help; }
+.pt-fix { display: block; margin-top: 3px; }

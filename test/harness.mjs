@@ -79,6 +79,15 @@ db.exec(`INSERT OR IGNORE INTO skips (game_id, steam_id)
          SELECT id, 'seed:1:pat' FROM games WHERE group_id=1
           AND id NOT IN (SELECT game_id FROM ratings) LIMIT 3`);
 
+// Sync state mirroring the real group: some readable, one with a public library
+// but playtime hidden — the case that distinguishes the two Steam privacy switches.
+const LEO_ACCOUNT = '76561198119052954';
+db.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${LEO_ACCOUNT}','Leo')`);
+db.exec(`INSERT INTO seed_assignments (group_id, steam_id, seed_steam_id)
+         VALUES (1,'${LEO_ACCOUNT}','seed:1:leo')`);
+db.exec(`INSERT INTO playtime_sync (steam_id, games, played, synced_at) VALUES
+  ('${ME}',122,98,unixepoch()), ('${LEO_ACCOUNT}',455,0,unixepoch())`);
+
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -219,6 +228,31 @@ const server = http.createServer(async (req, res) => {
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
+    if (sub === '/playtime' && req.method === 'GET') {
+      const rows = q(`SELECT m.steam_id, m.short_name, m.is_seed,
+                             COALESCE(a.steam_id, m.steam_id) AS account,
+                             s.games, s.played, s.synced_at
+                        FROM memberships m
+                        LEFT JOIN seed_assignments a
+                               ON a.group_id=m.group_id AND a.seed_steam_id=m.steam_id
+                        LEFT JOIN playtime_sync s ON s.steam_id=COALESCE(a.steam_id, m.steam_id)
+                       WHERE m.group_id=? ORDER BY m.short_name COLLATE NOCASE`, gid);
+      return send(res, 200, {
+        members: rows.map((m) => ({
+          steamId: m.steam_id, name: m.short_name,
+          seed: !!m.is_seed && m.account === m.steam_id,
+          syncedAt: m.synced_at ?? null, owned: m.games ?? null, played: m.played ?? null,
+          readable: (!!m.is_seed && m.account === m.steam_id) ? null : (m.played ?? 0) > 0,
+          reason: ((!!m.is_seed && m.account === m.steam_id) || (m.played ?? 0) > 0) ? null
+            : (m.games ?? 0) > 0 ? 'playtime hidden — untick "Always keep my total playtime private"'
+                                 : 'game library hidden — set Game details to Public',
+        })),
+      });
+    }
+    if (sub === '/playtime' && req.method === 'POST') {
+      return send(res, 200, { ok: true, members: [], gamesEstimated: 0 });
+    }
+
     if (sub.startsWith('/comments')) {
       const inGroup = (id) => one('SELECT id FROM games WHERE id=? AND group_id=?', id, gid);
       if (req.method === 'GET') {

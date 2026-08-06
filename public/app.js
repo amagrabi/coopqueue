@@ -460,6 +460,20 @@ const gameById = (id) => state.games.find((g) => g.id === id);
  * Partitioned on the client from data it already has. The queue endpoint returns
  * ids and the library carries each game's status, so this needed no new API.
  */
+/**
+ * Which hours figure to show, and whether it is a measurement or a bound.
+ * A number a human typed always wins; the estimate is an upper bound on time
+ * played together, so it is marked with "≈" and carries how many people it was
+ * taken over. Never present the two as the same kind of thing.
+ */
+const hoursOf = (g) => {
+  if (g.hours != null) return { value: g.hours, manual: true };
+  if (g.hours_estimated != null) {
+    return { value: g.hours_estimated, manual: false, participants: g.hours_participants ?? 0 };
+  }
+  return { value: null, manual: false };
+};
+
 /** Archived games are out of everything except the Library's archived filter. */
 const isActive = (g) => !g.archived_at;
 const activeGames = () => state.games.filter(isActive);
@@ -699,6 +713,7 @@ const LIB_COLUMNS = () => [
 
 const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
+  if (key === 'hours')   return hoursOf(g).value;
   if (key === 'status')  return STATUS_LABEL[g.status];
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
   return g[key];
@@ -770,8 +785,9 @@ function renderLibrary() {
     if (status && g.status !== status) return false;
     if (q && !g.name.toLowerCase().includes(q) && !(g.genre || '').toLowerCase().includes(q)) return false;
     if (minScore && !(g.raw >= minScore)) return false;
-    if (played === 'yes' && !(g.hours > 0)) return false;
-    if (played === 'no' && g.hours > 0) return false;
+    const eff = hoursOf(g).value;
+    if (played === 'yes' && !(eff > 0)) return false;
+    if (played === 'no' && eff > 0) return false;
     if (mine === 'unrated' && g.votes[state.me.steamId] != null) return false;
     if (mine === 'rated' && g.votes[state.me.steamId] == null) return false;
     if (mine === 'incomplete' && g.n >= voters) return false;
@@ -799,7 +815,7 @@ function renderLibrary() {
       best:     (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
       name:     (a, b) => a.name.localeCompare(b.name),
       spread:   (a, b) => (b.spread ?? -1) - (a.spread ?? -1),
-      hours:    (a, b) => (b.hours ?? -1) - (a.hours ?? -1),
+      hours:    (a, b) => (hoursOf(b).value ?? -1) - (hoursOf(a).value ?? -1),
       votes:    (a, b) => a.n - b.n,
     }[sort]);
   }
@@ -822,7 +838,13 @@ function renderLibrary() {
       }).join('')}
       <td class="c-num cell-strong">${fmt(g.raw, 1)}</td>
       <td class="c-num">${g.n || '–'}</td>
-      <td class="c-num">${g.hours ? fmt(g.hours, 0) : '–'}</td>
+      <td class="c-num">${(() => {
+        const h = hoursOf(g);
+        if (!h.value) return '–';
+        return h.manual
+          ? fmt(h.value, 0)
+          : `<span class="est" title="Estimated: the smallest playtime among the ${h.participants} of you who played it. An upper bound on time played together, not a measurement.">≈${fmt(h.value, 0)}</span>`;
+      })()}</td>
     </tr>`).join('');
 
   $$('#lib-table tbody tr').forEach((tr) =>
@@ -1063,6 +1085,9 @@ async function renderMembers() {
     }
   });
 
+  renderPlaytime();
+  $('#pt-sync').addEventListener('click', syncPlaytime);
+
   $('#s-hide-others').addEventListener('change', (e) => {
     savePrefs({ hideOthers: e.target.checked });
     toast(e.target.checked ? "Others' ratings hidden while you rate" : "Others' ratings visible again");
@@ -1179,6 +1204,60 @@ async function addManual() {
     toast(`Added ${r.name} by hand. No trailer — set a player count from the Library if it needs one.`);
   } catch (e) {
     $('#man-status').textContent = e.message;
+  } finally { btn.disabled = false; }
+}
+
+/** Who the playtime sync can and cannot read. */
+async function renderPlaytime() {
+  const box = $('#pt-members');
+  try {
+    const { members } = await gapi('/playtime');
+    box.innerHTML = members.map((m) => {
+      // Three genuinely different states, and conflating them is what makes a
+      // privacy warning feel like nagging: a placeholder has no account to read,
+      // an unsynced member has simply not been asked yet, and a private profile
+      // is the only one that needs the person to do something.
+      const state = m.seed
+        ? '<span class="chip">placeholder — no Steam account yet</span>'
+        : m.syncedAt == null
+          ? '<span class="chip">not synced yet</span>'
+          : m.readable
+            ? `<span class="chip chip-good">${m.played} games with playtime</span>`
+            : `<span class="chip chip-warn">${m.owned > 0 ? 'playtime hidden' : 'library hidden'}</span>`;
+      return `
+        <div class="person">
+          <div class="person-swatch" style="background:${colorOf(m.steamId)}"></div>
+          <div>
+            <div class="person-name">${esc(m.name)}</div>
+            <div class="person-sub">${m.syncedAt ? `synced ${when(m.syncedAt)}` : 'never synced'}</div>
+          </div>
+          <div>${state}</div>
+        </div>`;
+    }).join('');
+
+    // One line per distinct cause, because the two fixes are different settings.
+    const blocked = members.filter((m) => m.readable === false);
+    $('#pt-status').innerHTML = blocked.length
+      ? blocked.map((m) => `<span class="pt-fix">${esc(m.name)}: ${esc(m.reason || '')}</span>`).join('')
+        + '<span class="pt-fix">Estimates still work from whoever we can read.</span>'
+      : '';
+  } catch (e) {
+    box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+  }
+}
+
+async function syncPlaytime() {
+  const btn = $('#pt-sync');
+  btn.disabled = true;
+  $('#pt-status').textContent = 'Asking Steam…';
+  try {
+    const r = await gapi('/playtime', { method: 'POST' });
+    await loadGroup();
+    await renderPlaytime();
+    const ok = r.members.filter((m) => m.ok).length;
+    toast(`Synced ${ok}/${r.members.length} — ${r.gamesEstimated} games got an estimate`);
+  } catch (e) {
+    $('#pt-status').textContent = e.message;
   } finally { btn.disabled = false; }
 }
 

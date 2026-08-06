@@ -6,6 +6,8 @@
 -- groups; their display name and role are per-group, held on memberships.
 
 DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS playtime;
+DROP TABLE IF EXISTS playtime_sync;
 DROP TABLE IF EXISTS seed_assignments;
 DROP TABLE IF EXISTS skips;
 DROP TABLE IF EXISTS ratings;
@@ -129,7 +131,9 @@ CREATE TABLE games (
   price             TEXT,
   release_date      TEXT,
   metacritic        INTEGER,
-  hours             REAL,
+  hours             REAL,             -- typed by a human; always wins over the estimate
+  hours_estimated   REAL,             -- min across participants; an upper bound, not a measurement
+  hours_participants INTEGER,         -- how many people that minimum was taken over
   started           TEXT,
   finished          TEXT,
   notes             TEXT,
@@ -150,6 +154,32 @@ CREATE TABLE ratings (
   comment    TEXT,
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
+);
+
+-- Per-person Steam playtime. Global rather than group-scoped: one person's minutes
+-- in a game are the same fact in every group they belong to. Mirrors
+-- migrations/011-playtime.sql, which explains why the group estimate is a MINIMUM.
+CREATE TABLE playtime (
+  steam_id   TEXT    NOT NULL,
+  appid      INTEGER NOT NULL,
+  minutes    INTEGER NOT NULL,
+  fetched_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (steam_id, appid)
+);
+CREATE INDEX idx_playtime_app ON playtime(appid);
+
+-- Steam returns an empty list for a private profile rather than an error, so
+-- "owns nothing" and "hidden from us" are indistinguishable unless the attempt is
+-- recorded. This is what lets the group settings say whose data is missing.
+-- `games` is how many titles came back; `played` how many had any playtime at all.
+-- Both are needed because Steam has two privacy switches: one hides the library,
+-- another hides only the minutes. A member with 455 games and 0 played minutes has
+-- the second one set, and counting games would call that a successful sync.
+CREATE TABLE playtime_sync (
+  steam_id  TEXT PRIMARY KEY,
+  games     INTEGER,
+  played    INTEGER,
+  synced_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
 -- One comment thread per game. group_id is denormalised on purpose: invariant 2

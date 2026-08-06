@@ -364,6 +364,35 @@ privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
    spreadsheet it ranged from 89% to 27% per person.
 5. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
+## Group hours
+
+`games.hours` is a number a human typed and **always wins**. `hours_estimated` is
+shown only in its absence, prefixed "≈", with `hours_participants` so a 2-of-4
+estimate is visibly weaker than a 4-of-4 one.
+
+The estimate is `min(minutes)` over members who played the game for at least an
+hour, and 0 below two of them. Steam exposes lifetime minutes per person and
+**nothing about when or with whom** — no session or concurrency data exists in the
+public API — so joint time cannot be measured, only bounded: you cannot all have
+played together longer than whoever played least. That one rule handles all three
+cases the group cared about (solo play scores 0, one member's extra solo hours
+cannot inflate it, and a non-participant's zero cannot drag it down).
+
+Corroborated against the group's own hand-typed figures: Valheim ≈67.3 vs 66 typed,
+Grounded ≈66.0 vs 67, Raft ≈21.1 vs 21, Green Hell ≈14.2 vs 14.
+
+**Steam has two separate privacy switches and both matter.** "Game details"
+controls whether the owned-games list is readable; a further checkbox — "Always
+keep my total playtime private, even if users can see my game details" — hides the
+minutes while leaving the list visible. One member of this group returns **455
+owned games with 0 minutes on every one**, so judging readability by game count
+reports him as fine while he contributes nothing. `playtime_sync.played` is the
+column that actually decides, and the Group tab names the specific setting to fix.
+
+All three code paths — status, sync and recompute — resolve a placeholder
+membership through `seed_assignments`, so a group that imported its history gets
+real estimates before its friends have signed in.
+
 ## Comments
 
 One thread per game, in `comments`. It replaced the single `notes` textarea, which

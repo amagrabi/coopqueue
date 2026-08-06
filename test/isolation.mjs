@@ -382,6 +382,98 @@ await check('auto-claim refuses to merge an existing rating history', async () =
     || `merged=${JSON.stringify(merged)} patIntact=${!!patIntact}`;
 });
 
+console.log('\nGroup hours estimate');
+
+const { recomputeEstimates } = await import(path.join(SITE, 'functions/api/g/[slug]/playtime.js'));
+
+// Four real members in group 1, and three games to exercise the three cases the
+// group actually asked about.
+const PLAYERS = ['76561198000000101', '76561198000000102', '76561198000000103', '76561198000000104'];
+sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES
+  ${PLAYERS.map((p, i) => `('${p}','P${i + 1}')`).join(',')}`);
+sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES
+  ${PLAYERS.map((p, i) => `(1,'${p}','P${i + 1}','member')`).join(',')}`);
+sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid, status) VALUES
+  (7001,1,'Solo Only',900001,'finished'),
+  (7002,1,'Coop Plus Solo',900002,'finished'),
+  (7003,1,'Three Of Four',900003,'finished')`);
+
+const mins = (steamId, appid, m) =>
+  sqlite.exec(`INSERT OR REPLACE INTO playtime (steam_id, appid, minutes) VALUES ('${steamId}',${appid},${m})`);
+
+// Only P1 played it at all.
+mins(PLAYERS[0], 900001, 6000);
+// All four played; P1 also sank a lot of solo time in.
+mins(PLAYERS[0], 900002, 9000); mins(PLAYERS[1], 900002, 1200);
+mins(PLAYERS[2], 900002, 1500); mins(PLAYERS[3], 900002, 1300);
+// Three played; the fourth never launched it.
+mins(PLAYERS[0], 900003, 600); mins(PLAYERS[1], 900003, 900);
+mins(PLAYERS[2], 900003, 720); mins(PLAYERS[3], 900003, 0);
+
+await recomputeEstimates(env, 1);
+const est = (id) => sqlite.prepare('SELECT hours_estimated AS h, hours_participants AS n FROM games WHERE id=?').get(id);
+
+await check('one person playing alone is zero group hours', async () => {
+  const g = est(7001);
+  return (g.h === 0 && g.n === 1) || `hours ${g.h}, participants ${g.n}`;
+});
+
+await check("one member's extra solo hours cannot inflate the estimate", async () => {
+  // P1 has 150h, the others 20-25h. The minimum is 20h, so the solo overflow is
+  // invisible — which is the whole reason for using a minimum.
+  const g = est(7002);
+  return (g.h === 20 && g.n === 4) || `hours ${g.h}, participants ${g.n}`;
+});
+
+await check('a member who never played does not drag the estimate down', async () => {
+  // Three participants at 10h, 15h and 12h; the fourth's zero is excluded, so the
+  // answer is 10 rather than 0.
+  const g = est(7003);
+  return (g.h === 10 && g.n === 3) || `hours ${g.h}, participants ${g.n}`;
+});
+
+await check('a hand-typed figure is never overwritten by a sync', async () => {
+  sqlite.exec('UPDATE games SET hours = 42 WHERE id = 7002');
+  await recomputeEstimates(env, 1);
+  const row = sqlite.prepare('SELECT hours, hours_estimated FROM games WHERE id=7002').get();
+  return (row.hours === 42 && row.hours_estimated === 20)
+    || `hours ${row.hours}, estimate ${row.hours_estimated}`;
+});
+
+await check('estimates work from partial data', async () => {
+  // Wipe two members' playtime entirely: the remaining two still produce a number,
+  // and the participant count says how thin it is.
+  sqlite.exec(`DELETE FROM playtime WHERE steam_id IN ('${PLAYERS[2]}','${PLAYERS[3]}')`);
+  await recomputeEstimates(env, 1);
+  const g = est(7002);
+  return (g.n === 2 && g.h === 20) || `participants ${g.n}, hours ${g.h}`;
+});
+
+await check('a pre-assigned friend counts before they have ever signed in', async () => {
+  // Leo is still the placeholder 'seed:1:leo' with a seed_assignments row pointing
+  // at his real SteamID64. His playtime must count, or a group that imported its
+  // history sees one participant everywhere and zero hours for everything.
+  const LEO_REAL = '76561198000000901';
+  sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${LEO_REAL}','Leo Real')`);
+  sqlite.exec(`INSERT OR REPLACE INTO seed_assignments (group_id, steam_id, seed_steam_id)
+               VALUES (1,'${LEO_REAL}','seed:1:pat')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid, status)
+               VALUES (7004,1,'Assigned Coop',900004,'finished')`);
+  mins(PLAYERS[0], 900004, 1200);   // a real member: 20h
+  mins(LEO_REAL,   900004, 900);    // via the assignment: 15h
+  await recomputeEstimates(env, 1);
+  const g = est(7004);
+  return (g.n === 2 && g.h === 15) || `participants ${g.n}, hours ${g.h}`;
+});
+
+await check('estimates never cross into another group', async () => {
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid, status)
+               VALUES (7100,2,'Mallory Coop',900002,'finished')`);
+  await recomputeEstimates(env, 1);
+  const other = sqlite.prepare('SELECT hours_estimated FROM games WHERE id=7100').get();
+  return other.hours_estimated == null || `group 2 game was given ${other.hours_estimated}`;
+});
+
 console.log('\nComments');
 
 const getReq = (url) => new Request(url);

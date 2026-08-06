@@ -407,6 +407,19 @@
         <h3 class="panel-title">Invite</h3>
         <div id="invite-panel"></div>
       </section>
+
+      <!-- The privacy caveat lives here rather than as a banner: it matters when
+           you are looking at the hours or fixing them, and nowhere else. -->
+      <section class="panel">
+        <h3 class="panel-title">Steam playtime</h3>
+        <p class="panel-sub">Group hours are estimated from Steam: the smallest playtime among the
+          people who actually played a game. That is an upper bound on time you played it
+          <em>together</em> — Steam records how long each of you played, never when or with whom. A
+          figure typed by hand in the Library always wins over the estimate.</p>
+        <div id="pt-members" class="people"></div>
+        <button class="btn" id="pt-sync" style="margin-top:14px">Sync playtime from Steam</button>
+        <p id="pt-status" class="add-status"></p>
+      </section>
     </section>
 
   </main>
