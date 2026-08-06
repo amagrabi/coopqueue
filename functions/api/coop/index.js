@@ -44,8 +44,8 @@ export async function onRequestGet({ request, env }) {
   }[sort] || 'popularity_rank ASC';
 
   const rows = await env.DB.prepare(
-    `SELECT appid, name, popularity_rank, header_image, short_description, genre,
-            price, release_date, metacritic, max_players, max_players_src, coop_note
+    `SELECT appid, name, popularity_rank, review_hint, header_image, short_description,
+            genre, price, release_date, metacritic, max_players, max_players_src, coop_note
        FROM coop_apps ${filter}
       ORDER BY ${order} LIMIT ? OFFSET ?`
   ).bind(...args, PAGE + 1, page * PAGE).all();

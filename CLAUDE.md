@@ -234,28 +234,41 @@ table, and the tenancy boundary is untouched. What is missing is the global side
 one table alongside `steam_apps`: `coop_apps(appid PK, name, popularity_rank,
 review_count, release_date, type, coop_categories, verified_max_players)`.
 
-Discovery is solved and verified against live Steam:
-`store.steampowered.com/search/results/?query&category2=38&sort_by=Reviews_DESC&json=1`
-paginates the co-op catalogue, 50 per page. Use `Reviews_DESC`, not
-`filter=topsellers` — the former returns the enduring co-op games (Stardew
-Valley, Portal 2, Vampire Survivors), the latter is promotion-weighted and
-includes unreleased titles. Popularity rank is just the crawl position.
+Discovery works, with three traps that `scripts/crawl-coop.mjs` exists to handle.
+All three were measured against live Steam, not assumed:
 
-Two constraints to design around:
+- **`sort_by=Reviews_DESC` sorts by review *score*, not review count.** It ranked
+  a 534-review DLC above Stardew Valley's 1.03 million and happily included
+  listings with **zero** reviews. Using it as a popularity proxy — an earlier
+  version of this file recommended exactly that, wrongly — fills the browse
+  page with obscurities and buries everything recognisable. Popularity means
+  `total_reviews`, fetched per game from
+  `store.steampowered.com/appreviews/<appid>?json=1&num_per_page=0`. Discovery
+  uses `filter=globaltopsellers`, and a review floor drops unreleased and
+  abandoned listings.
+- **The co-op search is full of things that are not games**: 141 of the first 398
+  hits were DLC, demos or soundtracks. Filtering on `appdetails`' `type` field
+  is mandatory, which costs one throttled request per candidate.
+- **`max_players` cannot come from the crawl** (invariant #6). The upsert
+  deliberately omits it, so a re-crawl refreshes metadata and popularity without
+  flattening a verified cap. Unverified caps render as "player count unverified",
+  and the fit filter excludes them rather than claiming they fit —
+  `test/isolation.mjs` asserts this, because it is the claim that costs someone
+  money.
 
-- Results include DLC, demos and soundtracks, so each candidate needs a
-  `type == 'game'` check from `appdetails` — one throttled request each. A
-  library of a few thousand titles is therefore **a cron that fills in over
-  days, never a button**. Browsing stays instant because it reads `coop_apps`.
-- **`max_players` cannot come from the crawl** (invariant #6). A crawled library
-  is thousands of games whose player cap is unknown, which `viability()` will
-  report as unknown rather than blocked — honest, but it means the headline
-  feature is blank for new groups until a human fills it in. Open question:
-  leave unknown, or hand-seed caps for the top few hundred.
+Two Steam calls per candidate at ~1.7s spacing makes a few-hundred-game crawl a
+**cron that fills in over minutes-to-days, never a button press**. Browsing is
+instant because it reads `coop_apps` and never touches Steam.
+
+Verified caps live in the curated list in `scripts/seed-player-caps.mjs`, matched
+to appids by name against the crawl output so the appids come from Steam rather
+than from memory. Extending it is a one-line edit per game. Ambiguous games
+(party size vs dedicated-server size) record the smaller always-true number in
+`max_players` and the nuance in `coop_note`; genuinely unclear ones are left out.
 
 Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/add
-UI → crawl cron → Steam playtime/achievements → recent-releases button →
-comments. Note the Steam stats step depends on every member setting Steam
+UI (**done**) → crawl cron → Steam playtime/achievements → recent-releases button
+→ comments. Note the Steam stats step depends on every member setting Steam
 privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
 
 ## Next up, roughly in value order

@@ -907,6 +907,7 @@ async function renderBrowse(reset) {
             ${g.max_players ? `<span class="chip chip-good">${esc(cap)}</span>` : cap}
             ${g.genre ? `<span class="chip">${esc(g.genre)}</span>` : ''}
             ${g.price ? `<span class="chip">${esc(g.price)}</span>` : ''}
+            ${g.review_hint ? `<span class="chip">${esc(g.review_hint)}</span>` : ''}
           </div>
           ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
         </div>
