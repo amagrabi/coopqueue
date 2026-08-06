@@ -120,7 +120,20 @@ kbd {
   padding: 10px 20px; background: rgba(13,13,13,.86); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
-.brand { font-weight: 750; font-size: 17px; letter-spacing: -.02em; }
+/* The brand mark is the logo lockup. Height-driven, width auto, so the one asset
+   serves both headers — the intrinsic width/height on the <img> keeps the box
+   reserved before it loads and stops the topbar reflowing. */
+.brand { display: inline-flex; align-items: center; flex: none; text-decoration: none; }
+.brand-logo { display: block; height: 26px; width: auto; }
+.landing-top .brand-logo { height: 30px; }
+/* On a narrow phone the wordmark competes with the group switcher and the tab row
+   for one line. The controller alone is still recognisable, so crop to it rather
+   than shrinking the whole lockup into illegibility. */
+@media (max-width: 560px) {
+  .topbar .brand-logo {
+    height: 24px; width: 28px; object-fit: cover; object-position: left center;
+  }
+}
 .tabs { display: flex; gap: 2px; }
 .tab {
   font: inherit; font-size: 14px; font-weight: 550; padding: 7px 14px; border-radius: var(--radius-sm);

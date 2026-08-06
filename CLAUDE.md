@@ -1,12 +1,23 @@
 # CLAUDE.md
 
-Context for Claude Code working in this repo. Read `README.md` first for what
-the product does and how to deploy it; this file covers the things that are not
-obvious from the code and the state the project is in.
+Context for Claude Code working in this repo. This file covers the things that are
+not obvious from the code, and the state the project is in.
+
+The other docs, and what each is for:
+
+- **`AGENTS.md`** — the short orientation for any coding agent: hard rules, layout,
+  and which constants are measured rather than chosen. Start there if this file is
+  too long to read in full.
+- **`docs/OPERATIONS.md`** — the runbook for the deployed instance: what exists in
+  Cloudflare, secrets, deploying, migrations, backups and recovery, catalogue
+  maintenance, and a troubleshooting table.
+- **`README.md`** — the product, and first-time setup from nothing.
+
+Keep them in sync when behaviour changes. This file is the one with the numbers.
 
 ## The name
 
-The product is **CoopQ**, live at **<https://coopqueue.pages.dev>**. The Pages
+The product is **CoopQueue**, live at **<https://coopqueue.pages.dev>**. The Pages
 project is `coopqueue`; the old `g4m1ng` project has been deleted and that URL is
 gone. `coopq.pages.dev` was not available — `*.pages.dev` names are globally
 unique across all Cloudflare accounts, and `coopq` is taken by someone else.
@@ -23,9 +34,20 @@ They are three unrelated identifiers that happen to share the old name:
 - **group 1's slug and name**, which is genuinely what those four friends call
   themselves — nothing to do with the product name.
 
-The GitHub repository is **`amagrabi/coopqueue`** (private). The local checkout
-directory is still `~/code/g4m1ng` — renaming it would invalidate every git
-worktree path under `.claude/worktrees/`, so it is left alone deliberately.
+The GitHub repository is **`amagrabi/coopqueue`** (private) and the local checkout is
+**`~/code/coopqueue`**, renamed from `~/code/g4m1ng` at the owner's request.
+
+That rename does break things, and the fix is one command. Git worktrees record
+absolute paths in both directions — the worktree's `.git` file points at
+`<main>/.git/worktrees/<name>`, and that directory's `gitdir` file points back — so
+after moving the checkout every worktree under `.claude/worktrees/` is detached until:
+
+```bash
+cd ~/code/coopqueue && git worktree repair
+```
+
+Run it from the main checkout and it repairs every worktree at once. Nothing else in
+the repo hardcodes the path.
 
 Deleting a Pages project does **not** touch D1: they are separate resources, and
 the row counts were identical either side of the deletion. A custom domain is
@@ -567,6 +589,35 @@ wants data gone, deleting the group does that and says so plainly.
 Anything counting the library must filter on `archived_at IS NULL` — the queue,
 stats, coverage bars and Play next all do, and `isActive()` / `activeGames()` in
 `app.js` exist so the client cannot forget.
+
+## Brand assets
+
+`public/brand/` is **generated** by `scripts/build-brand.py`, not hand-drawn. Re-run it
+when the logo changes: `python3 scripts/build-brand.py path/to/logo.png`. Two decisions there are load-bearing:
+
+- **The favicons and app icons keep a dark field rather than transparency.** The
+  three figures inside the controller are white, so a transparent icon leaves them
+  invisible against light browser chrome — only the controller outline survives.
+- **The lockup's transparency comes from a luminance ramp, not a colour key.** The
+  source is bright content on a near-black field (luminance ~17; the darkest part of
+  the gradient is ~125), so a ramp between the two separates them while leaving
+  antialiased edges as partial alpha. A hard colour match leaves a staircase, and
+  keying to one exact RGB value misses the compression noise around the glyphs. It
+  composites cleanly on both `--plane` (#0d0d0d) and the lighter card surfaces.
+
+`logo.png` is 448×96 — 3× a 26–30px display height, not the full-resolution crop,
+which was 116 KB for a mark nobody sees above 30px. On screens under 560px the
+topbar clips the lockup to the controller with `object-fit: cover`, because the
+wordmark, the group switcher and the tab row cannot share one line.
+
+The source image had a generator watermark in its bottom-right corner. It sits
+outside the lockup's bounding box, so the tight crop removes it — but check for one
+when regenerating from a new source.
+
+**The name is inconsistent and that is not yet decided.** The logo reads "Coop
+Queue", the host is `coopqueue.pages.dev`, and this file and parts of the UI still
+say "CoopQ". `<title>`, the manifest and the OG tags now say "CoopQueue" to match
+the logo and the domain. Ask before making a wholesale rename.
 
 ## Vocabulary
 

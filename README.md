@@ -1,9 +1,14 @@
-# CoopQ
+<p align="center">
+  <img src="public/brand/logo.png" alt="CoopQueue" width="448" height="96">
+</p>
+
+# CoopQueue
 
 A co-op game tracker for groups of friends. Sign in with Steam, create a group,
 rate games in a queue with the trailer playing, suggest new ones by pasting a
-store link, and settle "what next" with a score that accounts for who actually
-bothered to vote — and for whether your whole group can even fit in the lobby.
+store link, and settle "what next" with a group score shown next to how many
+people voted for it — and with a check on whether your whole group can even fit
+in the lobby.
 
 Multi-tenant: any number of groups, each with its own library, members and
 headcount. One person can belong to several.
@@ -31,11 +36,13 @@ disagreement" and "fewest votes", which is how you find what needs attention.
 Filterable by whose votes a game already has, by group score, and by whether
 anyone has logged hours.
 
-**Browse.** The most-reviewed online co-op games on Steam, as a global
-catalogue. Pull the ones your group might play into its **pool** — and only
-pooled games ever appear in anyone's rating queue. That opt-in step is the whole
-point: a catalogue of thousands would otherwise bury the handful of votes that
-decide what you actually play. Games whose player cap nobody has verified say so
+**Find games.** The most-reviewed online co-op games on Steam, as a global
+catalogue, defaulting to a **Recommended for us** order built from your group's
+own ratings — and it names the tags it based that on, so you can disagree with
+it. A **Co-op only** filter is on by default. Add the ones your group might play
+to its **library**, and only library games ever appear in anyone's rating queue.
+That opt-in step is the whole point: a catalogue of thousands would otherwise
+bury the handful of votes that decide what you actually play. Games whose player cap nobody has verified say so
 rather than guessing, and the "only ones we can all play" filter leaves them out
 instead of claiming they fit.
 
@@ -300,7 +307,7 @@ genuinely popular before you'd notice.
 
 **The actual constraint is Steam, not Cloudflare.** The store endpoints throttle
 at roughly 200 requests / 5 minutes *per IP*, and Cloudflare Workers egress from
-a shared pool. That's why `steam_apps` exists: metadata is cached globally by
+a shared egress pool. That's why `steam_apps` exists: metadata is cached globally by
 appid with a 14-day TTL, so the thousandth group to add Terraria costs zero
 Steam requests. Search can't be cached (unbounded query space) and is the thing
 that would break first under load. If it does, the fix is a debounce on the
@@ -313,19 +320,33 @@ Rate Limiting rules are free and would be the first thing to add.
 
 ---
 
-## Ideas for v2
+## Further reading
 
-- **Steam auto-sync.** You already store SteamID64s, so
-  `IPlayerService/GetOwnedGames` and `ISteamUserStats/GetPlayerAchievements`
-  would fill in real playtime and achievement completion per person. A
-  Cloudflare cron trigger (free) could refresh nightly and auto-detect when the
-  group has started something new.
-- **"Who owns it"** badges from the same endpoint, so you stop buying a game two
-  people already have.
-- **Session log** — who played, when, for how long, so `hours` stops depending
-  on somebody remembering to type it in.
-- **A nudge.** A weekly Discord webhook listing what still has fewer than a full
-  set of votes. Given how lopsided rating coverage tends to get, this is
-  probably the highest-value addition on the list.
-- **Public group pages** — a read-only shareable ranking, which is also the
-  cheapest growth loop the site has.
+- **[`docs/OPERATIONS.md`](docs/OPERATIONS.md)** — the runbook for a deployed
+  instance: secrets, deploying, migrations, backups and recovery, catalogue
+  maintenance, and a troubleshooting table of everything that has actually gone
+  wrong.
+- **[`AGENTS.md`](AGENTS.md)** — orientation for coding agents: the hard rules,
+  the layout, and which constants are measured rather than chosen.
+- **[`CLAUDE.md`](CLAUDE.md)** — the long form of all of the above, including the
+  numbers behind every invariant.
+
+## What's next
+
+Steam playtime sync, comments, archiving and the recommender are **done**. Still
+open, roughly in value order:
+
+- **Rate-limit writes.** Cloudflare Rate Limiting rules are free; right now the
+  only protection is soft caps enforced in application code.
+- **Scheduled D1 backups** via a cron trigger running `d1 export`. The free tier
+  has no automatic backups, and Time Travel only reaches back 30 days.
+- **Verified player caps at scale.** Only 55 of 337 catalogue rows have one, so
+  most cards read "player count unverified". Steam publishes no machine-readable
+  co-op cap; IGDB's `multiplayer_modes.onlinecoopmax` is exactly the field, and
+  the API is free with Twitch developer credentials.
+- **Achievement sync** — `ISteamUserStats/GetPlayerAchievements`, plus a "who
+  already owns this" badge, so you stop buying a game two people already have.
+- **A weekly nudge** (Discord webhook) listing games with fewer votes than the
+  group has members. Rating coverage is the app's core problem — in the original
+  spreadsheet it ranged from 89% to 27% per person.
+- **Public read-only group pages**, also the cheapest growth loop the site has.

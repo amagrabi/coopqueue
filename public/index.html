@@ -4,17 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>CoopQ — plan co-op nights with your group</title>
+<title>CoopQueue — plan co-op nights with your group</title>
 <meta name="description" content="Rate the games you've played, vote on what's next, and see which ones your whole group can actually play together. Free, sign in with Steam.">
 <link rel="stylesheet" href="/styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎮</text></svg>">
+
+<!-- Icons carry a dark field rather than transparency on purpose: the three figures
+     inside the controller are white, so a transparent icon leaves them invisible
+     against light browser chrome. -->
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0d0d0d">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CoopQueue">
+<meta property="og:title" content="CoopQueue — plan co-op nights with your group">
+<meta property="og:description" content="Rate the games you've played, vote on what's next, and see which ones your whole group can actually play together. Free, sign in with Steam.">
+<meta property="og:image" content="https://coopqueue.pages.dev/brand/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://coopqueue.pages.dev/">
+<meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
 
 <!-- ═════════════════════════ signed out: landing ═════════════════════════ -->
 <section id="landing" class="landing" hidden>
   <header class="landing-top">
-    <div class="brand">CoopQ</div>
+    <a class="brand" href="/" aria-label="CoopQueue">
+      <img src="/brand/logo.png" alt="CoopQueue" width="448" height="96" class="brand-logo">
+    </a>
     <a class="btn btn-steam btn-sm" href="/api/auth/steam">Sign in through Steam</a>
   </header>
 
@@ -109,7 +129,9 @@
 <div id="app" hidden>
 
   <header class="topbar">
-    <div class="brand">CoopQ</div>
+    <a class="brand" href="#/" aria-label="CoopQueue">
+      <img src="/brand/logo.png" alt="CoopQueue" width="448" height="96" class="brand-logo">
+    </a>
 
     <div class="group-switch">
       <button class="group-btn" id="group-btn" aria-haspopup="menu" aria-expanded="false">
