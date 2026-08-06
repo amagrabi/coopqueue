@@ -21,6 +21,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOML = path.join(ROOT, 'wrangler.toml');
 const PROJECT = 'g4m1ng';
 const DB_NAME = 'g4m1ng';
+const BRANCH = 'main';
 
 const c = {
   dim: (s) => `\x1b[2m${s}\x1b[0m`,
@@ -37,20 +38,40 @@ const note = (msg) => console.log(`    ${c.dim(msg)}`);
 const warn = (msg) => console.log(`    ${c.yellow('!')} ${msg}`);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+/**
+ * Reading an answer must fail loudly. readline's `question()` never settles on a
+ * closed stream, so on EOF the process would just run out of work and exit 0 —
+ * a silent vanish mid-setup that looks like success. Race the close event so a
+ * short answer file becomes an error instead.
+ */
 const ask = async (q, dflt = '') => {
-  const a = (await rl.question(`    ${q}${dflt ? c.dim(` [${dflt}]`) : ''} `)).trim();
+  const prompt = `    ${q}${dflt ? c.dim(` [${dflt}]`) : ''} `;
+  const eof = new Promise((_, reject) =>
+    rl.once('close', () => reject(new Error(
+      `stdin ended while waiting for: "${q}"\n` +
+      '    When piping answers, supply one line per prompt.'))));
+  const a = (await Promise.race([rl.question(prompt), eof])).trim();
   return a || dflt;
 };
 const yes = async (q) => /^y(es)?$/i.test(await ask(`${q} (y/N)`, 'n'));
 
-/** Run wrangler, returning stdout. `quiet` swallows a non-zero exit. */
-function wrangler(args, { quiet = false, input } = {}) {
+/**
+ * Run wrangler, returning stdout. `quiet` swallows a non-zero exit.
+ *
+ * stdin is withheld from the child on purpose. Handing it our own descriptor
+ * lets the child drain answers meant for the prompts above — which silently
+ * desynchronises every later question when setup is driven from a pipe. Only
+ * `login`, which has its own interactive flow, gets the real stdin.
+ */
+function wrangler(args, { quiet = false, input, interactive = false } = {}) {
+  const stdin = input !== undefined ? 'pipe' : interactive ? 'inherit' : 'ignore';
   try {
     return execFileSync('npx', ['wrangler', ...args], {
       cwd: ROOT,
       encoding: 'utf8',
       input,
-      stdio: input === undefined ? ['inherit', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
+      stdio: [stdin, 'pipe', 'pipe'],
     });
   } catch (e) {
     if (quiet) return (e.stdout || '') + (e.stderr || '');
@@ -67,7 +88,7 @@ async function main() {
   let who = wrangler(['whoami'], { quiet: true });
   if (/not authenticated|you are not logged in/i.test(who)) {
     note('Opening a browser to authorise wrangler…');
-    wrangler(['login']);
+    wrangler(['login'], { interactive: true });
     who = wrangler(['whoami'], { quiet: true });
   }
   const email = who.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0];
@@ -79,7 +100,7 @@ async function main() {
   if (new RegExp(`\\b${PROJECT}\\b`).test(projects)) {
     ok(`Project "${PROJECT}" already exists`);
   } else {
-    wrangler(['pages', 'project', 'create', PROJECT, '--production-branch', 'main']);
+    wrangler(['pages', 'project', 'create', PROJECT, '--production-branch', BRANCH]);
     ok(`Created "${PROJECT}"`);
   }
 
@@ -174,9 +195,15 @@ async function main() {
 
   /* ── 6. deploy ──────────────────────────────────────────────────────── */
   say('Deploying');
-  const out = wrangler(['pages', 'deploy', '--project-name', PROJECT, '--commit-dirty=true']);
-  const url = out.match(/https:\/\/[\w-]+\.[\w-]*\.?pages\.dev/g)?.pop();
+  // --branch is not optional. Without it wrangler infers the current git branch,
+  // and anything other than the production branch becomes a *preview* deploy —
+  // which reads the preview environment's secrets, not the ones set above, and
+  // so boots with no SESSION_SECRET while still reporting success.
+  const out = wrangler(['pages', 'deploy', '--project-name', PROJECT,
+                        '--branch', BRANCH, '--commit-dirty=true']);
   ok('Deployed');
+  const url = `https://${PROJECT}.pages.dev`;
+  note(`Production: ${url}`);
 
   console.log(c.green('\n  Done.\n'));
   if (url) console.log(`  ${c.b(url)}\n`);

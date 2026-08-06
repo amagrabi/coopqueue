@@ -8,7 +8,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "g4m1ng"
-database_id = "PASTE_YOUR_DATABASE_ID_HERE"
+database_id = "f16e7e1e-e2c3-463b-b1e4-158bc961de92"
 
 # Secrets are NOT set here — never commit them. Set them once each with:
 #   npx wrangler pages secret put SESSION_SECRET

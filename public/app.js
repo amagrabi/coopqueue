@@ -63,6 +63,18 @@ const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
 
+/**
+ * Can a bare <video> actually play this URL? Steam serves most trailers as an
+ * HLS manifest now, which only Safari handles without a streaming library, so
+ * ask the browser rather than assuming. Progressive files always pass.
+ */
+const playable = (url) => {
+  if (!/\.m3u8(\?|$)/i.test(url)) return true;
+  const v = document.createElement('video');
+  return !!(v.canPlayType('application/vnd.apple.mpegurl') ||
+            v.canPlayType('application/x-mpegURL'));
+};
+
 const show = (id) => {
   for (const s of ['landing', 'onboard', 'claim', 'app']) $('#' + s).hidden = s !== id;
 };
@@ -355,10 +367,18 @@ function renderQueue() {
   const media = $('.rate-media');
   const note  = $('#rate-notrailer');
   video.pause();
-  if (g.trailer_url) {
+  if (g.trailer_url && playable(g.trailer_url)) {
     video.src = g.trailer_url;
     video.poster = g.header_image || '';
     video.hidden = false; image.hidden = true; note.hidden = true;
+    media.classList.remove('is-blank');
+  } else if (g.trailer_url && g.header_image) {
+    // Steam now serves most trailers only as an HLS stream, which Safari plays
+    // natively and Chrome/Firefox do not. Showing the art beats showing a video
+    // element that silently never starts.
+    video.removeAttribute('src'); video.hidden = true;
+    image.src = g.header_image; image.hidden = false;
+    note.hidden = false; note.textContent = 'Trailer needs Safari — Steam streams it as HLS';
     media.classList.remove('is-blank');
   } else if (g.header_image) {
     video.removeAttribute('src'); video.hidden = true;
