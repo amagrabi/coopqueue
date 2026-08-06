@@ -81,7 +81,8 @@ CREATE TABLE coop_apps (
   short_description TEXT,
   genre             TEXT,
   price             TEXT,
-  release_date      TEXT,
+  release_date      TEXT,             -- Steam's display string, e.g. '16 May, 2011'
+  release_ts        INTEGER,          -- parsed epoch seconds; sorting the string is NOT chronological
   metacritic        INTEGER,
   coop_categories   TEXT,             -- JSON array of Steam's co-op tags: a HINT
   max_players       INTEGER,          -- verified online co-op cap; NULL = unknown
@@ -92,6 +93,7 @@ CREATE TABLE coop_apps (
 
 CREATE INDEX idx_coop_apps_rank ON coop_apps(popularity_rank);
 CREATE INDEX idx_coop_apps_name ON coop_apps(name COLLATE NOCASE);
+CREATE INDEX idx_coop_apps_released ON coop_apps(release_ts);
 
 -- ── a group's library ───────────────────────────────────────────────────────
 -- Metadata is denormalised onto the row rather than joined from steam_apps so

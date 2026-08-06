@@ -145,7 +145,7 @@ const server = http.createServer(async (req, res) => {
     rows.sort({
       rank: (a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9),
       name: (a, b) => a.name.localeCompare(b.name),
-      new:  (a, b) => String(b.release_date || '').localeCompare(String(a.release_date || '')),
+      new:  (a, b) => (b.release_ts ?? -1) - (a.release_ts ?? -1),
     }[sort] || ((a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9)));
 
     const slice = rows.slice(page * PAGE, page * PAGE + PAGE + 1);

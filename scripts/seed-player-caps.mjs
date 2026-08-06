@@ -125,8 +125,12 @@ const CAPS = [
   ['subnautica below zero',         0,  'No co-op — single player only'],
 ];
 
+// Apostrophes are DELETED, not collapsed to a space: turning them into spaces
+// makes "Baldur's Gate 3" normalise to "baldur s gate 3", which silently fails to
+// match "baldurs gate 3" and quietly loses the cap for every possessive title —
+// Garry's Mod, Don't Starve Together, Tiny Tina's Wonderlands.
 const norm = (s) => s.toLowerCase()
-  .replace(/[™®©]/g, '')
+  .replace(/[™®©'’`]/g, '')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 

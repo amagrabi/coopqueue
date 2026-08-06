@@ -40,12 +40,15 @@ export async function onRequestGet({ request, env }) {
   const order = {
     rank: 'popularity_rank ASC',
     name: 'name COLLATE NOCASE ASC',
-    new:  'release_date DESC',
+    // release_date is a display string ('9 Sep, 2025'); ordering it as text
+    // groups by day-of-month instead of by date. release_ts is the real thing.
+    new:  'release_ts DESC',
   }[sort] || 'popularity_rank ASC';
 
   const rows = await env.DB.prepare(
     `SELECT appid, name, popularity_rank, review_hint, header_image, short_description,
-            genre, price, release_date, metacritic, max_players, max_players_src, coop_note
+            genre, price, release_date, release_ts, metacritic, max_players, max_players_src,
+            coop_note
        FROM coop_apps ${filter}
       ORDER BY ${order} LIMIT ? OFFSET ?`
   ).bind(...args, PAGE + 1, page * PAGE).all();

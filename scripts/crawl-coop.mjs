@@ -64,6 +64,30 @@ const num = (v) => (v === null || v === undefined || Number.isNaN(Number(v)) ? '
 /** Entries that are obviously not games, skipped before spending an appdetails call. */
 const OBVIOUS_NON_GAME = /\b(soundtrack|ost|art\s?book|demo|season pass|upgrade pack)\b/i;
 
+const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+              jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+/**
+ * Steam's release_date is a display string ('16 May, 2011'). Sorting it as text
+ * is not chronological — it groups by day-of-month — so the browse "Newest" sort
+ * needs a real timestamp alongside it. Unparseable values ('Coming soon') are
+ * null, which sorts last.
+ */
+function releaseTs(s) {
+  if (!s) return null;
+  const t = s.trim();
+  let m = /^(\d{1,2})\s+([A-Za-z]{3})[a-z]*,?\s+(\d{4})$/.exec(t);
+  if (m && MON[m[2].toLowerCase()] != null) {
+    return Math.floor(Date.UTC(+m[3], MON[m[2].toLowerCase()], +m[1]) / 1000);
+  }
+  m = /^([A-Za-z]{3})[a-z]*\s+(\d{4})$/.exec(t);           // 'Mar 2026'
+  if (m && MON[m[1].toLowerCase()] != null) {
+    return Math.floor(Date.UTC(+m[2], MON[m[1].toLowerCase()], 1) / 1000);
+  }
+  m = /^(?:Q[1-4]\s+)?(\d{4})$/.exec(t);                    // 'Q1 2026', '2026'
+  if (m) return Math.floor(Date.UTC(+m[1], 0, 1) / 1000);
+  return null;
+}
+
 async function searchPage(start) {
   const url = 'https://store.steampowered.com/search/results/'
     + `?query&category2=${CATEGORY_ONLINE_COOP}&filter=${DISCOVER}&json=1`
@@ -94,6 +118,7 @@ async function details(appid) {
     genre: d.genres?.[0]?.description || null,
     price: d.is_free ? 'Free' : (d.price_overview?.final_formatted || null),
     release_date: d.release_date?.date || null,
+    release_ts: releaseTs(d.release_date?.date),
     metacritic: d.metacritic?.score ?? null,
     coop_categories: (d.categories || [])
       .map((c) => c.description)
@@ -168,16 +193,17 @@ const sql = `-- CoopQ — global co-op catalogue, crawled from Steam.
 
 ${rows.map((g) => `INSERT INTO coop_apps
   (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
+   price, release_date, release_ts, metacritic, coop_categories, crawled_at)
 VALUES (${num(g.appid)}, ${sq(g.name)}, ${num(g.rank)}, ${sq(g.review_hint)},
         ${sq(g.header_image)}, ${sq(g.short_description)}, ${sq(g.genre)}, ${sq(g.price)},
-        ${sq(g.release_date)}, ${num(g.metacritic)},
+        ${sq(g.release_date)}, ${num(g.release_ts)}, ${num(g.metacritic)},
         ${sq(JSON.stringify(g.coop_categories))}, unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
   review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();`).join('\n\n')}
 `;

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS coop_apps (
   genre             TEXT,
   price             TEXT,
   release_date      TEXT,
+  release_ts        INTEGER,          -- parsed epoch seconds; the string is not sortable
   metacritic        INTEGER,
   coop_categories   TEXT,             -- JSON array of Steam's co-op tags: a HINT
   -- Max simultaneous ONLINE co-op players. NULL means genuinely unknown, which
