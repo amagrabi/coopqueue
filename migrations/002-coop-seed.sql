@@ -6,4961 +6,5339 @@
 -- sort_by=Reviews_DESC ranks by review score, which puts 534-review curiosities
 -- and zero-review listings above games with a million reviews.
 --
--- 330 games kept, discovered via globaltopsellers, minimum 200 reviews.
--- Skipped: 53 not type 'game', 0 obvious non-games,
+-- 333 games kept, discovered via globaltopsellers, minimum 200 reviews.
+-- Skipped: 52 not type 'game', 0 obvious non-games,
 -- 15 below the review floor, 0 with no store data,
--- 2 duplicates across pages.
+-- 0 duplicates across pages.
 --
 -- max_players is intentionally absent from the column list: this upsert must
 -- never overwrite a player count a human verified. Re-running the crawl only
 -- refreshes metadata and popularity.
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (105600, 'Terraria', 1, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (105600, 'Terraria', 1, 1542854, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/105600/header.jpg?t=1769844435', 'Dig, fight, explore, build! Nothing is impossible in this action-packed adventure game. Four Pack also available!', 'Action', '9,75€',
-        '16 May, 2011', 83,
+        '16 May, 2011', 1305504000, 83,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (359550, 'Tom Clancy''s Rainbow Six Siege', 2, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (359550, 'Tom Clancy''s Rainbow Six Siege', 2, 1537430, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/359550/cd31c5a197317624687ad580af592e6404d13581/header.jpg?t=1784137517', 'Tom Clancy''s Rainbow Six Siege is an elite, tactical team-based shooter where superior planning and execution triumph.', 'Action', 'Free',
-        '1 Dec, 2015', NULL,
+        '1 Dec, 2015', 1448928000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (252490, 'Rust', 3, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (252490, 'Rust', 3, 1387805, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/252490/header.jpg?t=1781536981', 'The only aim in Rust is to survive. Everything wants you to die - the island’s wildlife, other inhabitants, the environment, and other survivors. Do whatever it takes to last another night.', 'Action', '19,99€',
-        '8 Feb, 2018', 69,
+        '8 Feb, 2018', 1518048000, 69,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4000, 'Garry''s Mod', 4, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4000, 'Garry''s Mod', 4, 1256125, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4000/header.jpg?t=1776868682', 'Garry''s Mod is a physics sandbox. There aren''t any predefined aims or goals. We give you the tools and leave you to play.', 'Casual', '9,99€',
-        '29 Nov, 2006', NULL,
+        '29 Nov, 2006', 1164758400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (553850, 'HELLDIVERS™ 2', 5, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (553850, 'HELLDIVERS™ 2', 5, 1152943, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/553850/f11c258b04a5e3e7771c1bab60f324ebf6c6c6fb/header.jpg?t=1779899567', 'The Galaxy’s Last Line of Offence. Enlist in the Helldivers and join the fight for freedom across a hostile galaxy in a fast, frantic, and ferocious third-person shooter.', 'Action', '39,99€',
-        '8 Feb, 2024', NULL,
+        '8 Feb, 2024', 1707350400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1245620, 'ELDEN RING', 6, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1245620, 'ELDEN RING', 6, 1147073, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/header.jpg?t=1784684281', 'THE CRITICALLY ACCLAIMED FANTASY ACTION RPG. Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring and become an Elden Lord in the Lands Between.', 'Action', '59,99€',
-        '24 Feb, 2022', 94,
+        '24 Feb, 2022', 1645660800, 94,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1172470, 'Apex Legends™', 7, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1172470, 'Apex Legends™', 7, 1061916, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172470/6cf04767652d703b6050da84b82cfb1194258d7d/header.jpg?t=1786031871', 'Apex Legends is the award-winning, free-to-play Hero Shooter from Respawn Entertainment. Master an ever-growing roster of legendary characters with powerful abilities, and experience strategic squad play and innovative gameplay in the next evolution of Hero Shooter and Battle Royale.', 'Action', 'Free',
-        '4 Nov, 2020', 88,
+        '4 Nov, 2020', 1604448000, 88,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (550, 'Left 4 Dead 2', 8, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (550, 'Left 4 Dead 2', 8, 1051160, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/550/header.jpg?t=1772742214', 'Set in the zombie apocalypse, Left 4 Dead 2 is a co-operative action horror FPS takes you and your friends through the cities, swamps and cemeteries of the Deep South, from Savannah to New Orleans across five expansive campaigns.', 'Action', '9,75€',
-        '16 Nov, 2009', 89,
+        '16 Nov, 2009', 1258329600, 89,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (413150, 'Stardew Valley', 9, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (413150, 'Stardew Valley', 9, 1029457, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/413150/header.jpg?t=1754692865', 'You''ve inherited your grandfather''s old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life. Can you learn to live off the land and turn these overgrown fields into a thriving home?', 'Indie', '13,99€',
-        '26 Feb, 2016', 89,
+        '26 Feb, 2016', 1456444800, 89,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (227300, 'Euro Truck Simulator 2', 10, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (227300, 'Euro Truck Simulator 2', 10, 935213, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/227300/9a81dc3126c56637297b654f9dcac057cfd79b77/header.jpg?t=1785394779', 'Travel across Europe as king of the road, a trucker who delivers important cargo across impressive distances! With dozens of cities to explore, your endurance, skill and speed will all be pushed to their limits.', 'Indie', '19,99€',
-        '12 Oct, 2012', 79,
+        '12 Oct, 2012', 1350000000, 79,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (381210, 'Dead by Daylight', 11, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (381210, 'Dead by Daylight', 11, 925212, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/381210/header.jpg?t=1784216454', '10 years of horror. 10 years of jump scares and close calls. 10 years of brutal sacrifices and thrilling escapes. Trapped forever in a realm of eldritch evil where even death is not an escape, four determined Survivors face a bloodthirsty Killer in a vicious game of nerve and wits.', 'Action', '19,99€',
-        '14 Jun, 2016', NULL,
+        '14 Jun, 2016', 1465862400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1174180, 'Red Dead Redemption 2', 12, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1174180, 'Red Dead Redemption 2', 12, 905119, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1174180/header.jpg?t=1759502961', 'Arthur Morgan and the Van der Linde Gang are outlaws on the run. With federal agents and bounty hunters massing on their heels, the gang must rob, steal, and fight their way across the rugged heartland in order to survive.', 'Action', '59,99€',
-        '5 Dec, 2019', 93,
+        '5 Dec, 2019', 1575504000, 93,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1086940, 'Baldur''s Gate 3', 13, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1086940, 'Baldur''s Gate 3', 13, 851310, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1086940/48a2fcbda8565bb45025e98fd8ebde8a7203f6a0/header.jpg?t=1777363040', 'Baldur’s Gate 3 is a story-rich, party-based RPG set in the universe of Dungeons &amp; Dragons, where your choices shape a tale of fellowship and betrayal, survival and sacrifice, and the lure of absolute power.', 'Adventure', '59,99€',
-        '3 Aug, 2023', 96,
+        '3 Aug, 2023', 1691020800, 96,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (739630, 'Phasmophobia', 14, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (739630, 'Phasmophobia', 14, 836303, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/739630/c227a2855aba60f3657bc0c3a46515b8c41fb2b6/header.jpg?t=1785937507', 'Phasmophobia is a 4 player online co-op psychological horror. Paranormal activity is on the rise and it’s up to you and your team to use all the ghost-hunting equipment at your disposal in order to gather as much evidence as you can.', 'Action', '18,99€',
-        '18 Sep, 2020', NULL,
+        '18 Sep, 2020', 1600387200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1938090, 'Call of Duty®', 15, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1938090, 'Call of Duty®', 15, 778674, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1938090/23af6cf41e2d09620caa07700a4cb3288dbcbaa8/header.jpg?t=1784850874', 'The Call of Duty® experience supports Modern Warfare® 4, Black Ops 7 and Call of Duty®: Warzone™.', 'Action', NULL,
-        '27 Oct, 2022', NULL,
+        '27 Oct, 2022', 1666828800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (236390, 'War Thunder', 16, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (236390, 'War Thunder', 16, 773037, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/236390/65885881b96806d55fea45e130233fdafd78b129/header.jpg?t=1784211516', 'War Thunder is the most comprehensive free-to-play, cross-platform, MMO military game dedicated to aviation, armoured vehicles, and naval craft, from the early 20th century to the most advanced modern combat units. Join now and take part in major battles on land, in the air, and at sea.', 'Action', 'Free',
-        '15 Aug, 2013', 81,
+        '15 Aug, 2013', 1376524800, 81,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (945360, 'Among Us', 17, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (945360, 'Among Us', 17, 742169, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/945360/header.jpg?t=1781287930', 'An online and local party game of teamwork and betrayal for 4-15 players...in space!', 'Casual', '4,49€',
-        '16 Nov, 2018', 85,
+        '16 Nov, 2018', 1542326400, 85,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (242760, 'The Forest', 18, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (242760, 'The Forest', 18, 679633, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/242760/header.jpg?t=1699381053', 'As the lone survivor of a passenger jet crash, you find yourself in a mysterious forest battling to stay alive against a society of cannibalistic mutants. Build, explore, survive in this terrifying first person survival horror simulator.', 'Action', '16,79€',
-        '30 Apr, 2018', 83,
+        '30 Apr, 2018', 1525046400, 83,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (218620, 'PAYDAY 2', 19, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (218620, 'PAYDAY 2', 19, 673847, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/218620/header.jpg?t=1782903835', 'PAYDAY 2 is an action-packed, four-player co-op shooter that once again lets gamers don the masks of the original PAYDAY crew - Dallas, Hoxton, Wolf and Chains - as they descend on Washington DC for an epic crime spree.', 'Action', '9,49€',
-        '13 Aug, 2013', 79,
+        '13 Aug, 2013', 1376352000, 79,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (230410, 'Warframe', 20, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (230410, 'Warframe', 20, 672973, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/230410/a000b4bf98dde5d51cd44206f1ac21d04841017e/header.jpg?t=1785169127', 'Awaken as an unstoppable warrior and battle alongside your friends in this story-driven free-to-play online action game', 'Action', 'Free',
-        '25 Mar, 2013', 69,
+        '25 Mar, 2013', 1364169600, 69,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1085660, 'Destiny 2', 21, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1085660, 'Destiny 2', 21, 660672, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1085660/0ccf0dc0a8c4ec078db7ab99ddc820b2fa884441/header.jpg?t=1781815889', 'Explore the mysteries of Sol and experience exhilirating first-person shooter combat in Destiny 2. Unlock powerful abilities and collect unique gear across story missions, co-op, and PvP modes.', 'Action', 'Free',
-        '1 Oct, 2019', 83,
+        '1 Oct, 2019', 1569888000, 83,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (322330, 'Don''t Starve Together', 22, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (322330, 'Don''t Starve Together', 22, 540718, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/322330/da5d1bc20a2b35fe987c68047ba96a7f3d25c982/header_alt_assets_50.jpg?t=1782413299', 'Fight, Farm, Build and Explore Together in the standalone multiplayer expansion to the uncompromising wilderness survival game, Don''t Starve.', 'Action', '14,99€',
-        '21 Apr, 2016', 83,
+        '21 Apr, 2016', 1461196800, 83,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (892970, 'Valheim', 23, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (892970, 'Valheim', 23, 539519, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/892970/de0bdcf6c008c508a79d8e75eb91fc67f4bebd5d/header.jpg?t=1786012504', 'A brutal exploration and survival game for 1-10 players, set in a procedurally-generated purgatory inspired by viking culture. Battle, build, and conquer your way to a saga worthy of Odin’s patronage!', 'Action', '29,99€',
-        '2 Feb, 2021', NULL,
+        '2 Feb, 2021', 1612224000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1966720, 'Lethal Company', 24, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1966720, 'Lethal Company', 24, 510096, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1966720/header.jpg?t=1775380053', 'A co-op horror about scavenging at abandoned moons to sell scrap to the Company.', 'Action', '9,75€',
-        '23 Oct, 2023', NULL,
+        '23 Oct, 2023', 1698019200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1623730, 'Palworld', 25, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1623730, 'Palworld', 25, 469174, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1623730/6912f19c43a95ff5fe514eedd35e68bf12335459/header.jpg?t=1784714419', 'Fight, farm, build and work alongside mysterious creatures called &quot;Pals&quot; in this completely new multiplayer, open world survival and crafting game!', 'Action', '28,99€',
-        '9 Jul, 2026', NULL,
+        '9 Jul, 2026', 1783555200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (108600, 'Project Zomboid', 26, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (108600, 'Project Zomboid', 26, 467744, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/108600/header.jpg?t=1785771763', 'Project Zomboid is the ultimate in zombie survival. Alone or in MP: you loot, build, craft, fight, farm and fish in a struggle to survive. A hardcore RPG skillset, a vast map, massively customisable sandbox and a cute tutorial raccoon await the unwary. So how will you die? All it takes is a bite..', 'Indie', '25,49€',
-        '8 Nov, 2013', NULL,
+        '8 Nov, 2013', 1383868800, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (221100, 'DayZ', 27, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (221100, 'DayZ', 27, 466953, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/221100/header.jpg?t=1769695513', 'How long can you survive a post-apocalyptic world? A land overrun with an infected &quot;zombie&quot; population, where you compete with other survivors for limited resources. Will you team up with strangers and stay strong together? Or play as a lone wolf to avoid betrayal? This is DayZ – this is your story.', 'Action', '47,99€',
-        '13 Dec, 2018', NULL,
+        '13 Dec, 2018', 1544659200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (620, 'Portal 2', 28, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (620, 'Portal 2', 28, 464879, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/620/header.jpg?t=1745363004', 'The &quot;Perpetual Testing Initiative&quot; has been expanded to allow you to design co-op puzzles for you and your friends!', 'Action', '9,75€',
-        '18 Apr, 2011', 95,
+        '18 Apr, 2011', 1303084800, 95,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2357570, 'Overwatch®', 29, 'Mostly Negative',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2357570, 'Overwatch®', 29, 415751, 'Mostly Negative',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2357570/217c51ee328bb2f97c66776bb92b1ddb3d8333fe/header_alt_assets_21.jpg?t=1784740349', 'Overwatch®, A FUTURE WORTH FIGHTING FOR! Overwatch® is an always-on and ever-evolving free-to-play, team-based action game set in an optimistic future, where every match is the ultimate 5v5 or 6v6 battlefield brawl.', 'Action', 'Free',
-        '10 Aug, 2023', NULL,
+        '10 Aug, 2023', 1691625600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3241660, 'R.E.P.O.', 30, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3241660, 'R.E.P.O.', 30, 415258, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3241660/a12c92856b71315da885924ea5e1d5290c8025b8/header_alt_assets_2.jpg?t=1778158882', 'An online co-op horror game with up to 6 players. Locate valuable, fully physics-based objects and handle them with care as you retrieve and extract to satisfy your creator''s desires.', 'Action', '6,16€',
-        '26 Feb, 2025', NULL,
+        '26 Feb, 2025', 1740528000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (275850, 'No Man''s Sky', 31, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (275850, 'No Man''s Sky', 31, 413075, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/275850/5f39cba0164881a53f6aee01f72180f7c619c011/header.jpg?t=1779908213', 'No Man''s Sky is a game about exploration and survival in an infinite procedurally generated universe.', 'Action', '58,99€',
-        '12 Aug, 2016', 61,
+        '12 Aug, 2016', 1470960000, 61,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1808500, 'ARC Raiders', 32, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1808500, 'ARC Raiders', 32, 411136, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1808500/04baafaf64a5aa5f46ecda5d71889a4848dc0628/header.jpg?t=1784099728', 'ARC Raiders is a multiplayer extraction adventure, set in a lethal future earth, ravaged by a mysterious mechanized threat known as ARC.', 'Action', '39,99€',
-        '30 Oct, 2025', NULL,
+        '30 Oct, 2025', 1761782400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (291550, 'Brawlhalla', 33, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (291550, 'Brawlhalla', 33, 410362, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/291550/2db0e0cc21262d6a7da18db928b8c374521b4463/header_alt_assets_10.jpg?t=1785948877', 'An epic platform fighter for up to 8 players online or local. Try casual free-for-alls, ranked matches, or invite friends to a private room. And it''s free! Play cross-platform with millions of players on PlayStation, Xbox, Nintendo Switch, iOS, Android &amp; Steam! Frequent updates. Over sixty Legends.', 'Action', 'Free',
-        '17 Oct, 2017', NULL,
+        '17 Oct, 2017', 1508198400, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2767030, 'Marvel Rivals', 34, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2767030, 'Marvel Rivals', 34, 405856, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2767030/86f180fb2b17adae577bd1d175ca8096c9f91769/header.jpg?t=1783674088', 'Marvel Rivals is a Super Hero Team-Based PVP Shooter! Assemble an all-star Marvel squad, devise countless strategies by combining powers to form unique Team-Up skills and fight in destructible, ever-changing battlefields across the continually evolving Marvel universe!', 'Action', 'Free',
-        '5 Dec, 2024', NULL,
+        '5 Dec, 2024', 1733356800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (251570, '7 Days to Die', 35, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (251570, '7 Days to Die', 35, 397996, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/251570/header.jpg?t=1785351975', '7 Days to Die is an open-world game that is a unique combination of first-person shooter, survival horror, tower defense, and role-playing games. Play the definitive zombie survival sandbox RPG that came first. Navezgane awaits!', 'Action', '43,99€',
-        '25 Jul, 2024', NULL,
+        '25 Jul, 2024', 1721865600, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (960090, 'Bloons TD 6', 36, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (960090, 'Bloons TD 6', 36, 392357, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/960090/header.jpg?t=1782123772', 'The Bloons are back and better than ever! Get ready for a massive 3D tower defense game designed to give you hours and hours of the best strategy gaming available.', 'Strategy', '13,79€',
-        '17 Dec, 2018', NULL,
+        '17 Dec, 2018', 1545004800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (548430, 'Deep Rock Galactic', 37, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (548430, 'Deep Rock Galactic', 37, 378668, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/548430/7218336ad0b0fdbe13bfe7503627f30ac901b02c/header_alt_assets_15.jpg?t=1786014445', 'Deep Rock Galactic is a 1-4 player co-op FPS featuring dwarven space miners, procedurally-generated destructible environments, and endless hordes of alien monsters. Explore cave systems, mine for minerals, and work together to survive!', 'Action', '8,99€',
-        '13 May, 2020', 85,
+        '13 May, 2020', 1589328000, 85,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (648800, 'Raft', 38, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (648800, 'Raft', 38, 376592, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/648800/header.jpg?t=1727184011', 'Raft™ throws you and your friends into an epic oceanic adventure! Alone or together, players battle to survive a perilous voyage across a vast sea! Gather debris, scavenge reefs and build your own floating home, but be wary of the man-eating sharks!', 'Adventure', '20,49€',
-        '20 Jun, 2022', NULL,
+        '20 Jun, 2022', 1655683200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1172620, 'Sea of Thieves: 2026 Edition', 39, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1172620, 'Sea of Thieves: 2026 Edition', 39, 371882, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172620/579c6d544424019a032f4add98e8f923925c1cef/header.jpg?t=1782135471', 'Sea of Thieves is a smash-hit pirate adventure game, offering the quintessential pirate experience of plundering lost treasures, intense battles, vanquishing sea monsters and more. Dive in with this revised edition of the game, which includes access to digital bonus media.', 'Action', '13,99€',
-        '3 Jun, 2020', NULL,
+        '3 Jun, 2020', 1591142400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (632360, 'Risk of Rain 2', 40, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (632360, 'Risk of Rain 2', 40, 351110, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/632360/header.jpg?t=1783621122', 'Escape a chaotic alien planet by fighting through hordes of frenzied monsters – with your friends, or on your own. Combine loot in surprising ways and master each character until you become the havoc you feared upon your first crash landing.', 'Action', '24,99€',
-        '11 Aug, 2020', 85,
+        '11 Aug, 2020', 1597104000, 85,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3527290, 'PEAK', 41, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3527290, 'PEAK', 41, 342111, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3527290/31bac6b2eccf09b368f5e95ce510bae2baf3cfcd/header.jpg?t=1775581133', 'PEAK is a co-op climbing game where the slightest mistake can spell your doom. Either solo or as a group of lost nature scouts, your only hope of rescue from a mysterious island is to scale the mountain at its center. Do you have what it takes to reach the PEAK?', 'Action', '3,74€',
-        '16 Jun, 2025', NULL,
+        '16 Jun, 2025', 1750032000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1144200, 'Ready or Not', 42, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1144200, 'Ready or Not', 42, 340832, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1144200/2b44644b033a996a9efb95051bb01809215d0d23/header.jpg?t=1781703931', 'Become an elite SWAT commander and bring order to a city overwhelmed by chaos and corruption.', 'Action', '24,99€',
-        '13 Dec, 2023', NULL,
+        '13 Dec, 2023', 1702425600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2246340, 'Monster Hunter Wilds', 43, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2246340, 'Monster Hunter Wilds', 43, 326844, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2246340/header.jpg?t=1785888380', 'The unbridled force of nature runs wild and relentless, with environments transforming drastically from one moment to the next. This is a story of monsters and humans and their struggles to live in harmony in a world of duality.', 'Action', '39,99€',
-        '27 Feb, 2025', NULL,
+        '27 Feb, 2025', 1740614400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1517290, 'Battlefield™ 2042', 44, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1517290, 'Battlefield™ 2042', 44, 325391, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1517290/header.jpg?t=1777324359', 'Battlefield™ 2042 is a first-person shooter that marks the return to the iconic all-out warfare of the franchise.', 'Action', '5,99€',
-        '19 Nov, 2021', NULL,
+        '19 Nov, 2021', 1637280000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1326470, 'Sons Of The Forest', 45, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1326470, 'Sons Of The Forest', 45, 316489, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1326470/header.jpg?t=1708624856', 'Sent to find a missing billionaire on a remote island, you find yourself in a cannibal-infested hellscape. Craft, build, and struggle to survive, alone or with friends, in this terrifying new open-world survival horror simulator.', 'Action', '28,99€',
-        '22 Feb, 2024', NULL,
+        '22 Feb, 2024', 1708560000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3164500, 'Schedule I', 46, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3164500, 'Schedule I', 46, 311134, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3164500/header.jpg?t=1785744977', 'From small-time dope pusher to kingpin - manufacture and distribute a range of drugs throughout the grungy city of Hyland Point. Expand your empire with properties, businesses, employees and more.', 'Action', '19,50€',
-        '24 Mar, 2025', NULL,
+        '24 Mar, 2025', 1742774400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (107410, 'Arma 3', 47, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (107410, 'Arma 3', 47, 294544, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/107410/header.jpg?t=1781616621', 'Experience true combat gameplay in a massive military sandbox. Deploy with a wide variety of single- and multiplayer content, a massive arsenal of modern weapons and vehicles, and limitless opportunities for content creation. Authentic, diverse, open - Arma 3 sends you to war.', 'Action', '29,99€',
-        '12 Sep, 2013', 74,
+        '12 Sep, 2013', 1378944000, 74,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1551360, 'Forza Horizon 5', 48, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1551360, 'Forza Horizon 5', 48, 278749, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1551360/header.jpg?t=1746471508', 'Explore the vibrant open world landscapes of Mexico with limitless, fun driving action in the world’s greatest cars.', 'Action', '59,99€',
-        '8 Nov, 2021', NULL,
+        '8 Nov, 2021', 1636329600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (526870, 'Satisfactory', 49, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (526870, 'Satisfactory', 49, 277104, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/526870/header.jpg?t=1780413533', 'Satisfactory is a first-person open-world factory building game with a dash of exploration and combat. Play alone or with friends, explore an alien planet, create multi-story factories, and enter conveyor belt heaven!', 'Adventure', '38,99€',
-        '10 Sep, 2024', 91,
+        '10 Sep, 2024', 1725926400, 91,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (594650, 'Hunt: Showdown 1896', 50, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (594650, 'Hunt: Showdown 1896', 50, 276540, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/594650/279c054bf947c40225a8f2f56b15bf7f817976f0/header_alt_assets_27.jpg?t=1785847079', 'Hunt: Showdown 1896 is the brutally rewarding extraction shooter. Track twisted monsters and overcome ruthless PvP. Take bounties in corrupted backwaters lost to history. With a team, you might survive. Die with nothing or get out with everything.', 'Action', '29,99€',
-        '27 Aug, 2019', 81,
+        '27 Aug, 2019', 1566864000, 81,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2073850, 'THE FINALS', 51, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2073850, 'THE FINALS', 51, 273781, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2073850/61f55ef49a74c76bf9fda9ec35bc3101eeee2b3e/header.jpg?t=1783602452', 'THE FINALS is the world’s first Dynamism Shooter, a free-to-play, fast-paced, physics-driven, first-person shooter set on the stage of the biggest Gameshow of the future! Fight for Fans and fortune in fully-destructible, virtual Arenas that guarantee no two rounds will ever play the same!', 'Action', 'Free',
-        '7 Dec, 2023', NULL,
+        '7 Dec, 2023', 1701907200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2995920, 'It Takes Two Friend''s Pass', 52, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2995920, 'It Takes Two Friend''s Pass', 52, 266763, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2995920/header.jpg?t=1733241802', 'Download Friend''s Pass* and play It Takes Two with a friend for free. Just grab a friend who owns the full game, download Friend''s Pass for free, and play together!', 'Action', NULL,
-        '25 May, 2021', 89,
+        '25 May, 2021', 1621900800, 89,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1426210, 'It Takes Two', 53, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1426210, 'It Takes Two', 53, 266763, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1426210/header.jpg?t=1777395376', 'Embark on the craziest journey of your life in It Takes Two. Invite a friend to join for free with Friend’s Pass and work together across a huge variety of gleefully disruptive gameplay challenges. Winner of GAME OF THE YEAR at the Game Awards 2021.', 'Action', '11,99€',
-        '25 Mar, 2021', 89,
+        '25 Mar, 2021', 1616630400, 89,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (438100, 'VRChat', 54, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (438100, 'VRChat', 54, 266696, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/438100/header.jpg?t=1762366454', 'Join our growing community as you explore, play, and help craft the future of social VR. Create worlds and custom avatars. Welcome to VRChat.', 'Adventure', 'Free',
-        '1 Feb, 2017', NULL,
+        '1 Feb, 2017', 1485907200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1794680, 'Vampire Survivors', 55, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1794680, 'Vampire Survivors', 55, 264473, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1794680/2ca07b690dde645771125ed9d9206c4c5fde4dd4/header.jpg?t=1781096909', 'Mow down thousands of night creatures and survive until dawn! Vampire Survivors is a gothic horror casual game with rogue-lite elements, where your choices can allow you to quickly snowball against the hundreds of monsters that get thrown at you. Be the bullet hell!', 'Action', '4,99€',
-        '20 Oct, 2022', 86,
+        '20 Oct, 2022', 1666224000, 86,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (976730, 'Halo: The Master Chief Collection', 56, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (976730, 'Halo: The Master Chief Collection', 56, 261259, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/976730/header.jpg?t=1774466074', 'The Master Chief’s iconic journey includes six games, built for PC and collected in a single integrated experience. Whether you’re a long-time fan or meeting Spartan 117 for the first time, The Master Chief Collection is the definitive Halo gaming experience.', 'Action', '39,99€',
-        '3 Dec, 2019', NULL,
+        '3 Dec, 2019', 1575331200, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (238960, 'Path of Exile', 57, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (238960, 'Path of Exile', 57, 248989, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/238960/177c953b362c5a6221f9c15d340a0b1e2b8bfab8/header.jpg?t=1784681738', 'You are an Exile, struggling to survive on the dark continent of Wraeclast, as you fight to earn power that will allow you to exact your revenge against those who wronged you. Path of Exile is an online Action RPG set in a dark fantasy world. The game is completely free and will never be pay-to-win.', 'Action', 'Free',
-        '23 Oct, 2013', 86,
+        '23 Oct, 2013', 1382486400, 86,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (393380, 'Squad', 58, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (393380, 'Squad', 58, 241270, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/393380/0b19b50aabea356bd8f534fbe7d6db9bd227810a/header.jpg?t=1784319638', 'Squad is a tactical FPS that provides authentic combat experiences through teamwork, communication, and realistic combat. It bridges the gap between arcade shooter and military realism with 100-player battles, combined-arms warfare, and base building.', 'Action', '33,99€',
-        '23 Sep, 2020', NULL,
+        '23 Sep, 2020', 1600819200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (427520, 'Factorio', 59, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (427520, 'Factorio', 59, 232911, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/427520/header.jpg?t=1763986204', 'Factorio is a game about building and creating automated factories to produce items of increasing complexity, within an infinite 2D world. Use your imagination to design your factory, combine simple elements into ingenious structures, and finally protect it from the creatures who don''t really like you.', 'Casual', '32,--€',
-        '14 Aug, 2020', 90,
+        '14 Aug, 2020', 1597363200, 90,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2694490, 'Path of Exile 2', 60, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2694490, 'Path of Exile 2', 60, 224053, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2694490/24eeddcbda17903f03d819588757e40845f8115f/header.jpg?t=1781573777', 'Path of Exile 2 is a next generation Action RPG from Grinding Gear Games, featuring co-op for up to six players. Set years after the original Path of Exile, you will return to the dark world of Wraeclast and seek to end the corruption that is spreading.', 'Action', '27,75€',
-        '6 Dec, 2024', NULL,
+        '6 Dec, 2024', 1733443200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2183900, 'Warhammer 40,000: Space Marine 2', 61, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2183900, 'Warhammer 40,000: Space Marine 2', 61, 220967, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2183900/2f7b287bdc8ffcea5b32aa44368e7d8a9568be5e/header_alt_assets_13.jpg?t=1785493374', 'Embody the superhuman skill and brutality of a Space Marine. Unleash deadly abilities and devastating weaponry to obliterate the relentless Tyranid swarms. Defend the Imperium in spectacular third-person action in solo or multiplayer modes.', 'Action', '59,99€',
-        '9 Sep, 2024', 82,
+        '9 Sep, 2024', 1725840000, 82,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (534380, 'Dying Light 2 Stay Human: Reloaded Edition', 62, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (534380, 'Dying Light 2 Stay Human: Reloaded Edition', 62, 217840, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/534380/header.jpg?t=1784310924', 'Humanity is fighting a losing battle against the virus. Experience a post-apocalyptic open world overrun by hordes of zombies, where your parkour and combat skills are key to survival. Traverse the City freely during the day, but watch the monsters take over during the night.', 'Action', '11,99€',
-        '3 Feb, 2022', NULL,
+        '3 Feb, 2022', 1643846400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3240220, 'Grand Theft Auto V Enhanced', 63, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3240220, 'Grand Theft Auto V Enhanced', 63, 212147, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3240220/header.jpg?t=1781187782', 'Experience entertainment blockbusters Grand Theft Auto V and Grand Theft Auto Online — now upgraded for a new generation with stunning visuals, faster loading, 3D audio, and more, plus exclusive content for GTA Online players.', 'Action', '29,99€',
-        '4 Mar, 2025', NULL,
+        '4 Mar, 2025', 1741046400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (435150, 'Divinity: Original Sin 2 - Definitive Edition', 64, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (435150, 'Divinity: Original Sin 2 - Definitive Edition', 64, 204863, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/435150/3f6ee788cb01bd65097c52399d536eb424b4876f/header.jpg?t=1765811123', 'The critically acclaimed RPG that raised the bar, from the creators of Baldur''s Gate 3. Gather your party. Master deep, tactical combat. Venture as a party of up to four - but know that only one of you will have the chance to become a God.', 'Adventure', '11,24€',
-        '14 Sep, 2017', 93,
+        '14 Sep, 2017', 1505347200, 93,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1599340, 'Lost Ark', 65, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1599340, 'Lost Ark', 65, 203201, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1599340/header.jpg?t=1763571534', 'Embark on an odyssey for the Lost Ark in a vast, vibrant world: explore new lands, seek out lost treasures, and test yourself in thrilling action combat in this action-packed free-to-play RPG.', 'Action', 'Free',
-        '11 Feb, 2022', NULL,
+        '11 Feb, 2022', 1644537600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (518790, 'theHunter: Call of the Wild™', 66, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (518790, 'theHunter: Call of the Wild™', 66, 201303, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/518790/00f0df3558439a6a2cc4fbd7a658b00fb71353ea/header.jpg?t=1781679235', 'Discover an atmospheric hunting game like no other in this realistic, stunning open world – regularly updated in collaboration with the community. Immerse yourself in the single player campaign, or share the ultimate hunting experience with friends.', 'Adventure', '3,90€',
-        '16 Feb, 2017', NULL,
+        '16 Feb, 2017', 1487203200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (270880, 'American Truck Simulator', 67, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (270880, 'American Truck Simulator', 67, 194678, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270880/a80e5a18363259677ca96c2a39503ea595d2a45f/header.jpg?t=1781788415', 'Experience legendary American trucks and deliver various cargoes across sunny California, sandy Nevada, and the Grand Canyon State of Arizona. American Truck Simulator takes you on a journey through the breathtaking landscapes and widely recognized landmarks around the States.', 'Indie', '19,99€',
-        '2 Feb, 2016', 76,
+        '2 Feb, 2016', 1454371200, 76,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2868840, 'Slay the Spire 2', 68, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2868840, 'Slay the Spire 2', 68, 194175, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2868840/b0958d387dc366211e0f353443710cfcf9fdb020/header.jpg?t=1776735385', 'The iconic roguelike deckbuilder returns. Craft a unique deck, encounter bizarre creatures, and discover relics of immense power in Slay the Spire 2!', 'Indie', '22,99€',
-        '5 Mar, 2026', NULL,
+        '5 Mar, 2026', 1772668800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2507950, 'Delta Force', 69, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2507950, 'Delta Force', 69, 191327, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2507950/3ae5740670d823fe86a8405a73b01469b6885597/header_alt_assets_12.jpg?t=1785765801', 'Play for free in operator-based extraction and full-scale combined arms warfare. Become elite Operators, customize an ever-expanding arsenal of weapons, and deploy into thrill-packed missions across multiple modes.', 'Action', 'Free',
-        '4 Dec, 2024', NULL,
+        '4 Dec, 2024', 1733270400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2622380, 'ELDEN RING NIGHTREIGN', 70, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2622380, 'ELDEN RING NIGHTREIGN', 70, 188915, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2622380/header.jpg?t=1773099036', 'ELDEN RING NIGHTREIGN is a standalone adventure within the ELDEN RING universe, crafted to offer players a new gaming experience by reimagining the game’s core design.', 'Action', '39,99€',
-        '29 May, 2025', NULL,
+        '29 May, 2025', 1748476800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (813780, 'Age of Empires II: Definitive Edition', 71, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (813780, 'Age of Empires II: Definitive Edition', 71, 181207, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/813780/header.jpg?t=1785432195', '42 Civilizations, 229 Campaign Missions, Singleplayer, Co-Op, Multiplayer, In-Game Editor, Mods, Cross-play...It is good to be the king.', 'Strategy', '32,99€',
-        '14 Nov, 2019', 84,
+        '14 Nov, 2019', 1573689600, 84,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2139460, 'Once Human', 72, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2139460, 'Once Human', 72, 180222, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2139460/c18b08a2f93dec32fcc5fa71bc2da44ee42de1f0/header.jpg?t=1785930822', 'Once Human is a Strange Worlds Survival Game set in a strange, post-apocalyptic future. Unite with friends to fight monstrous enemies, uncover secret plots, compete for resources, and build your own territory. Once, you were merely human. Now, you have the power to remake the world.', 'Action', 'Free',
-        '9 Jul, 2024', NULL,
+        '9 Jul, 2024', 1720483200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (397540, 'Borderlands 3', 73, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (397540, 'Borderlands 3', 73, 163516, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/397540/header.jpg?t=1750802377', 'The original shooter-looter returns, packing bazillions of guns and a mayhem-fueled adventure! Blast through new worlds and enemies as one of four new Vault Hunters.', 'Action', '5,99€',
-        '13 Mar, 2020', 81,
+        '13 Mar, 2020', 1584057600, 81,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (304390, 'FOR HONOR™', 74, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (304390, 'FOR HONOR™', 74, 163418, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/304390/2c22776de84112b1c4f39da2597567bb450386a0/header.jpg?t=1785427415', 'Fight alone or with friends in For Honor, a third-person hero-based melee fighting game. Enter the chaos of war as a Knight, a Viking, a Samurai, a Wu Lin, or an Outlander. Fight in brutal PvP and team-oriented modes, or play the thrilling story campaign.', 'Action', '29,99€',
-        '13 Feb, 2017', 76,
+        '13 Feb, 2017', 1486944000, 76,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2881650, 'Content Warning', 75, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2881650, 'Content Warning', 75, 162236, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2881650/header.jpg?t=1785137321', 'Film your friends doing scary things to become SpöökTube famous! (strongly advised to not go alone)', 'Action', '7,49€',
-        '1 Apr, 2024', NULL,
+        '1 Apr, 2024', 1711929600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (306130, 'The Elder Scrolls® Online', 76, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (306130, 'The Elder Scrolls® Online', 76, 161181, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/306130/465cc6917d2ed89c364ebfca85da07f79a2abfd6/header.jpg?t=1783621796', 'Every legend starts somewhere and in The Elder Scrolls Online, it starts with you. Join millions of players in an online, fantasy RPG set in a vast living Elder Scrolls world.', 'Action', '4,99€',
-        '22 May, 2017', 80,
+        '22 May, 2017', 1495411200, 80,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1943950, 'Escape the Backrooms', 77, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1943950, 'Escape the Backrooms', 77, 159399, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1943950/f3dac53a5d3e68a4bb67786872b4693260049b26/header.jpg?t=1784563663', 'Escape the Backrooms is a 1-4 player co-op horror exploration game. Traverse 30+ eerie backrooms levels while avoiding entities and other dangers. Try to escape but be warned: survival isn''t guaranteed.', 'Action', '7,59€',
-        '23 Oct, 2025', NULL,
+        '23 Oct, 2025', 1761177600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (552990, 'World of Warships', 78, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (552990, 'World of Warships', 78, 155865, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/552990/6761efd4d2ad43b180f856ff483716d059c42ea3/header_alt_assets_13.jpg?t=1785238914', 'Immerse yourself in thrilling naval battles and assemble an armada of over 800 ships from the first half of the 20th century — from stealthy destroyers to gigantic battleships. Change the look of your ship, choose upgrades to suit your play style, and go into battle with other players!', 'Action', 'Free',
-        '15 Nov, 2017', 81,
+        '15 Nov, 2017', 1510704000, 81,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (444200, 'World of Tanks Blitz', 79, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (444200, 'World of Tanks Blitz', 79, 153078, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/444200/3477eb0d8e9abbffb1081298186aa17e44c62932/header_alt_assets_5.jpg?t=1785649889', 'Blow off steam and tank turrets in a free-to-play online 7v7 tank shooter! Drive hundreds of tanks, from museum classics to &quot;did-that-ever-exist?&quot; specials, in quick 5 to 7-minute brawls packed with metal mayhem. Play solo or team up with a friend and enjoy smooth action even on modest hardware!', 'Action', 'Free',
-        '9 Nov, 2016', NULL,
+        '9 Nov, 2016', 1478649600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1222680, 'Need for Speed™ Heat', 80, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1222680, 'Need for Speed™ Heat', 80, 151171, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1222680/header.jpg?t=1777414224', 'Hustle by day and risk it all at night in Need for Speed™ Heat Deluxe Edition, a white-knuckle street racer, where the lines of the law fade as the sun starts to set.', 'Action', '3,49€',
-        '4 Jun, 2020', 72,
+        '4 Jun, 2020', 1591228800, 72,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1142710, 'Total War: WARHAMMER III', 81, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1142710, 'Total War: WARHAMMER III', 81, 146516, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1142710/header.jpg?t=1784197039', 'The cataclysmic conclusion to the Total War: WARHAMMER trilogy is here. Rally your forces and step into the Realm of Chaos, a dimension of mind-bending horror where the very fate of the world will be decided. Will you conquer your Daemons… or command them?', 'Action', '59,99€',
-        '16 Feb, 2022', 86,
+        '16 Feb, 2022', 1644969600, 86,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (204360, 'Castle Crashers®', 82, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (204360, 'Castle Crashers®', 82, 140014, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/204360/header.jpg?t=1764096331', 'Hack, slash, and smash your way to victory in this award winning 2D arcade adventure from The Behemoth!', 'Action', '11,99€',
-        '26 Sep, 2012', NULL,
+        '26 Sep, 2012', 1348617600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1151340, 'Fallout 76', 83, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1151340, 'Fallout 76', 83, 139985, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1151340/0bd68f952d2abb58a5710964b97f56584ef49f4d/header.jpg?t=1780927266', 'Bethesda Game Studios welcome you to Fallout 76. Twenty-five years after the bombs fall, you and your fellow Vault Dwellers emerge into post-nuclear America. Explore a vast wasteland in this open-world multiplayer addition to the Fallout story.', 'RPG', '9,99€',
-        '14 Apr, 2020', NULL,
+        '14 Apr, 2020', 1586822400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1361210, 'Warhammer 40,000: Darktide', 84, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1361210, 'Warhammer 40,000: Darktide', 84, 137345, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1361210/c9110a232b6ba7ef21039fc00e4582b2acfec810/header_alt_assets_19.jpg?t=1782226781', 'Take back the city of Tertium from hordes of bloodthirsty foes in this intense and brutal action shooter. Warhammer 40,000: Darktide is the new co-op focused experience from the award-winning team behind the Vermintide series. As Tertium falls, Rejects Will Rise.', 'Action', '39,99€',
-        '30 Nov, 2022', NULL,
+        '30 Nov, 2022', 1669766400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (236850, 'Europa Universalis IV', 85, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (236850, 'Europa Universalis IV', 85, 137073, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/236850/header.jpg?t=1778249292', 'Rule your land and dominate the world with unparalleled freedom, depth and historical accuracy. Write a new history of the world and build an empire for the ages.', 'Simulation', '49,99€',
-        '13 Aug, 2013', 87,
+        '13 Aug, 2013', 1376352000, 87,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1604030, 'V Rising', 86, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1604030, 'V Rising', 86, 136367, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1604030/be49834ab147ad22ba17005fb847c93917d18b97/header.jpg?t=1785921000', 'Awaken as a Vampire. Hunt for blood in nearby settlements to regain your strength and evade the scorching sun to survive. Raise your castle and thrive in an ever-changing, open world full of mystery. Gain allies online and conquer the land of the living.', 'Action', '34,99€',
-        '8 May, 2024', NULL,
+        '8 May, 2024', 1715126400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1167630, 'Teardown', 87, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1167630, 'Teardown', 87, 134331, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1167630/9372e21ac8ec66b087400abe2b9150d378f6e52f/header_alt_assets_7.jpg?t=1781525152', 'Prepare the perfect heist in a fully destructible, simulated voxel world. Tear down walls with vehicles or use explosives to create your own shortcuts. Shape the environment to your advantage in the most creative ways you can imagine. Play solo or with up to 12 players in multiplayer.', 'Action', '29,99€',
-        '21 Apr, 2022', 80,
+        '21 Apr, 2022', 1650499200, 80,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (513710, 'SCUM', 88, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (513710, 'SCUM', 88, 126084, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/513710/9ff47c09f7e041df09fcbd9d2abbcd24270d31c9/header_alt_assets_3.jpg?t=1784560168', 'Welcome to SCUM, a ruthless open-world survival game where deep character customization defines the prisoner you become. Loot, craft, hunt, build, and fight to outlast a hostile island where every choice can change your fate. Stay alive. Stay dangerous. Become harder to kill.', 'Action', '44,99€',
-        '17 Jun, 2025', NULL,
+        '17 Jun, 2025', 1750118400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2001120, 'Split Fiction', 89, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2001120, 'Split Fiction', 89, 124861, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2001120/header.jpg?t=1763484567', 'Embrace mind-blowing moments as you’re pulled deep into the many worlds of Split Fiction, a boundary-pushing co-op adventure.', 'Action', '32,49€',
-        '6 Mar, 2025', NULL,
+        '6 Mar, 2025', 1741219200, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1962700, 'Subnautica 2', 90, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1962700, 'Subnautica 2', 90, 124582, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1962700/header.jpg?t=1785967256', 'Subnautica 2 is an underwater survival adventure set on an all-new alien world, developed by Unknown Worlds. Play alone or with friends in 4-player co-op. Adapt to survive by building custom bases and crafting tools. Explore the unknown to uncover the mysteries hidden within the depths.', 'Action', '29,99€',
-        '14 May, 2026', NULL,
+        '14 May, 2026', 1778716800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (594570, 'Total War: WARHAMMER II', 91, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (594570, 'Total War: WARHAMMER II', 91, 121414, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/594570/header.jpg?t=1780389571', 'The forces of Lustria await your command. Choose your Legendary Lord, expand your armies, forge alliances in a strategic turn-based campaign, and unleash the might of your monstrous forces in fast-paced real-time battles.', 'Action', '59,99€',
-        '28 Sep, 2017', 87,
+        '28 Sep, 2017', 1506556800, 87,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (387990, 'Scrap Mechanic', 92, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (387990, 'Scrap Mechanic', 92, 121019, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/387990/5c31bde0a901d9459a8d8c556c5a44262b5f57e4/header.jpg?t=1784914037', 'Enter the creative paradise of Scrap Mechanic! Build fantastic machines, go on adventures with your friends and defend against waves of evil Farmbots in this imaginative multiplayer survival sandbox. With Scrap Mechanic’s powerful creation tools you can engineer your own adventures!', 'Action', '28,99€',
-        '24 Jul, 2026', NULL,
+        '24 Jul, 2026', 1784851200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (440900, 'Conan Exiles Enhanced', 93, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (440900, 'Conan Exiles Enhanced', 93, 116968, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/440900/710f42dec831fa88bcf736d0715152822231505f/header.jpg?t=1784642443', 'Conan Exiles Enhanced is an open world survival game set in the mythical lands of Hyboria, now fully upgraded to Unreal Engine 5 with stunning visuals and improved performance. SURVIVE, BUILD, and DOMINATE alone or with friends in a world brimming with adventure!', 'Action', '39,99€',
-        '8 May, 2018', NULL,
+        '8 May, 2018', 1525737600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2399830, 'ARK: Survival Ascended', 94, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2399830, 'ARK: Survival Ascended', 94, 114795, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2399830/d934813ca531af0fce69fe36bc972f1c90d1aa19/header.jpg?t=1779293241', 'ARK is reimagined from the ground-up into the next-generation of video game technology with Unreal Engine 5! Form a tribe, tame &amp; breed hundreds of unique dinosaurs and primeval creatures, explore, craft, build, and fight your way to the top of the food-chain. Your new world awaits!', 'Action', '44,99€',
-        '25 Oct, 2023', NULL,
+        '25 Oct, 2023', 1698192000, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1665460, 'eFootball™', 95, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1665460, 'eFootball™', 95, 114461, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1665460/9182eac331f562e4a3aab2384b6759c3e1a95797/header.jpg?t=1782314037', 'Step up and experience the exhilarating soccer game that has now surpassed 1 billion downloads! Play eFootball™ with users around the world!', 'Simulation', 'Free',
-        '29 Sep, 2021', NULL,
+        '29 Sep, 2021', 1632873600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3564740, 'Where Winds Meet', 96, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3564740, 'Where Winds Meet', 96, 113176, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3564740/e78afb6db40bf0c0d4ed31df8f6ce65fa89f741d/header_alt_assets_8.jpg?t=1785224697', 'Step into an open-world action-adventure RPG set in ancient China. Uncover the secrets of your own identity as you rise from a humble village wanderer to the sword master of the imperial capital. Learn martial arts and build your reputation as a hero or a bringer of chaos in this free wuxia world.', 'Action', 'Free',
-        '14 Nov, 2025', NULL,
+        '14 Nov, 2025', 1763078400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (231430, 'Company of Heroes 2', 97, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (231430, 'Company of Heroes 2', 97, 112978, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/231430/header.jpg?t=1750947634', 'Experience the ultimate WWII RTS platform with COH2 and its standalone expansions. This package includes the base game, which you can then upgrade by purchasing The Western Front Armies, Ardennes Assault and/or The British Forces. More info in the &quot;About This Game&quot; section below.', 'Strategy', '4,62€',
-        '25 Jun, 2013', 80,
+        '25 Jun, 2013', 1372118400, 80,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2074920, 'The First Descendant', 98, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2074920, 'The First Descendant', 98, 111463, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2074920/d6ab480d5d08d13363287bfc103ce62e2bb28c65/header.jpg?t=1781267897', 'The First Descendant is a third-person looter shooter powered by Unreal Engine 5. Become a Descendant. Fight for the survival of humanity. Descendants have unique abilities to tackle both solo and co-op missions. Up to 4 players use varied mechanics to defeat giant bosses. BE THE FIRST DESCENDANT!', 'Action', 'Free',
-        '30 Jun, 2024', NULL,
+        '30 Jun, 2024', 1719705600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1304930, 'The Outlast Trials', 99, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1304930, 'The Outlast Trials', 99, 110068, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1304930/65fbdba4ad0f1a7ed7a362a086c87042fa40fadc/header_alt_assets_3.jpg?t=1784123708', 'Red Barrels invites you to experience mind-numbing terror, this time with friends. Whether you go through the trials alone or in teams, if you survive long enough and complete the therapy, Murkoff will happily let you leave… but will you be the same?', 'Action', '38,99€',
-        '5 Mar, 2024', NULL,
+        '5 Mar, 2024', 1709596800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (219990, 'Grim Dawn', 100, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (219990, 'Grim Dawn', 100, 108557, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/219990/header.jpg?t=1785095531', 'Enter an apocalyptic fantasy world where humanity is on the brink of extinction, iron is valued above gold and trust is hard earned. This ARPG features complex character development, hundreds of unique items, crafting and quests with choice &amp; consequence.', 'Action', '25,99€',
-        '25 Feb, 2016', 83,
+        '25 Feb, 2016', 1456358400, 83,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1818450, 'STALZONE', 101, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1818450, 'STALZONE', 101, 105118, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1818450/03ac3c6b881ac2c344fb465bfec8a707d24f33a9/header.jpg?t=1785758933', 'STALZONE is the PvPvE extraction shooter where you don''t have to start over — and the only one with persistent world worth belonging to. You are invited to explore the Chernobyl Exclusion Zone twisted by anomalies and divided between rival factions whose territories shape the danger around you', 'Action', 'Free',
-        '9 Dec, 2022', NULL,
+        '9 Dec, 2022', 1670544000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1203620, 'Enshrouded', 102, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1203620, 'Enshrouded', 102, 104225, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1203620/062c788d22ecf236269da0f115150c0d3b7055a4/header.jpg?t=1782800102', 'You are Flameborn, last ember of hope of a dying race. Awaken, survive the terror of a corrupting fog, and reclaim the lost beauty of your kingdom. Venture into a vast world, vanquish punishing bosses, build grand halls and forge your path in this co-op survival action RPG for up to 16 players.', 'Action', '29,99€',
-        '24 Jan, 2024', NULL,
+        '24 Jan, 2024', 1706054400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1217060, 'Gunfire Reborn', 103, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1217060, 'Gunfire Reborn', 103, 103518, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1217060/dd6c1906d262c38c183ccd711f192db187b5103f/header.jpg?t=1785381312', 'Gunfire Reborn is a level-based adventure game featuring FPS, Roguelite and RPG. Players can control heroes with various abilities to experience diverse Build gameplay, use various weapons to explore procedurally-generated levels. You can play the game alone, or join 4-player coop.', 'Action', '11,75€',
-        '17 Nov, 2021', NULL,
+        '17 Nov, 2021', 1637107200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1222700, 'A Way Out', 104, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1222700, 'A Way Out', 104, 102117, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1222700/header.jpg?t=1777323433', 'A Way Out is an exclusively co-op adventure where you play the role of one of two prisoners making their daring escape from prison.', 'Action', '8,99€',
-        '18 Jun, 2020', 78,
+        '18 Jun, 2020', 1592438400, 78,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (815370, 'Green Hell', 105, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (815370, 'Green Hell', 105, 100737, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/815370/header.jpg?t=1783077147', 'Plunge into the open-world survival simulation set in the extreme conditions of the uncharted Amazon jungle. Use real-life survival techniques to craft, hunt, fight, and gather resources, set a makeshift shelter, or raise a fortress. Survive alone or team up with your friends and challenge the jungle together.', 'Action', '3,14€',
-        '5 Sep, 2019', 78,
+        '5 Sep, 2019', 1567641600, 78,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3405690, 'EA SPORTS FC™ 26', 106, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3405690, 'EA SPORTS FC™ 26', 106, 98830, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3405690/2d96aa1b06e453cd62dae9029d412f19e61932c3/header.jpg?t=1785772769', 'Experience The World''s Game like never before in EA SPORTS FC™ 26. Go for glory in a 48-team international tournament mode, take on themed Manager Live Challenges, and step into Player Career with new international ICONs and Heroes.', 'Simulation', '69,99€',
-        '25 Sep, 2025', NULL,
+        '25 Sep, 2025', 1758758400, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (962130, 'Grounded', 107, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (962130, 'Grounded', 107, 95262, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/962130/header.jpg?t=1768264530', 'The world is a vast, beautiful and dangerous place – especially when you have been shrunk to the size of an ant. Can you thrive alongside the hordes of giant insects, fighting to survive the perils of the backyard?', 'Action', '39,99€',
-        '27 Sep, 2022', 83,
+        '27 Sep, 2022', 1664236800, 83,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2215430, 'Ghost of Tsushima DIRECTOR''S CUT', 108, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2215430, 'Ghost of Tsushima DIRECTOR''S CUT', 108, 94989, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2215430/header.jpg?t=1763409398', 'A storm is coming. Venture into the complete Ghost of Tsushima DIRECTOR’S CUT on PC; forge your own path through this open-world action adventure and uncover its hidden wonders. Brought to you by Sucker Punch Productions, Nixxes Software and PlayStation Studios.', 'Action', '59,99€',
-        '16 May, 2024', NULL,
+        '16 May, 2024', 1715817600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1466860, 'Age of Empires IV: Anniversary Edition', 109, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1466860, 'Age of Empires IV: Anniversary Edition', 109, 94947, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1466860/header.jpg?t=1780854334', 'Celebrating its first year of delighting millions of global players, the award-winning and best-selling strategy franchise continues with Age of Empires IV: Anniversary Edition, putting you at the center of even more epic historical battles that shaped the world.', 'Strategy', '39,99€',
-        '28 Oct, 2021', 81,
+        '28 Oct, 2021', 1635379200, 81,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (582660, 'Black Desert', 110, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (582660, 'Black Desert', 110, 93802, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/582660/3c4172635738d9e5901e340b28136745fd9e491a/header_alt_assets_27.jpg?t=1785447962', 'Played by over 20 million Adventurers - Black Desert Online is an open-world, action MMORPG. Experience intense, action-packed combat, battle massive world bosses, fight alongside friends to siege and conquer castles, and train in professions such as fishing, trading, crafting, cooking, and more!', 'Action', '0,99€',
-        '24 May, 2017', 80,
+        '24 May, 2017', 1495584000, 80,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (304050, 'Trove', 111, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (304050, 'Trove', 111, 92775, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/304050/815c09f647aea609e3545012345b8b11119bf5fe/header_alt_assets_15.jpg?t=1785857690', 'Grab your friends, hone your blades, and set off for an epic procedurally generated adventure in Trove! Battle the Shadow in realms filled with dungeons and items created by your fellow players. Whether hunting treasure or building realms of your own, it’s never been this good to be square!', 'Action', 'Free',
-        '9 Jul, 2015', NULL,
+        '9 Jul, 2015', 1436400000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1248130, 'Farming Simulator 22', 112, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1248130, 'Farming Simulator 22', 112, 92292, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1248130/7ff56320788fa4b1f46ac9a62ff955d3ef3f109c/header.jpg?t=1765792398', 'Create your farm and let the good times grow! Harvest crops, tend to animals, manage productions, and take on seasonal challenges.', 'Simulation', '19,99€',
-        '21 Nov, 2021', NULL,
+        '21 Nov, 2021', 1637452800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2483190, 'Forza Horizon 6', 113, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2483190, 'Forza Horizon 6', 113, 92112, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2483190/99ff2e08356158cc0aacb4cf192298fc4c45f215/header_alt_assets_2.jpg?t=1784819352', 'Discover the breathtaking landscapes of Japan in over 550 real-world cars and become a racing Legend in Forza Horizon''s biggest open world driving adventure yet.', 'Racing', '69,99€',
-        '18 May, 2026', NULL,
+        '18 May, 2026', 1779062400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (602960, 'Barotrauma', 114, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (602960, 'Barotrauma', 114, 88780, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/602960/header.jpg?t=1776271911', 'Barotrauma is a 2D co-op submarine simulator – in space, with survival horror and RPG elements. Steer your submarine, complete missions, fight monsters, fix leaks, operate machinery, man the guns and craft items, and stay alert: danger in Barotrauma doesn’t announce itself!', 'Action', '17,49€',
-        '13 Mar, 2023', 81,
+        '13 Mar, 2023', 1678665600, 81,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1274570, 'DEVOUR', 115, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1274570, 'DEVOUR', 115, 87951, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1274570/bb90f9fa36e4c35a5f28cdc38cf75b3eb5c39032/header.jpg?t=1765533474', 'DEVOUR is a co-op horror survival game for 1-4 players. Stop possessed cultists before they drag you to hell. Run. Scream. Hide. Just don''t get caught.', 'Indie', '9,75€',
-        '28 Jan, 2021', NULL,
+        '28 Jan, 2021', 1611792000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (214950, 'Total War: ROME II - Emperor Edition', 116, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (214950, 'Total War: ROME II - Emperor Edition', 116, 87823, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/214950/header.jpg?t=1768912466', 'Emperor Edition is the definitive edition of ROME II, featuring an improved politics system, overhauled building chains, rebalanced battles and improved visuals in both campaign and battleEmperor Edition contains all free feature updates since its release in 2013, which includes bug fixes, balancing, Twitch.', 'Strategy', '59,99€',
-        '2 Sep, 2013', 76,
+        '2 Sep, 2013', 1378080000, 76,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (39210, 'FINAL FANTASY XIV Online', 117, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (39210, 'FINAL FANTASY XIV Online', 117, 85314, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/39210/header.jpg?t=1782870674', 'Join over 30 million adventurers worldwide and take part in an epic and ever-changing FINAL FANTASY. Experience an unforgettable story, exhilarating battles, and a myriad of captivating environments to explore.', 'Massively Multiplayer', '9,99€',
-        '18 Feb, 2014', 83,
+        '18 Feb, 2014', 1392681600, 83,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2016590, 'Dark and Darker', 118, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2016590, 'Dark and Darker', 118, 84732, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2016590/header.jpg?t=1783659214', 'An unforgiving hardcore fantasy FPS dungeon PvPvE adventure. Band together with your friends and use your courage, wits, and cunning to uncover mythical treasures, defeat gruesome monsters, while staying one step ahead of the other devious treasure-hunters.', 'Action', 'Free',
-        '7 Jun, 2024', NULL,
+        '7 Jun, 2024', 1717718400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2670630, 'Supermarket Simulator', 119, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2670630, 'Supermarket Simulator', 119, 83527, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2670630/267eef055b0e5d45cb1c874f816a31dded4bb88e/header.jpg?t=1778755926', 'Run your own supermarket! Stock shelves, set your prices, take payments, hire staff, expand your store, handle shoplifters, and design your layout. Purchase goods from online or local markets around town, and personally deliver online orders to your customers.', 'Casual', '19,99€',
-        '19 Jun, 2025', NULL,
+        '19 Jun, 2025', 1750291200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (728880, 'Overcooked! 2', 120, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (728880, 'Overcooked! 2', 120, 83466, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/728880/header.jpg?t=1784805486', 'Overcooked returns with a brand-new helping of chaotic cooking action! Journey back to the Onion Kingdom and assemble your team of chefs in classic couch co-op or online play for up to four players. Hold onto your aprons… it’s time to save the world again!', 'Action', '5,74€',
-        '7 Aug, 2018', 81,
+        '7 Aug, 2018', 1533600000, 81,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3949040, 'RV There Yet?', 121, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3949040, 'RV There Yet?', 121, 82848, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3949040/cae24b4ed7f4531be51f0d63f785b7d253f92dc3/header.jpg?t=1778071815', 'A co-op adventure about driving your Recreational Vehicle home.', 'Action', '7,79€',
-        '21 Oct, 2025', NULL,
+        '21 Oct, 2025', 1761004800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1285190, 'Borderlands 4', 122, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1285190, 'Borderlands 4', 122, 82201, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1285190/312ee145046ea5bc31357f7d64a8053f5d18cbdb/header_alt_assets_4.jpg?t=1785427692', 'Borderlands 4 is a mayhem-fueled looter shooter, jam-packed with billions of weapons, deadly enemies, and intense co-op action. Break free from a dangerous hidden planet as one of four new badass Vault Hunters.', 'Action', '49,99€',
-        '11 Sep, 2025', 81,
+        '11 Sep, 2025', 1757548800, 81,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1371980, 'No Rest for the Wicked', 123, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1371980, 'No Rest for the Wicked', 123, 80241, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1371980/331de7e745f43867f0a220339153ac6019822ea4/header.jpg?t=1784886886', 'From Moon Studios, the award-winning creators of Ori and the Blind Forest and Ori and the Will of the Wisps, comes No Rest for the Wicked, a unique, visceral Action RPG set in a hand-crafted world with Souls-like combat. Featuring co-op for up to four players.', 'Action', '27,99€',
-        '18 Apr, 2024', NULL,
+        '18 Apr, 2024', 1713398400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1260320, 'Party Animals', 124, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1260320, 'Party Animals', 124, 78509, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1260320/8ecff3f10af08073061e46ad7001700e046200ce/header_alt_assets_9.jpg?t=1783653381', 'Fight your friends as puppies, kittens and other fuzzy creatures in PARTY ANIMALS! Paw it out with your friends remotely, or huddle together for chaotic fun on the same screen. Interact with the world under our realistic physics engine. Did I mention PUPPIES?', 'Action', '17,99€',
-        '20 Sep, 2023', NULL,
+        '20 Sep, 2023', 1695168000, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2479810, 'Gray Zone Warfare', 125, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2479810, 'Gray Zone Warfare', 125, 78105, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2479810/0992474ceeff2245228858446ccfb618a1d869ff/header.jpg?t=1785244229', 'Enter a high-stakes PvE-first open-world tactical shooter set on a quarantined Southeast Asian island torn apart by faction warfare. Deploy as an elite operator, fight solo or with your squad to carry out missions, earn reputation, and explore the truth behind the Event igniting the conflict.', 'Action', '39,99€',
-        '30 Apr, 2024', NULL,
+        '30 Apr, 2024', 1714435200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1172710, 'Dune: Awakening', 126, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1172710, 'Dune: Awakening', 126, 77778, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1172710/da994ea756677c3d1d9a77accb8596a8661f4cad/header.jpg?t=1783592766', 'Dune: Awakening is an Open World Survival game with immersive adventure and RPG gameplay. Explore, build, craft, and unravel a cinematic Dune story alone or with friends as you rise from survival to greatness on the most legendary planet in the universe. Just remember: the sandworm always comes.', 'Action', '49,99€',
-        '10 Jun, 2025', NULL,
+        '10 Jun, 2025', 1749513600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (380600, 'Fishing Planet', 127, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (380600, 'Fishing Planet', 127, 76589, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/380600/893d67a3798c2483503a9a6ed758046f39ac0b57/header_alt_assets_16.jpg?t=1786021016', 'Fishing Planet® is a highly realistic first-person online multiplayer fishing simulator. Developed by avid fishing enthusiasts to bring you the full thrill of actual angling on your PC. Free-to-Play and just a download away!', 'Massively Multiplayer', 'Free',
-        '28 Aug, 2017', NULL,
+        '28 Aug, 2017', 1503878400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2344520, 'Diablo® IV', 128, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2344520, 'Diablo® IV', 128, 74558, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2344520/80f21a42e378b93e8fbb68ee43103be8ab84891b/header.jpg?t=1782839766', 'Join the fight for Sanctuary in Diablo® IV, the ultimate action RPG adventure. Experience the critically acclaimed campaign and new seasonal content.', 'Action', '49,99€',
-        '17 Oct, 2023', NULL,
+        '17 Oct, 2023', 1697500800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (286160, 'Tabletop Simulator', 129, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (286160, 'Tabletop Simulator', 129, 73995, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/286160/header.jpg?t=1772387518', 'Tabletop Simulator is the only simulator where you can let your aggression out by flipping the table! There are no rules to follow: just you, a physics sandbox, and your friends. Make your own online board games or play the thousands of community created mods. Unlimited gaming possibilities!', 'Casual', '19,50€',
-        '5 Jun, 2015', NULL,
+        '5 Jun, 2015', 1433462400, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1284190, 'The Planet Crafter', 130, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1284190, 'The Planet Crafter', 130, 72624, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1284190/header.jpg?t=1783691047', 'A space survival open world terraforming crafting game, designed for 1 to 10 players. Alter the ecosystem of an inhospitable planet to render it habitable for humanity. Survive, gather resources, and build your base. Then, generate oxygen, warmth, and pressure to create a brand new biosphere.', 'Adventure', '23,99€',
-        '10 Apr, 2024', NULL,
+        '10 Apr, 2024', 1712707200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2073620, 'Arena Breakout: Infinite', 131, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2073620, 'Arena Breakout: Infinite', 131, 72131, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2073620/c8b016ff8790f74ee14c5e556d52b846052bd367/header.jpg?t=1785832840', 'Arena Breakout: Infinite is a high-stakes tactical extraction shooter where every decision matters. Fight, loot, and extract—or lose it all. With stunningly realistic visuals, lifelike sound, and unforgiving PvPvE combat, every raid is a gamble between glory and ruin.', 'Action', 'Free',
-        '15 Sep, 2025', NULL,
+        '15 Sep, 2025', 1757894400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3008130, 'Dying Light: The Beast', 132, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3008130, 'Dying Light: The Beast', 132, 70177, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3008130/12cc1d5f3bc9e43345f388abe36f0737e999f966/header.jpg?t=1777373421', 'BECOME THE BEAST. SURVIVE THE NIGHT. A terrifying new chapter in the Dying Light universe begins. As Kyle Crane, explore the vast and unpredictable wilderness, uncover a deadly evolution of the infected, and learn to control the beastly powers awakening inside you.', 'Action', '39,59€',
-        '18 Sep, 2025', NULL,
+        '18 Sep, 2025', 1758153600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (386180, 'Crossout', 133, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (386180, 'Crossout', 133, 69573, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/386180/4dfc237b732553a89244b42c9221943ac950b275/header.jpg?t=1783576938', 'Crossout - the postapocalyptic MMO action game where you can create a unique design for an armoured vehicle from dozens of parts and then drive it into multiplayer battles raging on land and in the skies alike.', 'Action', 'Free',
-        '26 Jul, 2017', NULL,
+        '26 Jul, 2017', 1501027200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2429640, 'Throne and Liberty', 134, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2429640, 'Throne and Liberty', 134, 68648, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2429640/497cc638fa3186f1aeefddaff89eaaf6f0c2e7dd/header.jpg?t=1783036206', 'Throne and Liberty captures the essence of classic MMORPGs while introducing new gameplay elements, depth and excitement at every turn. Gather your guild, prepare for battle, and set forth for throne... and liberty!', 'Action', 'Free',
-        '1 Oct, 2024', NULL,
+        '1 Oct, 2024', 1727740800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1282100, 'REMNANT II®', 135, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1282100, 'REMNANT II®', 135, 67947, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1282100/header.jpg?t=1764659459', 'REMNANT II® pits survivors of humanity against new deadly creatures and god-like bosses across terrifying worlds. Play solo or co-op with two other friends to explore the depths of the unknown to stop an evil from destroying reality itself.', 'Action', '49,99€',
-        '25 Jul, 2023', NULL,
+        '25 Jul, 2023', 1690243200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1149460, 'ICARUS', 136, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1149460, 'ICARUS', 136, 66804, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1149460/header.jpg?t=1784744651', 'ICARUS is a solo or multiplayer PvE survival game. Explore a savage wilderness in the aftermath of terraforming gone wrong. Complete narrative quests as either Open World operations or Individual Missions. Explore, build, craft and hunt while seeking your fortune and prospecting for exotic matter.', 'Action', '33,99€',
-        '3 Dec, 2021', NULL,
+        '3 Dec, 2021', 1638489600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1621690, 'Core Keeper', 137, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1621690, 'Core Keeper', 137, 65823, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1621690/header.jpg?t=1782408107', 'Explore a vast cavern of creatures, relics and resources in a mining sandbox adventure for 1-8 players. Mine, build, fight, craft and farm to unravel the mystery of the ancient Core.', 'Action', '19,99€',
-        '27 Aug, 2024', 86,
+        '27 Aug, 2024', 1724716800, 86,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1272080, 'PAYDAY 3', 138, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1272080/d2f9d9bb92bda9eb6a451488d4ddeae460da9366/header.jpg?t=1783416228', 'PAYDAY 3 is the ultimate co-op FPS crime fantasy. Choose between stealth or loud playstyles, customize your character, and get ready to pull off the perfect heist.', 'Action', '28,49€',
-        '21 Sep, 2023', 66,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2567870, 'Chained Together', 139, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2567870, 'Chained Together', 138, 63110, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2567870/header.jpg?t=1784802923', 'Climb up from the depths of Hell. Scale various worlds solo or chained together with your friends in the 1-4 player platforming sensation.', 'Adventure', '4,99€',
-        '19 Jun, 2024', NULL,
+        '19 Jun, 2024', 1718755200, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (678960, 'CODE VEIN', 140, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/678960/header.jpg?t=1766015412', 'In the face of certain death, we rise. Team up and embark on a journey to the ends of hell to unlock your past and escape your living nightmare in CODE VEIN.', 'Action', '49,99€',
-        '26 Sep, 2019', 72,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3932890, 'Escape from Tarkov', 141, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3932890, 'Escape from Tarkov', 139, 60348, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3932890/4dd12ea3b00a4f8b67bfd629f3b9abbf8d5cab05/header_alt_assets_2.jpg?t=1785782094', 'Escape from Tarkov is the original extraction FPS where every raid is a gamble with death. Prep your raid, bleed, endure and fight through ruthless PMC players and Scavs, gain tactical advantage and cling to your loot — only extraction decides if you live or lose it all.', 'Action', '49,99€',
-        '15 Nov, 2025', NULL,
+        '15 Nov, 2025', 1763164800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (573090, 'Stormworks: Build and Rescue', 142, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (573090, 'Stormworks: Build and Rescue', 140, 59497, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/573090/header.jpg?t=1772367420', 'Join a world where you design, create and pilot your own air sea rescue service. Release your inner hero as you battle fierce storms out at sea to rescue those in need.', 'Simulation', '24,50€',
-        '17 Sep, 2020', NULL,
+        '17 Sep, 2020', 1600300800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (454650, 'DRAGON BALL XENOVERSE 2', 143, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (454650, 'DRAGON BALL XENOVERSE 2', 141, 59151, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/454650/header.jpg?t=1783463273', 'DRAGON BALL XENOVERSE 2 builds upon the highly popular DRAGON BALL XENOVERSE with enhanced graphics that will further immerse players into the largest and most detailed Dragon Ball world ever developed.', 'Action', '19,99€',
-        '27 Oct, 2016', 78,
+        '27 Oct, 2016', 1477526400, 78,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1290000, 'PowerWash Simulator', 144, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1290000, 'PowerWash Simulator', 142, 58493, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1290000/header.jpg?t=1780392261', 'Release the Pressure with PowerWash Simulator! Wash away your worries with the soothing sounds of high-pressure water. Fire up your power washer and blast away every speck of dirt and grime you can find, all with the simple satisfaction of power-washing to a sparkling finish.', 'Casual', '24,99€',
-        '14 Jul, 2022', NULL,
+        '14 Jul, 2022', 1657756800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (427410, 'Abiotic Factor', 145, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (427410, 'Abiotic Factor', 143, 57882, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/427410/afe0e6c04aaa67d511a7fffe630aa8a54788c3b3/header.jpg?t=1785170446', 'Abiotic Factor is a survival crafting experience for 1-6 players set in the depths of an underground research facility. Caught between paranormal containment failure, a military crusade, and chaos from a dozen realms, the world’s greatest minds must survive against the universe’s biggest threats.', 'Action', '33,99€',
-        '22 Jul, 2025', NULL,
+        '22 Jul, 2025', 1753142400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (637650, 'FINAL FANTASY XV WINDOWS EDITION', 146, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (637650, 'FINAL FANTASY XV WINDOWS EDITION', 144, 57816, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/637650/header.jpg?t=1775105127', 'Take the journey, now in ultimate quality. Boasting a wealth of bonus content and supporting ultra high-resolution graphical options and HDR 10, you can now enjoy the beautiful and carefully-crafted experience of FINAL FANTASY XV like never before.', 'RPG', '13,99€',
-        '6 Mar, 2018', NULL,
+        '6 Mar, 2018', 1520294400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (633230, 'NARUTO TO BORUTO: SHINOBI STRIKER', 147, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (633230, 'NARUTO TO BORUTO: SHINOBI STRIKER', 145, 56541, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/633230/26e9bbb6491cd03cb2b1cb4d59261b4a5e75436b/header_alt_assets_1.jpg?t=1784284057', 'Battle as a team of 4 to compete against other teams online! Graphically, SHINOBI STRIKER is also built from the ground up in a completely new graphic style. Lead your team and fight online to see who the best ninjas are!', 'Action', '19,99€',
-        '29 Jun, 2023', NULL,
+        '29 Jun, 2023', 1687996800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2300320, 'Farming Simulator 25', 148, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2300320, 'Farming Simulator 25', 146, 56244, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2300320/c2a205133d23cd24faf3c152d972a1d0177661b8/header.jpg?t=1784811772', 'Farming Simulator 25 invites you to join the rewarding farm life, single-handedly or cooperatively in multiplayer. This Farm is Your Farm!', 'Simulation', '29,99€',
-        '12 Nov, 2024', NULL,
+        '12 Nov, 2024', 1731369600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3097560, 'Liar''s Bar', 149, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3097560, 'Liar''s Bar', 147, 56017, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3097560/054cf90dfb2e0de8bf595fcd2cfd1b6853bf2556/header.jpg?t=1783933354', 'Dive into this multiplayer online experience set in a sketchy bar where the games are as dangerous as the patrons. Join a table of 4 and test your skills in Liar''s Dice and Liar''s Deck, where lying and bluffing are key to victory. Ready for a night at Liar''s Bar?', 'Casual', '6,89€',
-        '2 Oct, 2024', NULL,
+        '2 Oct, 2024', 1727827200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1465360, 'SnowRunner', 150, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1465360, 'SnowRunner', 148, 55348, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1465360/header.jpg?t=1784713482', 'Get ready for the next-generation off-road experience! Drive powerful vehicles and overcome extreme open environments to complete dozens of challenging missions solo or with up to 3 friends!', 'Adventure', '29,99€',
-        '17 May, 2021', NULL,
+        '17 May, 2021', 1621209600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1874880, 'Arma Reforger', 151, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1874880, 'Arma Reforger', 149, 55317, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1874880/header.jpg?t=1779966148', 'Engage in massive combined arms battles, create and curate combat missions in real time, and shape your experience with endless community mods. Deploy into the Cold War and experience the most authentic and immersive military sandbox ever created.', 'Action', '39,99€',
-        '16 Nov, 2023', NULL,
+        '16 Nov, 2023', 1700092800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (881020, 'Granblue Fantasy: Relink', 152, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (881020, 'Granblue Fantasy: Relink', 150, 55072, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/881020/header.jpg?t=1783524179', 'A grand adventure in the skies awaits! Form a party of four from a diverse roster of skyfarers and slash—or shoot or hex—your way to victory against treacherous foes in this action RPG. Take on quests solo or with the help of others in up to 4-player co-op play!', 'Action', '39,99€',
-        '31 Jan, 2024', NULL,
+        '31 Jan, 2024', 1706659200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1501750, 'Lords of the Fallen', 153, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1501750, 'Lords of the Fallen', 151, 54763, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1501750/c793d85dc133f22112c7283b79dd89e2c0aa58a4/header.jpg?t=1782386576', 'A vast world awaits in the medieval, dark fantasy action-RPG, Lords of the Fallen. As a fabled Dark Crusader, embark on an epic quest to overthrow Adyr, the demon God. The final major update Version 2.5 is out now: features deadlier boss battles and all-new Veteran Mode.', 'Action', '29,99€',
-        '13 Oct, 2023', 75,
+        '13 Oct, 2023', 1697155200, 75,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (364360, 'Total War: WARHAMMER', 154, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/364360/header.jpg?t=1780389642', 'The Old World is yours to command. Lead Legendary Lords in a combination of turn-based campaign and magically charged, strategic real-time battles, and decide the fate of your chosen race in a fight against Chaos.', 'Action', '59,99€',
-        '24 May, 2016', 86,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2138720, 'REMATCH', 155, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2138720/header.jpg?t=1781682466', 'Rematch is an online multiplayer football game. Control one player and compete with your team in fast-paced 5v5 matches from an immersive third-person perspective. Team up with your friends and join the action.', 'Action', '12,49€',
-        '19 Jun, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1129580, 'Medieval Dynasty', 156, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1129580/header.jpg?t=1781251858', 'Hunt, survive, build and lead in the harsh Middle Ages: Create your own Medieval Dynasty and ensure its long-lasting prosperity or die trying! Play alone or team up with friends to enjoy the ultimate medieval experience.', 'Action', '29,99€',
-        '23 Sep, 2021', 73,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3041230, 'Windrose', 157, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3041230/7e838d87d787735d5d29d72777c5ee55653dfb2b/header.jpg?t=1783932953', 'Embark on a PvE survival adventure in the Age of Piracy. Fight on land and sea, solo or with friends. Build, craft and explore vast open world filled with dark secrets. Master soulslite combat and take on challenging bosses, command your ship and plunder unspoken treasures!', 'Action', '29,99€',
-        '14 Apr, 2026', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1962663, 'Call of Duty®: Warzone™', 158, 'Mostly Negative',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1962663/d8381959a500ead8f790115f18ec2fbccd65b5f5/header_alt_assets_19.jpg?t=1784823026', 'Welcome to Call of Duty®: Warzone™, the massive free-to-play combat arena.', 'Action', 'Free',
-        '16 Nov, 2022', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2943650, 'FragPunk', 159, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2943650/3664bad9e7a0739c2c4639424f711f9efb973eab/header_alt_assets_7.jpg?t=1783602641', 'FragPunk is a thrilling 5v5 hero shooter where Shard Cards allow you to break the rules of combat and ensure that no two rounds are ever the same. Get ready to unleash your skills!', 'Action', 'Free',
-        '6 Mar, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1325200, 'Nioh 2 – The Complete Edition', 160, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1325200/header.jpg?t=1775540023', 'Battle hordes of yokai in this masocore Action RPG. Create your protagonist and embark on an adventure through a myriad of locales across Japan during the Sengoku period. Utilize the new Yokai Shift ability to defeat even the most ferocious yokai and be prepared to brave through Dark Realms created by your enemies.', 'Action', '23,99€',
-        '5 Feb, 2021', 86,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1922560, 'Plants vs. Zombies™ Garden Warfare 2: Deluxe Edition', 161, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1922560/header.jpg?t=1772707471', 'Ready the Peashooters and prepare for the craziest, funniest shooter in the universe: Plants vs. Zombies Garden Warfare 2.', 'Action', '8,99€',
-        '16 May, 2022', 82,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1419170, 'My Singing Monsters', 162, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1419170/dccfe6f1528e3ed926f90751ac0e803b98de0984/header_alt_assets_56.jpg?t=1785942283', 'Dive into the Musical World of My Singing Monsters! Breed them, feed them, listen to them sing! Breed &amp; collect a menagerie of Monsters, each a living instrument! Build your paradise across 35+ Islands, customize your world, and enjoy endless music! There''s never a dull moment in the Monster World!', 'Casual', 'Free',
-        '24 Mar, 2021', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (200210, 'Realm of the Mad God Exalt', 163, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/200210/33ad01fe9223a7a117ff7de46d4b0443354c4f67/header.jpg?t=1782306757', 'Embark on an exhilarating journey into the pixelated Realm of the Mad God! Join, an action-packed, free-to-play MMO bullet hell game. Discover a world with danger, challenges, and hidden treasures as you battle through waves of enemies. Team up with players and conquer dungeons to become a legend!', 'Action', 'Free',
-        '20 Feb, 2012', 82,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2141730, 'Backrooms: Escape Together', 164, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2141730/header.jpg?t=1780282746', 'A visually lifelike co-op horror game for 1-6 people. Journey through 11 procedurally generated levels, using what''s available to survive and progress deeper into the Backrooms.', 'Action', '9,75€',
-        '18 Oct, 2022', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2186680, 'Warhammer 40,000: Rogue Trader', 165, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2186680/c7b0bd6f233f6c03fa68eee2fd1108a183329230/header.jpg?t=1781198086', 'Made in a close partnership with Games Workshop, Warhammer 40,000: Rogue Trader is a story-rich classical RPG from Owlcat Games, developers of the critically acclaimed game, Pathfinder: Wrath of the Righteous.', 'Action', '49,99€',
-        '7 Dec, 2023', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2051620, 'Enlisted', 166, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2051620/60ad41a592c49b3ccc298380b5d7ea4f28158af8/header.jpg?t=1783665086', 'In Enlisted, you are not only commanding a single soldier, but an entire squad! This MMO squad based shooter recreates the key battles of the bloodiest war of the 20th century, with hundreds of soldiers, tanks and aircraft taking part in each battle.', 'Action', 'Free',
-        '16 Jul, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2231380, 'Tom Clancy''s Ghost Recon® Breakpoint', 167, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2231380/3e05f31b9aa9fd29b9709f035e73761a908e9fbe/header.jpg?t=1786026109', 'Ghost Recon Breakpoint is a tactical third-person shooter set in a vast open world. You must survive, adapt, and fight a rogue spec ops faction, using stealth, strategy, and high-tech gear in solo or co-op.', 'Action', '2,99€',
-        '23 Jan, 2023', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2707930, 'Palia', 168, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2707930/9684b2812591bfafc0085adfd1e7128e9203385e/header.jpg?t=1778603601', 'Discover a welcoming world in Palia, a free-to-play fantasy life sim adventure where you can craft, explore, and create the life and home of your dreams. With nearly endless ways to make Palia your home, you’ll find relaxation and joy in every corner of this vibrant, heartwarming world.', 'Adventure', 'Free',
-        '25 Mar, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (704270, 'Generation Zero®', 169, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/704270/header.jpg?t=1733993638', 'Generation Zero is a stealth-action shooter where you wage guerilla warfare against lethal mechanical enemies. Explore a vast open world map inspired by the Swedish Cold War era, take part in the resistance alone or with up to three friends in seamless co-op.', 'Action', '4,99€',
-        '26 Mar, 2019', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (223750, 'DCS World Steam Edition', 170, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/223750/header.jpg?t=1784736456', 'Feel the excitement of flying the Su-25T &quot;Frogfoot&quot; attack jet and the TF-51D &quot;Mustang&quot; in the free-to-play Digital Combat Simulator World!', 'Simulation', 'Free',
-        '2 Aug, 2013', NULL,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1677280, 'Company of Heroes 3', 171, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1677280/header.jpg?t=1783012156', 'Company of Heroes 3 combines heart-pounding combat with deeper strategic choices in a stunning Mediterranean theatre of war. In Company of Heroes 3, every battle tells a story...what''s yours?', 'Action', '21,99€',
-        '23 Feb, 2023', 81,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (109600, 'Neverwinter', 172, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/109600/b45ba04297b16c13373f491bcd6bda81e6cda1d6/header.jpg?t=1781552751', 'Neverwinter is a free, action MMORPG based on the acclaimed Dungeons &amp; Dragons fantasy roleplaying game. Epic stories, action combat and classic roleplaying await those heroes courageous enough to enter the fantastic world of Neverwinter!', 'Action', 'Free',
-        '5 Dec, 2013', 74,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (835570, 'Conqueror''s Blade', 173, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/835570/35b58a16012a84b14047cf662d24dd88046df528/header.jpg?t=1782465517', 'Conqueror''s Blade gives you a chance to be a true warlord. Commanding medieval troops in epic 15 vs. 15 siege battles, conquering cities with allies in the open world or fighting against players from all over the world – it''s you who make the choice.', 'Action', 'Free',
-        '5 Apr, 2020', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (585420, 'Trailmakers', 174, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/585420/007e3884b218b63a0fdcd10a278bd07e179b4db1/header.jpg?t=1783506146', 'Build the ultimate vehicle and explore a vast open world filled with challenges and adventure. Play solo or team up with friends in multiplayer to conquer the toughest obstacles. With a thrilling campaign mode and endless creative possibilities, Trailmakers is the ultimate sandbox for adventurers.', 'Action', '4,99€',
-        '18 Sep, 2019', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2273430, 'BlazBlue Entropy Effect', 175, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2273430/header.jpg?t=1781579464', 'Enjoy action-packed flashy combat with incredibly satisfying combos and responsive controls! Numerous characters, each with completely unique playstyles and loads of unlockable moves &amp; upgrades! This action roguelike sets the bar for fluid fast-paced action.', 'Action', '11,70€',
-        '14 Feb, 2024', 83,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3124540, 'Far Far West', 176, 'Overwhelmingly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3124540/2d55092d45b1784dcc7cb0ba6ad3f919e62eb5d0/header.jpg?t=1781702029', 'Yee-haw, Cowboys! Team up in this chaotic 1-4 player co-op shooter. Journey to the Far Far West to blast monsters, sling spells, complete missions, and collect bounties. Work as a team to get in, get paid and get out (mostly) alive.', 'Action', '19,99€',
-        '28 Apr, 2026', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1527950, 'Wartales', 177, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1527950/056a8ddd7badf09aa3a0bba38b8f017002ae83e0/header_alt_assets_19.jpg?t=1785934032', 'Wartales is an open world RPG in which you lead a group of mercenaries in their search for wealth across a massive medieval universe. Explore the world, recruit companions, collect bounties and unravel the secrets of the tombs of the ancients!', 'Adventure', '34,99€',
-        '12 Apr, 2023', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2221490, 'Tom Clancy’s The Division® 2', 178, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2221490/f8f1d70c8bd6de8c9b4914d136fab97be62135db/header_alt_assets_8.jpg?t=1784820658', 'Join The Division in this open world tactical shooter. Engage in intense cover-based combat, team up with friends, and build your ultimate agent to save Washington, D.C.', 'Action', '7,49€',
-        '12 Jan, 2023', 84,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1211020, 'Wobbly Life', 179, 'Overwhelmingly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1211020/86c3e16dfbfec027053c733d929a61ecfd15278a/header.jpg?t=1761037189', 'Wobbly Life is a vibrant open-world physics sandbox. Play with your friends online or in local co-op, with exciting jobs, mini games and wacky story missions. Earn cash to spend in the world on clothes, vehicles and houses. There is a whole Wobbly World out there to explore!', 'Action', '16,24€',
-        '18 Sep, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1604270, 'Broken Arrow', 180, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1604270/6eaa69efdc71c74fad5c8e1c028648989bc22ff5/header_alt_assets_4.jpg?t=1785789718', 'Broken Arrow is a large-scale real-time modern warfare tactics game that combines the complexity of joint-forces wargaming with action-packed real-time tactics gameplay.', 'Strategy', '48,99€',
-        '19 Jun, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (641990, 'The Escapists 2', 181, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/641990/header.jpg?t=1784119111', 'Craft, Steal, Brawl and Escape! It’s time to bust out of the toughest prisons in the world as you return to the life of an inmate in The Escapists 2, now with multiplayer! Have you got what it takes to escape?', 'Indie', '4,99€',
-        '21 Aug, 2017', 75,
-        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (400750, 'Call to Arms - Gates of Hell: Ostfront', 182, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400750/dbbd1ee41869ac2bae52511ab9d171e1aba441e4/header.jpg?t=1764717941', 'Call to Arms - Gates of Hell is a realistic RTS/ RTT game that offers endless replay value. Command all types of troops in historical singleplayer, dynamic campaign, PvP and PvE battles. Are you ready for some serious immersion in World War 2?', 'Action', '34,99€',
-        '11 Jun, 2021', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (699130, 'World War Z', 183, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/699130/b35277055fbb7e07c26c5e31e4398684c6461d53/header.jpg?t=1781783964', 'World War Z is a heart-pounding coop third-person shooter for up to 4 players featuring massive swarms of hundreds of zombies, focused on fast-paced, gruesomely spectacular action.', 'Action', '29,99€',
-        '21 Sep, 2021', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1262580, 'Need for Speed™ Payback', 184, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262580/header.jpg?t=1777543107', 'Set in the underworld of Fortune Valley, you and your crew were divided by betrayal and reunited by revenge to take down The House, a nefarious cartel that rules the city’s casinos, criminals and cops. In this corrupt gambler’s paradise, the stakes are high and The House always wins.', 'Action', '2,99€',
-        '18 Jun, 2020', 62,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3472040, 'NBA 2K26', 185, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3472040/f7e126add75c3b09779b44cd349be93d31b0a80b/header.jpg?t=1782486648', 'Bragging rights are on the line in MyCAREER, MyTEAM, MyNBA, The W, and Play Now. Showcase your bag of moves with hyper realism, Powered by ProPLAY™, and challenge your friends, or rivals, in NBA 2K26’s competitive modes—and leave no doubt that you wear the crown.', 'Sports', '69,99€',
-        '4 Sep, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1282270, 'Strinova', 186, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1282270/6bd6c6b66dd137ddda618f5e9275633c740d7168/header.jpg?t=1784792247', 'Strinova is an anime-style third-person tactical competitive shooter. Switch freely between three-dimensional and two-dimensional forms in this one-of-a-kind game that offers a unique tactical shooting system for an unparalleled experience.', 'Action', 'Free',
-        '21 Nov, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3450310, 'Europa Universalis V', 187, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3450310/66ea428abab77da58a4ee16984da32c33be09d3e/header_alt_assets_2.jpg?t=1783587668', 'Use war, trade or diplomacy to satisfy your grandest ambitions and dominate five centuries of history in the newest version of Europa Universalis, Paradox Interactive''s flagship historical grand strategy game.', 'Strategy', '59,99€',
-        '4 Nov, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1284210, 'Guild Wars 2®', 188, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1284210/header.jpg?t=1782483330', 'Guild Wars 2 is an award-winning online roleplaying game with fast-paced action combat, deep character customization, and no subscription fee required. Choose from an arsenal of professions and weapons, explore a vast open world, compete in PVP modes and more. Join over 16 million players now!', 'Adventure', 'Free',
-        '23 Aug, 2022', 90,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2452280, 'Mecha BREAK', 189, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2452280/571b055960b15a3dc97583e16fb77c5a0d40b1a5/header.jpg?t=1785831815', 'Squad up in Mecha BREAK, a multiplayer third-person shooter offering three intense game modes filled with ground and aerial combat. Pilot your Striker into the breach and neutralize enemies. Are you ready for the ultimate showdown?', 'Action', 'Free',
-        '1 Jul, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1262540, 'Need for Speed™', 190, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262540/header.jpg?t=1777394657', 'Ready to own the streets? Get behind the wheel of iconic cars and floor it through Ventura Bay, a sprawling urban playground. Explore overlapping stories as you build your reputation – and your dream car – and become the ultimate racing icon.', 'Action', '2,99€',
-        '4 Jun, 2020', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1374490, 'RuneScape: Dragonwilds', 191, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1374490/6f6bba2ddccb49f3a0abb831684ca085e453c721/header_alt_assets_3.jpg?t=1785893866', 'On RuneScape''s forgotten continent of Ashenfall, dragons have awoken. Gather, build, skill and craft in this co-operative survival adventure. Only by mastering survival and uncovering ancient secrets can you hope to face the ferocious Dragon Queen.', 'Action', '29,99€',
-        '15 Apr, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1169040, 'Necesse', 192, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1169040/4b2e7f5253b4595a523e5c8b27a8ea6214e14ac6/header_alt_assets_5.jpg?t=1785482841', 'Build, quest, and conquer across an infinite procedurally generated world. Play alone or with friends as you establish a settlement and explore deep dungeons, fight monsters and bosses, mine rare ores, craft magical equipment, recruit specialists for your colony, and more!', 'Action', '7,49€',
-        '16 Oct, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3059520, 'F1® 25', 193, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3059520/76dc8ac45f1bd6dec26e04434ca1c8814e7bb330/header.jpg?t=1780590545', 'Rewrite The Grid with the ultimate evolution in racing: EA SPORTS™ F1® 25: 2026 Season Edition. Get F1® 25 and the 2026 Season Pack in one bundle for the most complete Formula One® experience.', 'Racing', '49,99€',
-        '30 May, 2025', NULL,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3595230, 'Call of Duty®: Modern Warfare® II', 194, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3595230/ce4d5e53b36cb9d3c4309d1df72bf8663bbbc7ef/header.jpg?t=1778886532', 'Call of Duty®: Modern Warfare® II drops players into an unprecedented global conflict that features the iconic Operators of Task Force 141.', 'Action', '69,99€',
-        '22 Oct, 2022', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1607250, 'MY HERO ULTRA RUMBLE', 195, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1607250/header.jpg?t=1785376799', 'Pick your favorite character, team up and fight to be the last ones standing in the new 24-player Battle Royale free to play game &quot;MY HERO ULTRA RUMBLE&quot;!', 'Action', 'Free',
-        '28 Sep, 2023', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1599600, 'PlateUp!', 196, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1599600/34583dc4049dfdd3d2a79114f8bcc624eeaea777/header_alt_assets_18.jpg?t=1785942503', 'Cook and serve your dishes, design and decorate your restaurants, and expand your culinary kingdom with new unlocks, abilities and dishes in procedurally-generated locations. Classic cooking action with permanent roguelite progression. Hire your friends - or do it all yourself!', 'Action', '4,87€',
-        '4 Aug, 2022', NULL,
-        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1432860, 'Sun Haven', 197, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1432860/header.jpg?t=1741982676', 'Build your farm and relationships with townsfolk, or forge ahead on a quest of magic, monsters, and dragons. Level up through a skill tree in 8 person multiplayer, or adventure solo!', 'Adventure', '8,57€',
-        '10 Mar, 2023', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (410900, 'Forts', 198, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/410900/header.jpg?t=1781628271', 'Unleash your creativity and strategic prowess in Forts, the exhilarating physics-based RTS! Design, construct, and customize imposing fortresses, bristling with devastating firepower, and blast your opponent’s buildings to rubble!', 'Action', '14,99€',
-        '19 Apr, 2017', 74,
-        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2698940, 'The Crew Motorfest', 199, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2698940/715d1f1e53a55a46ca00e689a1b7651c17fa592f/header.jpg?t=1783516305', 'Welcome to Motorfest, the ultimate open-world driving experience. Explore the Hawaiian islands of O''ahu and Maui. Celebrate the best of car culture through 20+ themed campaigns (street racing, offroad, drift...) and collect hundreds of iconic vehicles. Enjoy the game free for five hours!', 'Racing', '13,99€',
-        '18 Apr, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2325290, 'Sky: Children of the Light', 200, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2325290/ddbf1ae47d8a782280a99c97e2e4cfe882d1adaa/header_alt_assets_2.jpg?t=1784597874', 'A breathtaking open-world adventure awaits! Explore magical realms, restore lost light, and form wordless bonds with players worldwide. Complete quests and solve puzzles in seasonal events that celebrate kindness, discovery, and heartfelt connection.', 'Adventure', 'Free',
-        '10 Apr, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1056640, 'Phantasy Star Online 2 New Genesis', 201, 'Mixed',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1056640/cbc2abb55b0996b2ec85242aa11bf29139e46e9f/header_alt_assets_20.jpg?t=1785235324', 'Phantasy Star Online 2 New Genesis is a free-to-play action MMO. Join players around the world to explore the planet Halpha and fight in epic battles as ARKS Defenders! Unleash your imagination with our ultimate character creation experience and creative spaces to create your own phantasy.', 'Action', 'Free',
-        '5 Aug, 2020', NULL,
-        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1097840, 'Gears 5', 202, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1097840/header.jpg?t=1780003997', 'From one of gaming’s most acclaimed sagas, Gears is bigger than ever. With all-out war descending, Kait Diaz breaks away to uncover her connection to the enemy and discovers the true danger to Sera – herself.', 'Action', '4,49€',
-        '9 Sep, 2019', 82,
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (386940, 'Ultimate Chicken Horse', 152, 53110, 'Overwhelmingly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/386940/header.jpg?t=1765298731', 'Ultimate Chicken Horse is a party platformer game where you build the level as you play, placing traps and hazards to screw your friends over, but trying not to screw yourself.', 'Action', '4,54€',
+        '4 Mar, 2016', 1457049600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (979690, 'The Ascent', 203, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/979690/header.jpg?t=1772590323', 'The Ascent is a solo and co-op Action-shooter RPG set in a cyberpunk world. The mega corporation that owns you and everyone, The Ascent Group, has just collapsed. Can you survive without it?', 'Action', '7,49€',
-        '29 Jul, 2021', NULL,
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (364360, 'Total War: WARHAMMER', 153, 52293, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/364360/header.jpg?t=1780389642', 'The Old World is yours to command. Lead Legendary Lords in a combination of turn-based campaign and magically charged, strategic real-time battles, and decide the fate of your chosen race in a fight against Chaos.', 'Action', '59,99€',
+        '24 May, 2016', 1464048000, 86,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2138720, 'REMATCH', 154, 52243, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2138720/header.jpg?t=1781682466', 'Rematch is an online multiplayer football game. Control one player and compete with your team in fast-paced 5v5 matches from an immersive third-person perspective. Team up with your friends and join the action.', 'Action', '12,49€',
+        '19 Jun, 2025', 1750291200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1129580, 'Medieval Dynasty', 155, 51819, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1129580/header.jpg?t=1781251858', 'Hunt, survive, build and lead in the harsh Middle Ages: Create your own Medieval Dynasty and ensure its long-lasting prosperity or die trying! Play alone or team up with friends to enjoy the ultimate medieval experience.', 'Action', '29,99€',
+        '23 Sep, 2021', 1632355200, 73,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3041230, 'Windrose', 156, 51233, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3041230/7e838d87d787735d5d29d72777c5ee55653dfb2b/header.jpg?t=1783932953', 'Embark on a PvE survival adventure in the Age of Piracy. Fight on land and sea, solo or with friends. Build, craft and explore vast open world filled with dark secrets. Master soulslite combat and take on challenging bosses, command your ship and plunder unspoken treasures!', 'Action', '29,99€',
+        '14 Apr, 2026', 1776124800, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1962663, 'Call of Duty®: Warzone™', 157, 50621, 'Mostly Negative',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1962663/d8381959a500ead8f790115f18ec2fbccd65b5f5/header_alt_assets_19.jpg?t=1784823026', 'Welcome to Call of Duty®: Warzone™, the massive free-to-play combat arena.', 'Action', 'Free',
+        '16 Nov, 2022', 1668556800, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2943650, 'FragPunk', 158, 50364, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2943650/3664bad9e7a0739c2c4639424f711f9efb973eab/header_alt_assets_7.jpg?t=1783602641', 'FragPunk is a thrilling 5v5 hero shooter where Shard Cards allow you to break the rules of combat and ensure that no two rounds are ever the same. Get ready to unleash your skills!', 'Action', 'Free',
+        '6 Mar, 2025', 1741219200, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1325200, 'Nioh 2 – The Complete Edition', 159, 50362, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1325200/header.jpg?t=1775540023', 'Battle hordes of yokai in this masocore Action RPG. Create your protagonist and embark on an adventure through a myriad of locales across Japan during the Sengoku period. Utilize the new Yokai Shift ability to defeat even the most ferocious yokai and be prepared to brave through Dark Realms created by your enemies.', 'Action', '23,99€',
+        '5 Feb, 2021', 1612483200, 86,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1922560, 'Plants vs. Zombies™ Garden Warfare 2: Deluxe Edition', 160, 49712, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1922560/header.jpg?t=1772707471', 'Ready the Peashooters and prepare for the craziest, funniest shooter in the universe: Plants vs. Zombies Garden Warfare 2.', 'Action', '8,99€',
+        '16 May, 2022', 1652659200, 82,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1419170, 'My Singing Monsters', 161, 48620, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1419170/dccfe6f1528e3ed926f90751ac0e803b98de0984/header_alt_assets_56.jpg?t=1785942283', 'Dive into the Musical World of My Singing Monsters! Breed them, feed them, listen to them sing! Breed &amp; collect a menagerie of Monsters, each a living instrument! Build your paradise across 35+ Islands, customize your world, and enjoy endless music! There''s never a dull moment in the Monster World!', 'Casual', 'Free',
+        '24 Mar, 2021', 1616544000, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (200210, 'Realm of the Mad God Exalt', 162, 47657, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/200210/33ad01fe9223a7a117ff7de46d4b0443354c4f67/header.jpg?t=1782306757', 'Embark on an exhilarating journey into the pixelated Realm of the Mad God! Join, an action-packed, free-to-play MMO bullet hell game. Discover a world with danger, challenges, and hidden treasures as you battle through waves of enemies. Team up with players and conquer dungeons to become a legend!', 'Action', 'Free',
+        '20 Feb, 2012', 1329696000, 82,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2141730, 'Backrooms: Escape Together', 163, 47593, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2141730/header.jpg?t=1780282746', 'A visually lifelike co-op horror game for 1-6 people. Journey through 11 procedurally generated levels, using what''s available to survive and progress deeper into the Backrooms.', 'Action', '9,75€',
+        '18 Oct, 2022', 1666051200, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2186680, 'Warhammer 40,000: Rogue Trader', 164, 46989, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2186680/c7b0bd6f233f6c03fa68eee2fd1108a183329230/header.jpg?t=1781198086', 'Made in a close partnership with Games Workshop, Warhammer 40,000: Rogue Trader is a story-rich classical RPG from Owlcat Games, developers of the critically acclaimed game, Pathfinder: Wrath of the Righteous.', 'Action', '49,99€',
+        '7 Dec, 2023', 1701907200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2051620, 'Enlisted', 165, 46318, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2051620/60ad41a592c49b3ccc298380b5d7ea4f28158af8/header.jpg?t=1783665086', 'In Enlisted, you are not only commanding a single soldier, but an entire squad! This MMO squad based shooter recreates the key battles of the bloodiest war of the 20th century, with hundreds of soldiers, tanks and aircraft taking part in each battle.', 'Action', 'Free',
+        '16 Jul, 2024', 1721088000, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2231380, 'Tom Clancy''s Ghost Recon® Breakpoint', 166, 43646, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2231380/3e05f31b9aa9fd29b9709f035e73761a908e9fbe/header.jpg?t=1786026109', 'Ghost Recon Breakpoint is a tactical third-person shooter set in a vast open world. You must survive, adapt, and fight a rogue spec ops faction, using stealth, strategy, and high-tech gear in solo or co-op.', 'Action', '2,99€',
+        '23 Jan, 2023', 1674432000, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2707930, 'Palia', 167, 43567, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2707930/9684b2812591bfafc0085adfd1e7128e9203385e/header.jpg?t=1778603601', 'Discover a welcoming world in Palia, a free-to-play fantasy life sim adventure where you can craft, explore, and create the life and home of your dreams. With nearly endless ways to make Palia your home, you’ll find relaxation and joy in every corner of this vibrant, heartwarming world.', 'Adventure', 'Free',
+        '25 Mar, 2024', 1711324800, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (704270, 'Generation Zero®', 168, 42101, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/704270/header.jpg?t=1733993638', 'Generation Zero is a stealth-action shooter where you wage guerilla warfare against lethal mechanical enemies. Explore a vast open world map inspired by the Swedish Cold War era, take part in the resistance alone or with up to three friends in seamless co-op.', 'Action', '4,99€',
+        '26 Mar, 2019', 1553558400, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (223750, 'DCS World Steam Edition', 169, 40854, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/223750/header.jpg?t=1784736456', 'Feel the excitement of flying the Su-25T &quot;Frogfoot&quot; attack jet and the TF-51D &quot;Mustang&quot; in the free-to-play Digital Combat Simulator World!', 'Simulation', 'Free',
+        '2 Aug, 2013', 1375401600, NULL,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1677280, 'Company of Heroes 3', 170, 39739, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1677280/header.jpg?t=1783012156', 'Company of Heroes 3 combines heart-pounding combat with deeper strategic choices in a stunning Mediterranean theatre of war. In Company of Heroes 3, every battle tells a story...what''s yours?', 'Action', '21,99€',
+        '23 Feb, 2023', 1677110400, 81,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (109600, 'Neverwinter', 171, 39607, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/109600/b45ba04297b16c13373f491bcd6bda81e6cda1d6/header.jpg?t=1781552751', 'Neverwinter is a free, action MMORPG based on the acclaimed Dungeons &amp; Dragons fantasy roleplaying game. Epic stories, action combat and classic roleplaying await those heroes courageous enough to enter the fantastic world of Neverwinter!', 'Action', 'Free',
+        '5 Dec, 2013', 1386201600, 74,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (835570, 'Conqueror''s Blade', 172, 38757, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/835570/35b58a16012a84b14047cf662d24dd88046df528/header.jpg?t=1782465517', 'Conqueror''s Blade gives you a chance to be a true warlord. Commanding medieval troops in epic 15 vs. 15 siege battles, conquering cities with allies in the open world or fighting against players from all over the world – it''s you who make the choice.', 'Action', 'Free',
+        '5 Apr, 2020', 1586044800, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (585420, 'Trailmakers', 173, 38235, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/585420/007e3884b218b63a0fdcd10a278bd07e179b4db1/header.jpg?t=1783506146', 'Build the ultimate vehicle and explore a vast open world filled with challenges and adventure. Play solo or team up with friends in multiplayer to conquer the toughest obstacles. With a thrilling campaign mode and endless creative possibilities, Trailmakers is the ultimate sandbox for adventurers.', 'Action', '4,99€',
+        '18 Sep, 2019', 1568764800, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2273430, 'BlazBlue Entropy Effect', 174, 35756, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2273430/header.jpg?t=1781579464', 'Enjoy action-packed flashy combat with incredibly satisfying combos and responsive controls! Numerous characters, each with completely unique playstyles and loads of unlockable moves &amp; upgrades! This action roguelike sets the bar for fluid fast-paced action.', 'Action', '11,70€',
+        '14 Feb, 2024', 1707868800, 83,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3124540, 'Far Far West', 175, 35621, 'Overwhelmingly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3124540/2d55092d45b1784dcc7cb0ba6ad3f919e62eb5d0/header.jpg?t=1781702029', 'Yee-haw, Cowboys! Team up in this chaotic 1-4 player co-op shooter. Journey to the Far Far West to blast monsters, sling spells, complete missions, and collect bounties. Work as a team to get in, get paid and get out (mostly) alive.', 'Action', '19,99€',
+        '28 Apr, 2026', 1777334400, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1527950, 'Wartales', 176, 35404, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1527950/056a8ddd7badf09aa3a0bba38b8f017002ae83e0/header_alt_assets_19.jpg?t=1785934032', 'Wartales is an open world RPG in which you lead a group of mercenaries in their search for wealth across a massive medieval universe. Explore the world, recruit companions, collect bounties and unravel the secrets of the tombs of the ancients!', 'Adventure', '34,99€',
+        '12 Apr, 2023', 1681257600, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2221490, 'Tom Clancy’s The Division® 2', 177, 35278, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2221490/f8f1d70c8bd6de8c9b4914d136fab97be62135db/header_alt_assets_8.jpg?t=1784820658', 'Join The Division in this open world tactical shooter. Engage in intense cover-based combat, team up with friends, and build your ultimate agent to save Washington, D.C.', 'Action', '7,49€',
+        '12 Jan, 2023', 1673481600, 84,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1211020, 'Wobbly Life', 178, 35185, 'Overwhelmingly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1211020/86c3e16dfbfec027053c733d929a61ecfd15278a/header.jpg?t=1761037189', 'Wobbly Life is a vibrant open-world physics sandbox. Play with your friends online or in local co-op, with exciting jobs, mini games and wacky story missions. Earn cash to spend in the world on clothes, vehicles and houses. There is a whole Wobbly World out there to explore!', 'Action', '16,24€',
+        '18 Sep, 2025', 1758153600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1934680, 'Age of Mythology: Retold', 204, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1604270, 'Broken Arrow', 179, 34271, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1604270/6eaa69efdc71c74fad5c8e1c028648989bc22ff5/header_alt_assets_4.jpg?t=1785789718', 'Broken Arrow is a large-scale real-time modern warfare tactics game that combines the complexity of joint-forces wargaming with action-packed real-time tactics gameplay.', 'Strategy', '48,99€',
+        '19 Jun, 2025', 1750291200, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (641990, 'The Escapists 2', 180, 33657, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/641990/header.jpg?t=1784119111', 'Craft, Steal, Brawl and Escape! It’s time to bust out of the toughest prisons in the world as you return to the life of an inmate in The Escapists 2, now with multiplayer! Have you got what it takes to escape?', 'Indie', '4,99€',
+        '21 Aug, 2017', 1503273600, 75,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (400750, 'Call to Arms - Gates of Hell: Ostfront', 181, 33484, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400750/dbbd1ee41869ac2bae52511ab9d171e1aba441e4/header.jpg?t=1764717941', 'Call to Arms - Gates of Hell is a realistic RTS/ RTT game that offers endless replay value. Command all types of troops in historical singleplayer, dynamic campaign, PvP and PvE battles. Are you ready for some serious immersion in World War 2?', 'Action', '34,99€',
+        '11 Jun, 2021', 1623369600, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (699130, 'World War Z', 182, 31896, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/699130/b35277055fbb7e07c26c5e31e4398684c6461d53/header.jpg?t=1781783964', 'World War Z is a heart-pounding coop third-person shooter for up to 4 players featuring massive swarms of hundreds of zombies, focused on fast-paced, gruesomely spectacular action.', 'Action', '29,99€',
+        '21 Sep, 2021', 1632182400, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1262580, 'Need for Speed™ Payback', 183, 31828, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262580/header.jpg?t=1777543107', 'Set in the underworld of Fortune Valley, you and your crew were divided by betrayal and reunited by revenge to take down The House, a nefarious cartel that rules the city’s casinos, criminals and cops. In this corrupt gambler’s paradise, the stakes are high and The House always wins.', 'Action', '2,99€',
+        '18 Jun, 2020', 1592438400, 62,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3472040, 'NBA 2K26', 184, 31803, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3472040/f7e126add75c3b09779b44cd349be93d31b0a80b/header.jpg?t=1782486648', 'Bragging rights are on the line in MyCAREER, MyTEAM, MyNBA, The W, and Play Now. Showcase your bag of moves with hyper realism, Powered by ProPLAY™, and challenge your friends, or rivals, in NBA 2K26’s competitive modes—and leave no doubt that you wear the crown.', 'Sports', '69,99€',
+        '4 Sep, 2025', 1756944000, NULL,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1282270, 'Strinova', 185, 30401, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1282270/6bd6c6b66dd137ddda618f5e9275633c740d7168/header.jpg?t=1784792247', 'Strinova is an anime-style third-person tactical competitive shooter. Switch freely between three-dimensional and two-dimensional forms in this one-of-a-kind game that offers a unique tactical shooting system for an unparalleled experience.', 'Action', 'Free',
+        '21 Nov, 2024', 1732147200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3450310, 'Europa Universalis V', 186, 30164, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3450310/66ea428abab77da58a4ee16984da32c33be09d3e/header_alt_assets_2.jpg?t=1783587668', 'Use war, trade or diplomacy to satisfy your grandest ambitions and dominate five centuries of history in the newest version of Europa Universalis, Paradox Interactive''s flagship historical grand strategy game.', 'Strategy', '59,99€',
+        '4 Nov, 2025', 1762214400, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1476970, 'IdleOn', 187, 29437, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1476970/header.jpg?t=1783034427', 'The incremental idle MMO where your heroes keep fighting while you''re gone! Spend their loot on upgrades, unlock classes from Elemental-Wizard to Cannon-Pirate, and level 20 unique skills like Farming, Sailing, and Construction!', 'Adventure', 'Free',
+        '6 Nov, 2025', 1762387200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1284210, 'Guild Wars 2®', 188, 29123, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1284210/header.jpg?t=1782483330', 'Guild Wars 2 is an award-winning online roleplaying game with fast-paced action combat, deep character customization, and no subscription fee required. Choose from an arsenal of professions and weapons, explore a vast open world, compete in PVP modes and more. Join over 16 million players now!', 'Adventure', 'Free',
+        '23 Aug, 2022', 1661212800, 90,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2452280, 'Mecha BREAK', 189, 28980, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2452280/571b055960b15a3dc97583e16fb77c5a0d40b1a5/header.jpg?t=1785831815', 'Squad up in Mecha BREAK, a multiplayer third-person shooter offering three intense game modes filled with ground and aerial combat. Pilot your Striker into the breach and neutralize enemies. Are you ready for the ultimate showdown?', 'Action', 'Free',
+        '1 Jul, 2025', 1751328000, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1262540, 'Need for Speed™', 190, 28854, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262540/header.jpg?t=1777394657', 'Ready to own the streets? Get behind the wheel of iconic cars and floor it through Ventura Bay, a sprawling urban playground. Explore overlapping stories as you build your reputation – and your dream car – and become the ultimate racing icon.', 'Action', '2,99€',
+        '4 Jun, 2020', 1591228800, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2280, 'DOOM + DOOM II', 191, 28724, 'Overwhelmingly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2280/header.jpg?t=1750785073', 'Developed by id Software, and originally released in 1993 and 1994, the definitive, newly enhanced versions of DOOM + DOOM II are available as a combined product.', 'Action', '3,99€',
+        '3 Aug, 2007', 1186099200, NULL,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1374490, 'RuneScape: Dragonwilds', 192, 28664, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1374490/6f6bba2ddccb49f3a0abb831684ca085e453c721/header_alt_assets_3.jpg?t=1785893866', 'On RuneScape''s forgotten continent of Ashenfall, dragons have awoken. Gather, build, skill and craft in this co-operative survival adventure. Only by mastering survival and uncovering ancient secrets can you hope to face the ferocious Dragon Queen.', 'Action', '29,99€',
+        '15 Apr, 2025', 1744675200, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1169040, 'Necesse', 193, 28278, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1169040/4b2e7f5253b4595a523e5c8b27a8ea6214e14ac6/header_alt_assets_5.jpg?t=1785482841', 'Build, quest, and conquer across an infinite procedurally generated world. Play alone or with friends as you establish a settlement and explore deep dungeons, fight monsters and bosses, mine rare ores, craft magical equipment, recruit specialists for your colony, and more!', 'Action', '7,49€',
+        '16 Oct, 2025', 1760572800, NULL,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3059520, 'F1® 25', 194, 27990, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3059520/76dc8ac45f1bd6dec26e04434ca1c8814e7bb330/header.jpg?t=1780590545', 'Rewrite The Grid with the ultimate evolution in racing: EA SPORTS™ F1® 25: 2026 Season Edition. Get F1® 25 and the 2026 Season Pack in one bundle for the most complete Formula One® experience.', 'Racing', '49,99€',
+        '30 May, 2025', 1748563200, NULL,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3595230, 'Call of Duty®: Modern Warfare® II', 195, 27481, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3595230/ce4d5e53b36cb9d3c4309d1df72bf8663bbbc7ef/header.jpg?t=1778886532', 'Call of Duty®: Modern Warfare® II drops players into an unprecedented global conflict that features the iconic Operators of Task Force 141.', 'Action', '69,99€',
+        '22 Oct, 2022', 1666396800, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1607250, 'MY HERO ULTRA RUMBLE', 196, 26903, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1607250/header.jpg?t=1785376799', 'Pick your favorite character, team up and fight to be the last ones standing in the new 24-player Battle Royale free to play game &quot;MY HERO ULTRA RUMBLE&quot;!', 'Action', 'Free',
+        '28 Sep, 2023', 1695859200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1599600, 'PlateUp!', 197, 26822, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1599600/34583dc4049dfdd3d2a79114f8bcc624eeaea777/header_alt_assets_18.jpg?t=1785942503', 'Cook and serve your dishes, design and decorate your restaurants, and expand your culinary kingdom with new unlocks, abilities and dishes in procedurally-generated locations. Classic cooking action with permanent roguelite progression. Hire your friends - or do it all yourself!', 'Action', '4,87€',
+        '4 Aug, 2022', 1659571200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1432860, 'Sun Haven', 198, 25314, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1432860/header.jpg?t=1741982676', 'Build your farm and relationships with townsfolk, or forge ahead on a quest of magic, monsters, and dragons. Level up through a skill tree in 8 person multiplayer, or adventure solo!', 'Adventure', '8,57€',
+        '10 Mar, 2023', 1678406400, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (410900, 'Forts', 199, 25185, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/410900/header.jpg?t=1781628271', 'Unleash your creativity and strategic prowess in Forts, the exhilarating physics-based RTS! Design, construct, and customize imposing fortresses, bristling with devastating firepower, and blast your opponent’s buildings to rubble!', 'Action', '14,99€',
+        '19 Apr, 2017', 1492560000, 74,
+        '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2698940, 'The Crew Motorfest', 200, 24897, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2698940/715d1f1e53a55a46ca00e689a1b7651c17fa592f/header.jpg?t=1783516305', 'Welcome to Motorfest, the ultimate open-world driving experience. Explore the Hawaiian islands of O''ahu and Maui. Celebrate the best of car culture through 20+ themed campaigns (street racing, offroad, drift...) and collect hundreds of iconic vehicles. Enjoy the game free for five hours!', 'Racing', '13,99€',
+        '18 Apr, 2024', 1713398400, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2325290, 'Sky: Children of the Light', 201, 24731, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2325290/ddbf1ae47d8a782280a99c97e2e4cfe882d1adaa/header_alt_assets_2.jpg?t=1784597874', 'A breathtaking open-world adventure awaits! Explore magical realms, restore lost light, and form wordless bonds with players worldwide. Complete quests and solve puzzles in seasonal events that celebrate kindness, discovery, and heartfelt connection.', 'Adventure', 'Free',
+        '10 Apr, 2024', 1712707200, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1056640, 'Phantasy Star Online 2 New Genesis', 202, 24624, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1056640/cbc2abb55b0996b2ec85242aa11bf29139e46e9f/header_alt_assets_20.jpg?t=1785235324', 'Phantasy Star Online 2 New Genesis is a free-to-play action MMO. Join players around the world to explore the planet Halpha and fight in epic battles as ARKS Defenders! Unleash your imagination with our ultimate character creation experience and creative spaces to create your own phantasy.', 'Action', 'Free',
+        '5 Aug, 2020', 1596585600, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1097840, 'Gears 5', 203, 24616, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1097840/header.jpg?t=1780003997', 'From one of gaming’s most acclaimed sagas, Gears is bigger than ever. With all-out war descending, Kait Diaz breaks away to uncover her connection to the enemy and discovers the true danger to Sera – herself.', 'Action', '4,49€',
+        '9 Sep, 2019', 1567987200, 82,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (979690, 'The Ascent', 204, 24529, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/979690/header.jpg?t=1772590323', 'The Ascent is a solo and co-op Action-shooter RPG set in a cyberpunk world. The mega corporation that owns you and everyone, The Ascent Group, has just collapsed. Can you survive without it?', 'Action', '7,49€',
+        '29 Jul, 2021', 1627516800, NULL,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2129530, 'REANIMAL', 205, 24235, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2129530/4cdda917a0155258a2e7909d7869f35d8f980f96/header.jpg?t=1784646020', 'The creators of Little Nightmares™ I &amp; II have returned to take you on a darker, more terrifying journey than ever before. In this horror adventure game, a brother &amp; sister go through hell to rescue their missing friends and escape the island that they used to call home.', 'Adventure', '39,99€',
+        '13 Feb, 2026', 1770940800, 80,
+        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1934680, 'Age of Mythology: Retold', 206, 23229, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1934680/header.jpg?t=1780429786', 'Play as mythological Gods and smite your enemies in this award-winning, mythological Real-Time Strategy classic given new life. Wage war across timeless campaigns, fierce skirmishes, and god-powered multiplayer modes.', 'Strategy', '29,99€',
-        '4 Sep, 2024', 83,
+        '4 Sep, 2024', 1725408000, 83,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1430190, 'Killing Floor 3', 205, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1430190, 'Killing Floor 3', 207, 23145, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1430190/ec27cf2ad2fc5e75b80fd33dd3e013a1cb68329d/header_alt_assets_0.jpg?t=1784912665', 'It’s 2091 and megacorp Horzine has produced the ultimate army: an obedient horde of bioengineered monsters called zeds. Now, join the rebel group Nightfall in this co-op action/horror FPS that puts you and your teammates in a battle for the future of humanity.', 'Action', '39,99€',
-        '24 Jul, 2025', NULL,
+        '24 Jul, 2025', 1753315200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2437170, 'SMITE 2', 206, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2437170, 'SMITE 2', 208, 23047, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2437170/236dab1178cc7a081d0295625cadf045cde85ef3/header_alt_assets_23.jpg?t=1785186976', 'Become a god and wage war in SMITE 2, the free-to-play Unreal Engine 5-powered sequel to the legendary third-person action MOBA. If you love challenging competition, intense action, ability-driven combat, rewarding teamwork, or godly mythology, you’ll see why 40+ million players love SMITE.', 'Action', 'Free',
-        '27 Aug, 2024', NULL,
+        '27 Aug, 2024', 1724716800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1985810, 'Call of Duty®: Black Ops Cold War', 207, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1985810, 'Call of Duty®: Black Ops Cold War', 209, 22929, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1985810/header.jpg?t=1780964053', 'Black Ops Cold War, the direct sequel to Call of Duty®: Black Ops, will drop fans into the depths of the Cold War’s volatile geopolitical battle of the early 1980s.', 'Action', '59,99€',
-        '8 Mar, 2023', NULL,
+        '8 Mar, 2023', 1678233600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1669000, 'Age of Wonders 4', 208, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1669000, 'Age of Wonders 4', 210, 22833, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1669000/6117cd8a24c0af366d7c9cdb2fc1565c4a97d8cf/header.jpg?t=1782398714', 'Rule a fantasy realm of your own design! Explore new magical realms in Age of Wonders’ signature blend of 4X strategy and turn-based tactical combat. Control a faction that grows and changes as you expand your empire with each turn!', 'RPG', '49,99€',
-        '2 May, 2023', NULL,
+        '2 May, 2023', 1682985600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2661300, 'Grounded 2', 209, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2661300, 'Grounded 2', 211, 22633, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2661300/c4fc47c7e6ece14e438f0957d066dc9ab2a3412a/header.jpg?t=1784045614', 'Shrunk again, but the world is much larger. In this open-world, single-player or co-op survival adventure, craft weapons and armor, build your base, and traverse the playground on your buggy. But something else is out there—and it hasn’t forgotten you.', 'Action', '29,99€',
-        '29 Jul, 2025', NULL,
+        '29 Jul, 2025', 1753747200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (24200, 'DC Universe™ Online', 210, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (24200, 'DC Universe™ Online', 212, 21908, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/24200/4341fdcb5f72c77c6fb4e0b169e9f52f47cdff9e/header.jpg?t=1780512580', 'DC Universe Online is a Free-to-Play, massive multiplayer online action game set in the popular DC Universe. Become one of a new breed of Heroes or Villains and wield incredible powers as you go to war with legendary characters such as Batman, Superman, Lex Luthor and The Joker.', 'Action', 'Free',
-        '2 Nov, 2011', 72,
+        '2 Nov, 2011', 1320192000, 72,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3199170, 'Blood Strike', 211, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3199170, 'Blood Strike', 213, 21625, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3199170/header.jpg?t=1776308035', 'Gather your friends and dive into the action-packed Battle Royale, Squad Fight, or Hot Zone like there''s no tomorrow! Blood Strike offers a wide range of playable Strikers, each with a unique active and passive ability letting you deploy drones, shield walls and everything in between.', 'Action', 'Free',
-        '13 Mar, 2025', NULL,
+        '13 Mar, 2025', 1741824000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1974050, 'Torchlight: Infinite', 212, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1974050, 'Torchlight: Infinite', 214, 21362, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1974050/fe54332f68585adf7b5bb95b4827bf4be4f63dc8/header.jpg?t=1784200255', 'The fate of Ember Technology is in your hands. With abounding hero build possibilities, dive into an epic journey with endless loot, adrenaline-pumping fights &amp; new seasonal contents.', 'Action', 'Free',
-        '9 May, 2023', NULL,
+        '9 May, 2023', 1683590400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1812450, 'Bellwright', 213, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1812450, 'Bellwright', 215, 21129, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1812450/header.jpg?t=1782335635', 'Establish and expand your own settlements, liberate the land and assist its villagers, and recruit others to your cause while learning more about a life you had to leave behind. Command your forces, prove your valor through combat, and cement yourself as the hero of your people.', 'Action', '28,99€',
-        '23 Apr, 2024', NULL,
+        '23 Apr, 2024', 1713830400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2622000, 'Astral Party ', 214, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2622000, 'Astral Party ', 216, 21052, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2622000/bf2f2f5bd97e0f3be91209888d067a4858235db7/header.jpg?t=1785412352', 'Astral Party is a multiplayer party game populated by cute anime girls! Choose your favorite character, strategize skills &amp; cards, and roll the dice to destroy friendships in this unique board game.', 'Casual', 'Free',
-        '28 Feb, 2024', NULL,
+        '28 Feb, 2024', 1709078400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2444750, 'Shape of Dreams', 215, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2444750, 'Shape of Dreams', 217, 19973, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2444750/7206b4477a2f19a2d1c015717fd0cd86fd1e0313/header_alt_assets_4.jpg?t=1783499966', 'Shape of Dreams delivers fast-paced top-down roguelite action with chaotic projectile-filled battles, fluid combat, and high-stakes co-op. Play solo or with up to three friends as you dodge overwhelming attacks and unleash devastating builds.', 'Action', '17,15€',
-        '10 Sep, 2025', NULL,
+        '10 Sep, 2025', 1757462400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2625420, 'Drive Beyond Horizons', 216, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2625420, 'Drive Beyond Horizons', 218, 19916, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2625420/e618a699ed6d62bd52ec9b2d5220373888f3640f/header.jpg?t=1784659873', 'Explore, survive, and push the boundaries of the horizon in a vast, procedurally generated world. Customize your vehicle, face unpredictable events, gather resources, and embark on a unique adventure, alone or with up to 4 players.', 'Action', '24,50€',
-        '24 Mar, 2025', NULL,
+        '24 Mar, 2025', 1742774400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1190970, 'House Flipper 2', 217, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1190970, 'House Flipper 2', 219, 19662, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1190970/a8c4bf872d073e27e96c2179e19a5cd9971bfd2e/header.jpg?t=1784539929', 'Clean your worries away with this relaxing renovation simulator! Buy, fix, sell, and become a local legend. Or grab your power tools and build anything from scratch! With the online 2-4 players co-op mode, you can play both in sandbox and story mode together.', 'Casual', '37,49€',
-        '14 Dec, 2023', 79,
+        '14 Dec, 2023', 1702512000, 79,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3595270, 'Call of Duty®: Modern Warfare® III', 218, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3595270, 'Call of Duty®: Modern Warfare® III', 220, 19635, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3595270/7d0f21912a075c33bbb5ea558100e187ceb234ac/header.jpg?t=1778886604', 'In the direct sequel to the record-breaking Call of Duty®: Modern Warfare® II, Captain Price and Task Force 141 face off against the ultimate threat.', 'Action', '69,99€',
-        '10 Nov, 2023', NULL,
+        '10 Nov, 2023', 1699574400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1435790, 'Escape Simulator', 219, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1435790, 'Escape Simulator', 221, 19262, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1435790/413708a2da512607f70bb22b29270359586c6e5f/header.jpg?t=1782813501', 'First-person puzzler you can play solo or in an online co-op. Explore a set of highly interactive escape rooms. Move furniture, pick up and examine everything, smash pots and break locks! Play thousands of community-made rooms through the level editor.', 'Adventure', '8,49€',
-        '19 Oct, 2021', 82,
+        '19 Oct, 2021', 1634601600, 82,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3892270, 'Gamble With Your Friends', 220, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3892270, 'Gamble With Your Friends', 222, 18842, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3892270/395e6d7972474333a698b26f8aa5597bf38109a1/header.jpg?t=1785797127', 'An online 1-6 player co-op &quot;casino crawler&quot; where you and your friends share one bank account and one massive debt. Gamble, buy sketchy items, make terrible decisions, and climb an ominous casino tower to hit your loan shark’s daily quota in 5 minutes - or face the consequences.', 'Adventure', '7,79€',
-        '1 May, 2026', NULL,
+        '1 May, 2026', 1777593600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1815780, 'Asphalt Legends ', 221, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1815780, 'Asphalt Legends ', 223, 18755, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1815780/62d97fdca8328c041820e8dfa3cf4997d68881ab/header.jpg?t=1782205103', 'Spark your competitive soul with Asphalt Legends and feel the collective heartbeat of the road! Join forces with other players to speed through intense arcade races, perform jaw-dropping stunts, and charge towards victory while driving the finest hypercars!', 'Action', 'Free',
-        '2 Aug, 2022', NULL,
+        '2 Aug, 2022', 1659398400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3681010, 'Nioh 3', 222, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3681010, 'Nioh 3', 224, 18684, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3681010/a21264e9fd476dcb2901c2432b598107d024c5a8/header.jpg?t=1772090941', 'In the third game in the dark samurai action RPG series Nioh, you will need to use both Samurai and Ninja combat styles in your battles against formidable yokai as you explore a thrilling open field.', 'Action', '51,19€',
-        '5 Feb, 2026', 85,
+        '5 Feb, 2026', 1770249600, 85,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1341290, 'We Were Here Forever', 223, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1341290, 'We Were Here Forever', 225, 18661, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1341290/header.jpg?t=1764331788', 'You both awaken imprisoned inside the sinister Castle Rock - were you betrayed, or simply not that clever? Find out in the greatest co-op puzzle adventure in the We Were Here Series! Do you and your partner have what it takes to face the dark forces of this realm or will you be trapped… forever?', 'Adventure', '7,19€',
-        '10 May, 2022', NULL,
+        '10 May, 2022', 1652140800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1672970, 'Minecraft Dungeons', 224, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1672970, 'Minecraft Dungeons', 226, 18572, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1672970/header.jpg?t=1717003107', 'Fight your way through an exciting action-adventure game, inspired by classic dungeon crawlers and set in the Minecraft universe!', 'Action', '19,99€',
-        '22 Sep, 2021', NULL,
+        '22 Sep, 2021', 1632268800, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1258080, 'Shop Titans', 225, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1258080, 'Shop Titans', 227, 17917, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1258080/8c0601da3ee8fc826c62193888e77554b7934795/header.jpg?t=1754432193', 'Shop Titans is the ultimate RPG shopkeeper simulation. Craft powerful equipment, stock your shop and sell to aspiring heroes… at a markup! Hire heroes and explore dungeons to gather valuable materials to craft with. There’s never a dull moment in the world of Shop Titans!', 'Adventure', 'Free',
-        '5 May, 2020', NULL,
+        '5 May, 2020', 1588636800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (371970, 'Barony', 226, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (371970, 'Barony', 228, 17580, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/371970/0f8975e4b2af32eb0d68c309f1eff56d470e73dc/header.jpg?t=1785259607', 'Barony is the premier first-person roguelike with cooperative play! Adventure alone, or gather a party with iconic and unusual RPG classes to face off against the brutal dungeons. Test your resourcefulness, wits, and friendships, on your quest to lift the evil lich''s curse!', 'Action', '14,62€',
-        '23 Jun, 2015', NULL,
+        '23 Jun, 2015', 1435017600, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2352620, 'Fellowship', 227, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2352620, 'Fellowship', 229, 17464, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2352620/9a614f739249e84fb74fe986cd6ccfc0edcee2bb/header.jpg?t=1782140326', 'Choose your hero, form your group and battle through dungeons together in a Multiplayer Online Dungeon Adventure. Progress through Leagues, endlessly scaling Dungeons and chase new rewards with every fresh season. With a growing roster of Heroes and content there’s always something new in FELLOWSHIP', 'RPG', '14,70€',
-        '16 Oct, 2025', NULL,
+        '16 Oct, 2025', 1760572800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2904000, 'The Spell Brigade', 228, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2904000, 'The Spell Brigade', 230, 16376, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2904000/ef8f6a434fbdfaa2937ff83adf90b8ffde102ccf/header.jpg?t=1785900724', 'Survivors-like with ONLINE CO-OP for 1-4 players. Team up with your wizard friends to slay hordes of dark creatures. Complete team-based objectives, unlock new upgrades and create overpowered spell synergies. Friend nor foe is safe in this friendly fire bullet hell!', 'Action', '12,79€',
-        '29 Apr, 2026', NULL,
+        '29 Apr, 2026', 1777420800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (436150, 'Governor of Poker 3', 229, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (436150, 'Governor of Poker 3', 231, 16299, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/436150/header.jpg?t=1784100394', 'Governor of Poker 3 is the best multiplayer poker game with a great design. In this multi-player version of Governor of Poker you compete live with thousands of real poker players to prove you are the number 1 Texas Hold ’em poker star!', 'Casual', 'Free',
-        '19 Feb, 2016', NULL,
+        '19 Feb, 2016', 1455840000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (780290, 'Gloomhaven', 230, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (780290, 'Gloomhaven', 232, 16046, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/780290/header.jpg?t=1780409484', 'Lead your band of mercenaries in the land of Gloomhaven, work with unsavoury individuals, shape the fate of the region, fight your way through horrific places and get rich or die trying in this ruthless Tactical-RPG.', 'Adventure', '9,79€',
-        '20 Oct, 2021', 82,
+        '20 Oct, 2021', 1634688000, 82,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1676840, 'For The King II', 231, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1676840, 'For The King II', 233, 15976, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1676840/146cf4b5fad9a49caea91b23c7e43bb2c74bfa85/header_alt_assets_13.jpg?t=1786013028', 'Battle against Fahrul''s tyrannical Queen alone or as a party of four players in the sequel to For The King, the massively popular turn-based roguelite tabletop RPG. Will you unravel the once beloved Queen''s terrible secret?', 'Adventure', '8,49€',
-        '2 Nov, 2023', 76,
+        '2 Nov, 2023', 1698883200, 76,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1611600, 'WARNO', 232, 'Mostly Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1611600/header.jpg?t=1783436415', 'Realistic, immersive, breathtaking. WARNO is the ultimate World War III battle simulator from the masters of strategy, Eugen Systems. A Cold War turns decisively hot as you command hundreds of units on a beautiful and brutal battlefield. Outsmart, outfight, and lead your forces to total victory.', 'Action', '39,99€',
-        '23 May, 2024', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1056960, 'Wolfenstein: Youngblood', 233, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1056960, 'Wolfenstein: Youngblood', 234, 15787, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1056960/header.jpg?t=1761681484', 'Wolfenstein: Youngblood is the first modern co-op Wolfenstein adventure. Team up with a friend or play solo as one of BJ Blazkowicz’s twin daughters and wield a powerful arsenal of new weapons, gadgets, and abilities to liberate Paris from the Nazis.', 'Action', '4,99€',
-        '25 Jul, 2019', 69,
+        '25 Jul, 2019', 1564012800, 69,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4384550, 'Call of Duty®: Black Ops 6', 234, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4384550, 'Call of Duty®: Black Ops 6', 235, 15763, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4384550/836828b783fc1208664d6c3f9fe88e9abf060813/header.jpg?t=1783699904', 'Call of Duty®: Black Ops 6 is signature Black Ops across a cinematic single-player Campaign, a best-in-class Multiplayer experience and with the epic return of Round-Based Zombies.', 'Action', '79,99€',
-        '1 Nov, 2024', NULL,
+        '1 Nov, 2024', 1730419200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (784080, 'MechWarrior 5: Mercenaries', 235, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (784080, 'MechWarrior 5: Mercenaries', 236, 15673, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/784080/33d11250c669e8c755c12678d1ef401e70e1c4a5/header.jpg?t=1785535307', 'The year is 3015. The battlefields are dominated by war machines known as BattleMechs. Level entire cities and decimate the enemy in your BattleMech. Follow a quest for glory and revenge. Manage an expanding mercenary company. Fight alongside your friends with a four-player PvE co-op.', 'Action', '7,49€',
-        '26 May, 2021', 73,
+        '26 May, 2021', 1621987200, 73,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3679080, 'The Seven Deadly Sins: Origin', 236, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3679080, 'The Seven Deadly Sins: Origin', 237, 15414, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3679080/86b4734355e3e43b8323426e69d127ce79bab888/header.jpg?t=1782362949', '&lt;The Seven Deadly Sins: Origin&gt; is an open-world anime RPG set in the universe of [The Seven Deadly Sins]. Step into the role of Prince Tristan of Liones and explore an open-world Britannia, as you embark on a journey to restore order to a world thrown into chaos by the collision of time and space.', 'Action', 'Free',
-        '16 Mar, 2026', NULL,
+        '16 Mar, 2026', 1773619200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2840770, 'Avatar: Frontiers of Pandora™', 237, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2840770, 'Avatar: Frontiers of Pandora™', 238, 15331, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2840770/27aa6d8f9c3f11dc93a557164d30a9ba08a7c46a/header.jpg?t=1778598692', 'Avatar: Frontiers of Pandora™ is a third and first-person action-adventure game set in the Western Frontier. Reconnect with your lost heritage and discover what it means to be Na''vi.', 'Action', '29,99€',
-        '17 Jun, 2024', NULL,
+        '17 Jun, 2024', 1718582400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2605790, 'Deep Rock Galactic: Rogue Core', 238, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2605790, 'Deep Rock Galactic: Rogue Core', 239, 14938, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2605790/7eeed3c47ad188a374fada902b8c33687aff889b/header_alt_assets_0.jpg?t=1781771775', 'DEEP ROCK GALACTIC: ROGUE CORE is a 1-4 player co-op FPS action roguelite featuring sci-fi dwarves, alien horrors and procedurally-generated caves. Join the elite dwarven Reclaimers and fight through perilous mining facilities infested with deadly Corespawn. For Rock and Stone!', 'Action', '23,99€',
-        '20 May, 2026', NULL,
+        '20 May, 2026', 1779235200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1324780, 'Easy Red 2', 239, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1324780, 'Easy Red 2', 240, 14415, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1324780/3363888c8b58063e10a996b289611042c587ec7c/header.jpg?t=1785026019', 'Experience massive battles with infantry, tanks, artillery, and aircraft on large destructible open-world maps. Equip yourself, coordinate with your squad, and fight through World War II in singleplayer, co-op, or multiplayer!', 'Action', '8,99€',
-        '6 Jan, 2022', NULL,
+        '6 Jan, 2022', 1641427200, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2445690, 'Lost Castle 2', 240, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1273400, 'Construction Simulator', 241, 14328, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1273400/header.jpg?t=1784210925', 'Construction Simulator has returned – larger and more impressive than ever! Fulfil your ambition to become a successful construction entrepreneur by establishing your business from scratch, assisted by your mentor Hape.', 'Casual', '24,99€',
+        '20 Sep, 2022', 1663632000, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2445690, 'Lost Castle 2', 242, 13440, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2445690/f6619cdbb283b34d8fc5bdd12472127a2efd0866/header.jpg?t=1784785941', '&quot;Lost Castle 2&quot; is a 2D Beat''em up Rogue-Lite game. Explore abundant treasures and items to enhance yourself, master various weapons to showcase your skills, and challenge powerful monsters to demonstrate your strength. A new adventure is calling for treasure hunters!', 'Action', '12,24€',
-        '10 Jun, 2026', 83,
+        '10 Jun, 2026', 1781049600, 83,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3274580, 'Anno 117: Pax Romana', 241, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3274580, 'Anno 117: Pax Romana', 243, 12535, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3274580/88dbcce1c7630e2d4334fa25e835968e57e0ebfe/header.jpg?t=1785862092', 'Shape the Roman Empire in this genre-defining strategic builder game. Build cities while expanding your influence through Roman provinces. Govern using your economic prowess, diplomatic skills, or military might.', 'Simulation', '59,99€',
-        '12 Nov, 2025', 84,
+        '12 Nov, 2025', 1762905600, 84,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3556750, 'Warhammer 40,000: Dawn of War - Definitive Edition', 242, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3556750, 'Warhammer 40,000: Dawn of War - Definitive Edition', 244, 12444, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3556750/f60b47fa49e3582f21c39f6b123fb59e2b441292/header.jpg?t=1783120204', 'Warhammer 40,000: Dawn of War - Definitive Edition is the ultimate Dawn of War experience, featuring the original Dawn of War and all its expansions, along with enhanced visuals, an improved camera, and 64-bit platform support.', 'Strategy', '19,94€',
-        '14 Aug, 2025', NULL,
+        '14 Aug, 2025', 1755129600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2239550, 'Watch Dogs®: Legion', 243, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2239550, 'Watch Dogs®: Legion', 245, 12401, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2239550/header.jpg?t=1747655055', 'Build a resistance as you fight to take back a near-future London facing its downfall. Welcome to the Resistance.', 'Action', '8,99€',
-        '26 Jan, 2023', NULL,
+        '26 Jan, 2023', 1674691200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2495100, 'Hello Kitty Island Adventure', 244, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2495100, 'Hello Kitty Island Adventure', 246, 12185, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2495100/33b3efa148506359eb8d6e973f59a38cb95cc794/header.jpg?t=1776719582', 'Embark on a cozy, open-world adventure with Hello Kitty and Friends. Befriend beloved characters as you explore and restore a mysterious island, solve ancient puzzles, cook delicious dishes, customize yourself and your cabins, and so much more.', 'Action', '39,99€',
-        '30 Jan, 2025', NULL,
+        '30 Jan, 2025', 1738195200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2064650, 'Tower of Fantasy', 245, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2064650, 'Tower of Fantasy', 247, 12035, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2064650/0c82621e59d0b0a190952a06daf1bfe5fe39fd2c/header.jpg?t=1785813300', 'Embark together on your fantasy adventure! Set hundreds of years in the future on the distant planet of Aida, the shared open-world RPG, anime-infused sci-fi adventure Tower of Fantasy now is officially available on Steam.', 'Action', 'Free',
-        '19 Oct, 2022', NULL,
+        '19 Oct, 2022', 1666137600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1757300, 'Jump Space', 246, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1757300, 'Jump Space', 248, 11926, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1757300/f401ae1af25f31fdfed24f56cf98ea4a32d79997/header.jpg?t=1782900629', 'Jump Space (formerly Jump Ship) is a mission based co-op PvE for 1-4 players, where you are the crew of a spaceship. Transition seamlessly from crewing the ship to on-foot exploration and space walks. Explore, upgrade, and survive intense encounters in deep space together.', 'Action', '19,50€',
-        '19 Sep, 2025', NULL,
+        '19 Sep, 2025', 1758240000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1054490, 'Wingspan', 247, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1054490, 'Wingspan', 249, 11901, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1054490/header.jpg?t=1785850999', 'Wingspan is a relaxing, award-winning strategy card game about birds for 1 to 5 players. Each bird you play extends a chain of powerful combinations in one of your three habitats. Your goal is to discover and attract the best birds to your network of wildlife preserves.', 'Indie', '9,99€',
-        '17 Sep, 2020', 84,
+        '17 Sep, 2020', 1600300800, 84,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3293260, 'Waterpark Simulator', 248, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3293260, 'Waterpark Simulator', 250, 11886, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3293260/d777414ab68027db0399200587fd78d409cc9602/header_alt_assets_5.jpg?t=1785859866', 'Build and run your own waterpark solo or with friends. Design slides, send guests flying with ragdoll physics, manage staff, and fully customize your park. Turn total madness into a diamond five-star empire in this first-person management simulator!', 'Casual', '9,59€',
-        '31 Jul, 2026', NULL,
+        '31 Jul, 2026', 1785456000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1857950, 'VEIN', 249, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1857950, 'VEIN', 251, 11720, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1857950/header.jpg?t=1780246681', 'VEIN is a post-apocalyptic survival multiplayer sandbox game. Gather supplies to survive, explore abandoned buildings, defend your home, and rebuild society, whether alone or with friends.', 'Action', '20,49€',
-        '24 Oct, 2025', NULL,
+        '24 Oct, 2025', 1761264000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2968420, 'PowerWash Simulator 2', 250, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2968420, 'PowerWash Simulator 2', 252, 11549, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2968420/91fea40a711c5a74cce1bb1a9e05c48a379f6aa0/header.jpg?t=1784211271', 'PowerWash Simulator is back, bubbling with fresh locations, soap-erior equipment and splashy features. Effortlessly transform soiled surroundings into clean, serene scenes, solo or with pals. Satisfaction is a spray away!', 'Casual', '24,99€',
-        '23 Oct, 2025', NULL,
+        '23 Oct, 2025', 1761177600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3024040, 'Stronghold Crusader: Definitive Edition', 251, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3024040, 'Stronghold Crusader: Definitive Edition', 253, 11388, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3024040/a3d892e9ad07c4721b5fabb93cd97c214fe4f292/header_alt_assets_3.jpg?t=1785920681', 'Gird your loins and sharpen your steel! Besiege 20 unique enemy lords and battle friends online, in this expanded remaster of the classic ''castle sim''. Relive history with new units, opponents, visuals, audio, campaigns, skirmish trails, co-op and larger maps.', 'Simulation', '19,99€',
-        '15 Jul, 2025', NULL,
+        '15 Jul, 2025', 1752537600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1071870, 'Biped', 252, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1071870/e4534c085670f0ec4a2c4fab343e1342c81ca035/header.jpg?t=1780934155', 'Biped is a coop action adventure game with a strong focus on moment-to-moment collaboration between 2 players.', 'Action', '1,24€',
-        '26 Mar, 2020', 74,
-        '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2806050, 'Halo: Campaign Evolved', 253, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2806050, 'Halo: Campaign Evolved', 254, 11292, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2806050/30d8542d35d7919b34e5f5dbe955d04c3f99e6da/header.jpg?t=1785367749', 'Halo: Campaign Evolved is a faithful yet modernized remake of Halo: Combat Evolved’s campaign, rebuilt from the ground up.', 'Action', '59,99€',
-        '28 Jul, 2026', NULL,
+        '28 Jul, 2026', 1785196800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4069520, 'Super Battle Golf', 254, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4069520, 'Super Battle Golf', 255, 11101, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4069520/89e942c838b6cb0bb0c2127c113a86c59d6ce92f/header_alt_assets_1.jpg?t=1784798117', 'An online 1-8 player golf game where everyone plays at the same time. Swing, shoot, sabotage, and finish first by any means necessary in a free-for-all rush to the hole.', 'Casual', '12,49€',
-        '19 Feb, 2026', NULL,
+        '19 Feb, 2026', 1771459200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1340990, 'Rise of the Ronin', 255, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1340990, 'Rise of the Ronin', 256, 10842, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1340990/header.jpg?t=1775540130', 'Embark on an epic journey across war-torn 19th-century Japan in this open-world action RPG from Team NINJA, the veteran studio behind &quot;Nioh&quot; and &quot;NINJA GAIDEN.&quot;', 'Action', '24,99€',
-        '10 Mar, 2025', 73,
+        '10 Mar, 2025', 1741564800, 73,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2747330, 'Species: Unknown', 256, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2747330, 'Species: Unknown', 257, 10452, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2747330/7ace5e7b6e062e635c577464f25d847467f0c6c3/header.jpg?t=1785317996', 'Species: Unknown is a 1 to 4 players co-op survival horror. Complete high-risk missions aboard an abandoned ship while being hunted by an unknown creature. Survive and upgrade your gear to face each new threat that lurks in the dark.', 'Action', '7,80€',
-        '23 Oct, 2025', NULL,
+        '23 Oct, 2025', 1761177600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2168680, 'Nuclear Option', 257, 'Overwhelmingly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2168680, 'Nuclear Option', 258, 10390, 'Overwhelmingly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2168680/c56ac51c1670abb8e7f8d0eef35000d75c9738d8/header.jpg?t=1785376005', 'Fly near-future aircraft with immersive physics across dynamic battlefields, facing land, air, and sea threats. Wage war against AI or rival pilots using an array of advanced weaponry, including tactical and strategic nuclear weapons capable of annihilating anything in your path.', 'Action', '20,49€',
-        '15 Oct, 2023', NULL,
+        '15 Oct, 2023', 1697328000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1262600, 'Need for Speed™ Rivals', 258, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1262600, 'Need for Speed™ Rivals', 259, 10286, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262600/header.jpg?t=1777394510', 'Erase the line between single player and multiplayer in this street-racing rivalry between Cops and Racers. Seamlessly join a world where your friends are already racing and chasing', 'Action', '1,99€',
-        '4 Jun, 2020', 76,
+        '4 Jun, 2020', 1591228800, 76,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2827200, 'MIMESIS', 259, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2827200, 'MIMESIS', 260, 10145, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2827200/8a2a6edc97fbf23ea6941974bdf4ed9a6ab34eb4/header.jpg?t=1781771581', '4 Player co-op survival horror game. When the cursed rain falls, ''Mimesis'' appear, perfectly imitating your teammates, bringing a new level of tension you''ve never experienced before.', 'Action', '9,75€',
-        '27 Oct, 2025', NULL,
+        '27 Oct, 2025', 1761523200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (307960, 'IL-2 Sturmovik: Battle of Stalingrad', 260, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (307960, 'IL-2 Sturmovik: Battle of Stalingrad', 261, 9874, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/307960/header.jpg?t=1773937003', 'IL-2 Sturmovik: Battle of Stalingrad is the continuation of the legendary IL-2 Sturmovik series that has set the standard for PC combat flight games for more than ten years. This new entry into the series will offer virtual pilots an even more accurate simulation of the most famous air battles.', 'Action', '12,24€',
-        '22 Oct, 2014', 74,
+        '22 Oct, 2014', 1413936000, 74,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2916430, 'Fast Food Simulator', 261, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2916430, 'Fast Food Simulator', 262, 9628, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2916430/header.jpg?t=1762536253', 'Welcome to the world''s most chaotic place! Play solo or co-op with up to 6 players. Run a fast-food restaurant, and work with your friends to expand your business. Take orders, make burgers, and increase your earnings by dealing with customers.', 'Indie', '14,79€',
-        '10 Dec, 2024', NULL,
+        '10 Dec, 2024', 1733788800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1369670, 'Motor Town: Behind The Wheel', 262, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1369670, 'Motor Town: Behind The Wheel', 263, 9497, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1369670/header.jpg?t=1743269133', 'Enjoy realistic driving in the open world. Relaxing cargo deliveries or driving buses and taxis will give you enough money to buy new cars and parts. You can test your driving skills at the race track. It''s all about pure driving pleasure!', 'Adventure', '19,50€',
-        '17 Dec, 2021', NULL,
+        '17 Dec, 2021', 1639699200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3834090, 'YAPYAP', 263, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3834090, 'YAPYAP', 264, 9465, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3834090/399b7aa5bd9ea359e6d77cec3032758ea27c597b/header.jpg?t=1784273304', 'A magic-themed co-op horror game where you and up to 5 friends are minions summoned by a wizard to break into their rival''s towers to cause mayhem. Try to fufill your vandalism target with an assortment of spells while avoiding magical beasts and monsters that protect the tower.', 'Action', '9,75€',
-        '3 Feb, 2026', NULL,
+        '3 Feb, 2026', 1770076800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (799960, 'Wizard101', 264, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (799960, 'Wizard101', 265, 9460, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/799960/header.jpg?t=1778853004', 'Unleash your inner magic and prepare to unravel the mysteries surrounding a death professor gone rogue. Darkness threatens to engulf the Spiral as you master powerful spells, explore over 22 whimsical worlds, and team-up with friends in this nostalgic wizard turn-based deckbuilding MMORPG.', 'Adventure', 'Free',
-        '6 Sep, 2018', NULL,
+        '6 Sep, 2018', 1536192000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3672400, 'Farever', 265, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3672400, 'Farever', 266, 9097, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3672400/74fc62ca20ce2a66578d001564022cae827bca3c/header_alt_assets_5.jpg?t=1785223602', 'Forge your legend in a forgotten realm! Farever is an online multiplayer action RPG set in a vast fantasy open world. Alone or with friends, embark on an epic journey together! Explore wild lands and dangerous dungeons, craft powerful gear, and carve your path through dynamic combat and platforming.', 'Action', '19,99€',
-        '6 May, 2026', NULL,
+        '6 May, 2026', 1778025600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2373990, 'Solo Leveling: ARISE OVERDRIVE', 266, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2373990, 'Solo Leveling: ARISE OVERDRIVE', 267, 8896, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2373990/018068a74847b3953278efacca07cfbe537a46c7/header.jpg?t=1781758887', 'Solo Leveling, the webtoon with 14.3 billion views worldwide, is now an action RPG game! Help our hero grow from his humble E-Rank beginnings.', 'Action', '39,99€',
-        '24 Nov, 2025', NULL,
+        '24 Nov, 2025', 1763942400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1641960, 'Forever Skies', 267, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1641960, 'Forever Skies', 268, 8775, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1641960/cc56d2d6fd373940032bba383464ffa626b00717/header_alt_assets_9.jpg?t=1786032970', 'A first-person survival game set on a post-apocalyptic, ecologically ruined Earth. Play solo or with up to 3 friends as you build, upgrade, and fly a high-tech airship. Scavenge resources, craft tools, and face dangers on the surface as you hunt for a cure to save humanity.', 'Action', '11,59€',
-        '14 Apr, 2025', NULL,
+        '14 Apr, 2025', 1744588800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3282300, 'Mistfall Hunter', 268, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3282300, 'Mistfall Hunter', 269, 8600, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3282300/08d970d57d0e400ef35abae2602c5d5cd5f842d5/header.jpg?t=1785673983', 'Mistfall Hunter is a dark fantasy extraction ARPG. Combine skills, talents, and gear for each class in thrilling combat! Whether you team up or go solo, one thing remains certain—only by fighting your way through can you return with a full haul. Good luck, Gyldhunter.', 'Action', '22,49€',
-        '29 Jul, 2026', NULL,
+        '29 Jul, 2026', 1785283200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4570720, 'DragonSword : Awakening', 269, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4570720, 'DragonSword : Awakening', 270, 8504, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4570720/96a897e98f4472e656fbe6681191b3066cab6056/header.jpg?t=1785492030', 'Explore the anime-style open world of the Continent of Orbis, brought to life with Unreal Engine 5! Recruit unique companions, unleash spectacular Status Ailment tag-team action, and embark on an epic journey to save the world from the threat of a Dragon reawakened after 60 years.', 'Action', '29,99€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2948190, 'World of Sea Battle', 270, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2948190, 'World of Sea Battle', 271, 8381, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2948190/00cedbfad862733ac331538547cfbfc2a977cd38/header_alt_assets_1.jpg?t=1784556492', 'Set sail in World of Sea Battle, an action-packed open-world MMO in the Golden Age of Sail! Command historic ships, battle in PvP &amp; PvE, shape the economy, and engage in territorial guild wars in your quest for glory across the high seas!', 'Action', 'Free',
-        '21 Oct, 2025', NULL,
+        '21 Oct, 2025', 1761004800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1913370, 'OPERATOR', 271, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1913370, 'OPERATOR', 272, 8355, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1913370/header.jpg?t=1780431318', 'In OPERATOR, you will play as an elite Tier 1 operator undergoing dangerous clandestine operations all over the globe. With a strategic, measured, and unforgiving style of gameplay. You are the tactical advantage, Good luck.', 'Action', '19,50€',
-        '1 Aug, 2023', NULL,
+        '1 Aug, 2023', 1690848000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1072420, 'DRAGON QUEST BUILDERS™ 2', 272, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1072420, 'DRAGON QUEST BUILDERS™ 2', 273, 8043, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1072420/header.jpg?t=1775724306', 'DRAGON QUEST BUILDERS™ 2 is a block-building RPG set in a fantasy land threatened by an evil cult. Explore, battle, build and harvest in the charming single-player campaign or build big projects in the online sandbox mode for up to 4-players.', 'Action', '24,99€',
-        '10 Dec, 2019', 85,
+        '10 Dec, 2019', 1575936000, 85,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2436940, 'Sephiria', 273, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2436940, 'Sephiria', 274, 7682, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2436940/21b1476794fd8a2e0a3076448d28929e8139aad0/header_alt_assets_0.jpg?t=1785481238', 'Save Bunnyville from a doomed fate: a top-down action/RPG roguelite from the makers of Dungreed. Explore the depths of the tower, collect and upgrade artifacts, and defeat hordes of demons to keep your village safe.', 'Action', '8,87€',
-        '31 Jul, 2026', NULL,
+        '31 Jul, 2026', 1785456000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3722330, 'Shift At Midnight', 274, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3722330, 'Shift At Midnight', 275, 7330, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3722330/759ecea2ffe1ad3819aefdda79e265b8b332bf8f/header.jpg?t=1785426429', 'An online co-op detective horror for up to 3 players. Work together across randomly generated shifts to investigate your customers, as some are only pretending to be human. Make one mistake, and you’ll be forced to board up, set traps, and hide.', 'Indie', '9,99€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4121170, 'Fears to Fathom® - Scratch Creek', 275, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4121170, 'Fears to Fathom® - Scratch Creek', 276, 7302, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4121170/803663dce78da494e9d061cf6652ade566b96331/header.jpg?t=1781141362', 'After noticing bone-chilling similarities to an episode of Fears to Fathom, Tessa and Marcus decide to share their own experience. Scratch Creek is an exclusively online co-op experience.', 'Adventure', '8,15€',
-        '10 Jun, 2026', NULL,
+        '10 Jun, 2026', 1781049600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2737070, 'Crime Simulator', 276, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2737070, 'Crime Simulator', 277, 6679, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2737070/header.jpg?t=1781814789', 'You’re out of jail, but the debt isn’t gone. Sneak, steal, and break into houses solo or in 4-player co-op. Use lockpicks, sleeping gas, and brute force to complete jobs, outsmart security, and make enough money before time runs out. Will you pay back what you owe, or lose everything?', 'Action', '14,99€',
-        '17 Jun, 2025', NULL,
+        '17 Jun, 2025', 1750118400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (619820, 'Heroes of Hammerwatch II', 277, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (619820, 'Heroes of Hammerwatch II', 278, 6416, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/619820/bb367cb7f6d10326c9274383409bb6e5027d3dd7/header_alt_assets_2.jpg?t=1785259537', 'A rogue-lite action-rpg that offers extensive persistent progression. Build your town, upgrade and equip your heroes, before taking on the ever-changing Dark Citadel - either solo or with a team of friends.', 'Action', '7,99€',
-        '14 Jan, 2025', NULL,
+        '14 Jan, 2025', 1736812800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2536520, 'Diablo II: Resurrected – Infernal Edition', 278, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2536520, 'Diablo II: Resurrected – Infernal Edition', 279, 5767, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2536520/8cfd8f0d73075b10b3b58d9eccfee799baffab79/header.jpg?t=1774399170', 'Rediscover the dark fantasy classic that defined the modern ARPG genre; fully remastered with a new class, fresh content, quality‑of‑life upgrades, and an overhauled endgame. Chain brutal skill and item synergies, rise in power, and carve through Hell’s armies with up to eight players.', 'Action', '39,99€',
-        '11 Feb, 2026', NULL,
+        '11 Feb, 2026', 1770768000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1721110, 'Abyssus', 279, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1721110, 'Abyssus', 280, 5410, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1721110/ec646be95fc7565db6952ad4c42a687c3244cf76/header.jpg?t=1782399113', 'Choose your loadout, blast through the corrupted denizens of a sunken civilization, and wield godly powers in Abyssus – a fast-paced 1-to-4 players FPS and roguelite brinepunk adventure.', 'Action', '14,99€',
-        '12 Aug, 2025', NULL,
+        '12 Aug, 2025', 1754956800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4380490, 'Cat Mail Co.', 280, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4380490, 'Cat Mail Co.', 281, 5199, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4380490/9c206d8a7c8a6133230628b6326f4f08a683b40e/header.jpg?t=1786032235', 'Run a cozy cat post office. Sort and deliver parcels from the daily boat, organizing everything your way. At night, the moon reveals hidden truths about packages. Clear a strange backlog, help locals, and unlock new abilities and destinations.', 'Indie', '14,99€',
-        '9 Jul, 2026', NULL,
+        '9 Jul, 2026', 1783555200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2918150, 'ONE PIECE Bounty Rush', 281, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2918150, 'ONE PIECE Bounty Rush', 282, 5072, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2918150/header.jpg?t=1774508259', 'Take the loot, pirates! Bounty Rush is a 4 vs 4 multiplayer team action game. Work with your team to capture the other teams'' berries!', 'Action', 'Free',
-        '23 Sep, 2024', NULL,
+        '23 Sep, 2024', 1727049600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3606480, 'Call of Duty®: Black Ops 7', 282, 'Mostly Negative',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3606480, 'Call of Duty®: Black Ops 7', 283, 4749, 'Mostly Negative',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3606480/d7041a15f572f7702d5f4bc97e498cd3e1cc62e2/header.jpg?t=1784823045', 'In Call of Duty®: Black Ops 7, Treyarch and Raven Software are bringing players the biggest Black Ops ever across an innovative Co-Op Campaign, an electrifying Multiplayer experience, and the legendary Round-Based Zombies mode.', 'Action', '79,99€',
-        '13 Nov, 2025', NULL,
+        '13 Nov, 2025', 1762992000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2385530, 'PGA TOUR 2K25', 283, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2385530, 'PGA TOUR 2K25', 284, 4649, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2385530/11d362d6efc0d40d146a1ff7613bcb482b84d086/header_alt_assets_1.jpg?t=1783526355', 'Take your best shot at glory in PGA TOUR 2K25! In a 2K-first, compete in three prestigious major tournaments. Personalize your game with expanded MyCAREER, MyPLAYER and Course Designer options. Challenge friends across ranked, casual, and cross-platform multiplayer.', 'RPG', '39,99€',
-        '27 Feb, 2025', NULL,
+        '27 Feb, 2025', 1740614400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1805320, 'Romestead', 284, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1805320, 'Romestead', 285, 4641, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1805320/7ba6783ca5acd8068abd3bd924801ce173fc39e8/header.jpg?t=1782998088', 'Rome has fallen! Rebuild civilization in this action-adventure survival game for 1-8 players. Fight hordes of the walking dead, build settlements, restore the Roman gods... or kick back and farm with friends.', 'Action', '13,99€',
-        '25 May, 2026', NULL,
+        '25 May, 2026', 1779667200, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3844970, 'Burglin'' Gnomes', 285, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3844970, 'Burglin'' Gnomes', 286, 4637, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3844970/d6127e4eabda23e1d1c727a1875e6b6cb0e634ae/header.jpg?t=1781100001', 'An online Co-op game about breaking into houses and causing havoc as a tiny gnome. Avoid danger, repurpose stolen household items, and complete tasks to meet the High-Gnome’s demands. Craft equipment and upgrade your home to make your missions easier and more successful.', 'Action', '9,75€',
-        '10 Jun, 2026', NULL,
+        '10 Jun, 2026', 1781049600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1358700, 'STRANGER OF PARADISE FINAL FANTASY ORIGIN', 286, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1358700, 'STRANGER OF PARADISE FINAL FANTASY ORIGIN', 287, 4605, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1358700/header.jpg?t=1775030600', 'Developed in cooperation between Square Enix and Team NINJA (Koei Tecmo Games), STRANGER OF PARADISE FINAL FANTASY ORIGIN is a hard-core action RPG that takes the FINAL FANTASY series in a new direction. Experience the boldest and most merciless battles in FINAL FANTASY history.', 'Action', '15,99€',
-        '6 Apr, 2023', NULL,
+        '6 Apr, 2023', 1680739200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2879840, 'Escape Simulator 2', 287, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2879840, 'Escape Simulator 2', 288, 4528, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2879840/f1f548311fadd53263adca4647e380eaa75588c6/header.jpg?t=1784731700', 'Sequel to the best-selling escape room game, brings a fresh take on first-person puzzles with a variety of new rooms to explore solo or with friends. Solve intricate puzzles, uncover hidden secrets, or craft your own escape rooms with Room Editor 2.0.', 'Adventure', '13,59€',
-        '27 Oct, 2025', 80,
+        '27 Oct, 2025', 1761523200, 80,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3643170, 'Roadside Research', 288, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3643170, 'Roadside Research', 289, 4451, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3643170/573928872d1c356688774e5e7c65748b30645c58/header.jpg?t=1783927116', 'Roadside Research is a 1 to 4 player co-op gas station simulator. Except you’re aliens. And undercover. Do very human things like restocking shelves while preparing for the invasion. Just don’t get caught.', 'Action', '12,99€',
-        '12 Feb, 2026', NULL,
+        '12 Feb, 2026', 1770854400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4508340, 'NTE: Neverness to Everness', 289, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4508340, 'NTE: Neverness to Everness', 290, 4328, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4508340/7a1301fa4f8d31bfa3e32205bc92de6c520a9475/header.jpg?t=1785402571', 'NTE is a supernatural urban open-world RPG developed by Hotta Studio. Your story begins in Hethereau as an unlicensed anomaly hunter. Team up with a diverse cast of companions, each with unique abilities, to unravel the city''s mysteries.', 'Action', 'Free',
-        '7 Jul, 2026', NULL,
+        '7 Jul, 2026', 1783382400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2475460, 'SOS OPS!', 290, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2475460, 'SOS OPS!', 291, 4248, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2475460/e2707a3c7d7e19eee8321b9b14832f7220016a06/header.jpg?t=1785996994', 'SOS OPS! is more than a game. Your task is to save the city. You will find yourself in the epicenter of madness, where co-op missions with friends will raise the adrenaline to the limit!', NULL, '0,49€',
-        '30 Nov, 2023', NULL,
+        '30 Nov, 2023', 1701302400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2009350, 'Out of Ore', 291, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2009350, 'Out of Ore', 292, 4087, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2009350/header.jpg?t=1782294682', 'Build your own mining company from the ground up. Extract resources, operate heavy machinery, construct infrastructure, and grow from a laborer to the King of Klondike.', 'Adventure', '24,50€',
-        '31 Oct, 2022', NULL,
+        '31 Oct, 2022', 1667174400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1805110, 'Solarpunk™', 292, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1805110, 'Solarpunk™', 293, 4065, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1805110/9512e707770080499c95c50976ff1b6f712a95ba/header.jpg?t=1782219094', 'Solarpunk is a survival game in a technologically advanced world of floating islands. Alone or together with your friends, you can construct buildings, grow food, craft gadgets and hop on your airship to explore distant islands in the sky.', 'Adventure', '22,99€',
-        '8 Jun, 2026', NULL,
+        '8 Jun, 2026', 1780876800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (367270, 'Angels Fall First', 293, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (367270, 'Angels Fall First', 294, 3948, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/367270/fa7defd4ca90f5f306de47576a3424d8006d12f5/header.jpg?t=1783807186', 'From commanding the battle standing on the bridge of your flagship all the way down to tactical infantry firefights - AFF brings together all the combat you ever loved in a rich science fiction setting. Boarding, pilotable capital ships, deep weapon customization and full Bot support included!', 'Action', '17,99€',
-        '11 Jul, 2026', NULL,
+        '11 Jul, 2026', 1783728000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1478500, 'Big Walk', 294, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1478500, 'Big Walk', 295, 3920, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1478500/62eeee1507dbac905e128a62f2ce690550238db0/header.jpg?t=1785911674', 'Hang out and get lost with close friends in a big world. A cooperative online walker-talker from the creators of Untitled Goose Game.', 'Adventure', '14,24€',
-        '4 Aug, 2026', 94,
+        '4 Aug, 2026', 1785801600, 94,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2569760, 'The Mound: Omen of Cthulhu', 295, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2203070, 'Dragonheir: Silent Gods', 296, 3443, 'Mixed',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2203070/22df90f96fcf65ade2d627df0aeb452f80faa192/header.jpg?t=1781223193', 'Anniversary celebration is here! Returning players can claim up to 1,500 draws and 12 SSR heroes. Experience the new Magichess, a pure tactical auto-chess with 10-minute fast-paced duels! Season resets are officially gone, and your strength and progress are permanently preserved!', 'Adventure', 'Free',
+        '26 Oct, 2023', 1698278400, NULL,
+        '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2569760, 'The Mound: Omen of Cthulhu', 297, 3394, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2569760/0a3d1867d5781f18cb4fd0b1151729605e892c6b/header.jpg?t=1785400715', 'In up to four player co-op, form a group of explorers searching for treasure. In this cursed jungle, danger is everywhere and monstrous creatures alter reality. Stay clear-headed and tame the jungle before it devours you…', 'Action', '29,99€',
-        '15 Jul, 2026', NULL,
+        '15 Jul, 2026', 1784073600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3717070, 'WWE 2K26', 296, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3717070, 'WWE 2K26', 298, 3014, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3717070/b9e2584cefde9280c41b23607213dbca1ad8e015/header_alt_assets_0.jpg?t=1784739548', 'The show never stops in WWE 2K26! Step into CM Punk’s 2K Showcase, dominate with 400+ Superstars and Legends, and unleash chaos with all-new match types.', 'Simulation', '59,99€',
-        '12 Mar, 2026', NULL,
+        '12 Mar, 2026', 1773273600, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4244510, 'Pratfall', 297, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4244510, 'Pratfall', 299, 2892, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4244510/aa5134d11626034935daa974478c834d03d73f54/header.jpg?t=1784880390', 'A co-op game for 1-6+ players where you fall, dig, and explode your way down a dangerous cave system to find your lost dog. Catch your friends and watch your step on this journey full of traps, hazards, and the most deadly force of all: gravity. Will you jump into the unknown to rescue your dog?', 'Action', '7,49€',
-        '20 Apr, 2026', NULL,
+        '20 Apr, 2026', 1776643200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2195120, 'Go-Go Town!', 298, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2195120, 'Go-Go Town!', 300, 2621, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2195120/f6246e7ab8ceb5ec049b6d379ad42c4d0b28d11b/header_alt_assets_5.jpg?t=1785537039', 'Step into the role of a hands-on mayor and build your town from the ground up. Plan neighborhoods, automate logistics, and grow your community—all while juggling workers, infrastructure, and day-to-day chaos to create your dream town. Play solo for total control, or bring friends for co-op mayhem.', 'Casual', '25,99€',
-        '16 Jul, 2026', NULL,
+        '16 Jul, 2026', 1784160000, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3276050, 'SpaceCraft', 299, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3276050, 'SpaceCraft', 301, 2585, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3276050/header.jpg?t=1784788645', 'The Universe is yours. SpaceCraft is an online space exploration and building game. Explore a vast galaxy of solar systems and planets, mine and craft resources, design and build ships, automate planetary bases and interplanetary logistics, trade and cooperate.', 'Adventure', '23,99€',
-        '11 Jun, 2026', NULL,
+        '11 Jun, 2026', 1781136000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4282500, 'hololive Dreams', 300, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4282500, 'hololive Dreams', 302, 2584, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4282500/21d618af6bdb3be75a8b923bf8d38328aaba1820/header.jpg?t=1785720042', 'The official hololive rhythm game and RPG -- hololive Dreams -- is now on Steam! Enjoy rhythmical gameplay, park development, and mini-games. Featuring 50+ members and 150+ songs, it''s perfect for fans and newcomers alike. Play your way!', 'Action', 'Free',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3712080, 'Funnel Runners', 301, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3712080, 'Funnel Runners', 303, 2533, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3712080/5e03554f7fd68edf54813a8d5a576a8791672227/header.jpg?t=1784567934', 'Trapped in a doomed city, you and up to 7 friends must scavenge parts, fix your van, and escape the brutal tornado that approaches. A first-person co-op survival game with escalating disasters and total environmental destruction.', 'Action', '10,75€',
-        '16 Jul, 2026', NULL,
+        '16 Jul, 2026', 1784160000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1669480, 'Firefighting Simulator: Ignite', 302, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1669480, 'Firefighting Simulator: Ignite', 304, 2508, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1669480/8aa875a37e5dfc6d6a7401d7db3b5fc1a860e17a/header.jpg?t=1784796095', 'Face unpredictable dangers, fight perilous fires with your crew, and save lives in Firefighting Simulator: Ignite. Step into the boots of a U.S. firefighter and play with up to 3 friends or with the help of your NPC controlled crew members.', 'Action', '34,99€',
-        '9 Sep, 2025', NULL,
+        '9 Sep, 2025', 1757376000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3561220, 'Pass the Fear', 303, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3561220, 'Pass the Fear', 305, 2423, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3561220/75f77fc88eaf0226ebae317a94f05000164c5cc0/header.jpg?t=1785977220', 'PASS THE FEAR is a roguelite bullet-hell shooter. A catastrophic Witch’s Disaster strikes without warning, and chaotic magic forms the ancient Wall of Storms. Its corruption spreads relentlessly across the island. As a demon hunter trapped within, you must find a way to escape before dawn breaks.', 'Action', '17,25€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4108000, 'Machine Party', 304, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4108000, 'Machine Party', 306, 2214, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4108000/00ae7d0e0fd0ad72635bddb1dd80ee68cc94eed5/header.jpg?t=1785909320', 'Machine Party is a collection of violent party games where failure is lethal. Gather your friends and endure high stakes situations to prove your life is worth more than theirs. Survival is unlikely.', 'Action', '6,36€',
-        '30 Jul, 2026', NULL,
+        '30 Jul, 2026', 1785369600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4651220, 'Conqueror''s Blade: Three Kingdoms', 305, 'Overwhelmingly Negative',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4651220/2ea0aeff7baace1773177b4a470ba17158831276/header.jpg?t=1784887351', 'Conqueror''s Blade: Three Kingdoms is an open-world action war game blending hero combat and troop command. Lead legendary armies alongside allies to siege cities and claim vital resources. Forge alliances, crush rival factions, and seize the realm with steel and strategy!', 'Action', 'Free',
-        '23 Jul, 2026', NULL,
-        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
-ON CONFLICT(appid) DO UPDATE SET
-  name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
-  header_image = excluded.header_image, short_description = excluded.short_description,
-  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
-  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
-  crawled_at = unixepoch();
-
-INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1181550, 'Carnival Hunt', 306, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1181550, 'Carnival Hunt', 307, 2193, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1181550/header.jpg?t=1784823412', 'Carnival Hunt is a 5v1 first-person asymmetrical horror game. Five wind-up Bunnies must work together, manage their noisy keys, and find a way to escape an ever-changing carnival world while one player hunts them as the Carnival Monster.', 'Action', '19,99€',
-        '23 Jul, 2026', NULL,
+        '23 Jul, 2026', 1784764800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4800590, 'Supermarket Chaos', 307, 'Very Positive',
-        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4800590/12972366c9e8812cbd1ba7a3e367d7dfc100314a/header.jpg?t=1785856797', 'Supermarket Chaos is a cozy organizing simulator where you sort 4,668 products in a messy supermarket. Enjoy the satisfaction of stocking shelves in a calm, relaxing atmosphere.', 'Indie', '5,19€',
-        '29 Jun, 2026', NULL,
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4651220, 'Conqueror''s Blade: Three Kingdoms', 308, 2191, 'Overwhelmingly Negative',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4651220/2ea0aeff7baace1773177b4a470ba17158831276/header.jpg?t=1784887351', 'Conqueror''s Blade: Three Kingdoms is an open-world action war game blending hero combat and troop command. Lead legendary armies alongside allies to siege cities and claim vital resources. Forge alliances, crush rival factions, and seize the realm with steel and strategy!', 'Action', 'Free',
+        '23 Jul, 2026', 1784764800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4032350, 'EA SPORTS™ College Football 27', 308, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4800590, 'Supermarket Chaos', 309, 2186, 'Very Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4800590/12972366c9e8812cbd1ba7a3e367d7dfc100314a/header.jpg?t=1785856797', 'Supermarket Chaos is a cozy organizing simulator where you sort 4,668 products in a messy supermarket. Enjoy the satisfaction of stocking shelves in a calm, relaxing atmosphere.', 'Indie', '5,19€',
+        '29 Jun, 2026', 1782691200, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4032350, 'EA SPORTS™ College Football 27', 310, 2141, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4032350/1c628b40d5aa8dcf26e0ac9d394f0fbe1b8dc879/header.jpg?t=1784830507', 'Step into the modern era of college football, where personal ambition meets program pride. Balance expectations, identity, and everything Saturday demands while immersed in traditions and pageantry of game day.', 'Simulation', '69,99€',
-        '9 Jul, 2026', NULL,
+        '9 Jul, 2026', 1783555200, NULL,
         '["Multi-player","Co-op","Online Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1913120, 'Tears of Metal', 309, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1913120, 'Tears of Metal', 311, 2043, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1913120/9c62adaca165c8bc1a78990419e2cb35dd940b6b/header.jpg?t=1785940004', 'Fight solo or up to 4-player co-op to reclaim your island alongside your Scottish battalion. On each campaign, gain new powerful upgrades, rally your forces, and stop the invader as they carve into the Mother Stone to harvest its power.', 'Action', '24,99€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3950020, 'Duet Night Abyss', 310, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3950020, 'Duet Night Abyss', 312, 2037, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3950020/86effb340a804e6e30f579ab0cb2da84b29d1bd8/header.jpg?t=1785187462', 'A Thrilling Hybrid Action RPG, featuring a Dual NarrativeAll Characters &amp; Weapons Free to Unlock—— New Version [Silver Torrent, Rising Star] Now Available Limited-Time Giveaway: Up to free 60 Skin Pulls + Self-Pick Character &amp; Weapon!', 'Action', 'Free',
-        '19 Jan, 2026', NULL,
+        '19 Jan, 2026', 1768780800, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2679100, 'Witchspire', 311, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2681030, 'Outbound', 313, 2036, 'Mostly Positive',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2681030/header.jpg?t=1785940860', 'Explore a colorful world and build your own cozy home on wheels. Craft workstations, and source energy from the sun, wind, or water. Upgrade and customize your vehicle, grow crops, and live sustainably off-grid with up to 4 players.', 'Adventure', '19,99€',
+        '11 May, 2026', 1778457600, NULL,
+        '["Multi-player","Co-op","Online Co-op"]', unixepoch())
+ON CONFLICT(appid) DO UPDATE SET
+  name = excluded.name, popularity_rank = excluded.popularity_rank,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
+  header_image = excluded.header_image, short_description = excluded.short_description,
+  genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
+  metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
+  crawled_at = unixepoch();
+
+INSERT INTO coop_apps
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2679100, 'Witchspire', 314, 1924, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2679100/fb7f504258d3ace8267a937de3fb9be130c246d8/header.jpg?t=1784837351', 'Step into the ultimate open-world witch adventure. Befriend and battle creatures, and conjure up a sanctuary alongside other witches in co-op or single-player.', 'Adventure', '22,99€',
-        '10 Jun, 2026', NULL,
+        '10 Jun, 2026', 1781049600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1606340, 'Conquest of Elysium 5', 312, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1606340, 'Conquest of Elysium 5', 315, 1891, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1606340/header.jpg?t=1711215313', 'Conquest of Elysium 5 is a quick turn based fantasy strategy game with a touch of rogue-like. The game is full of depth, details and monsters. There are also a huge number of factions, each with its own unique gameplay and magic rituals.', 'Indie', '28,99€',
-        '17 Aug, 2021', NULL,
+        '17 Aug, 2021', 1629158400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op","Shared/Split Screen Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1343070, 'Call to Arms: Panzer Elite', 313, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1343070, 'Call to Arms: Panzer Elite', 316, 1867, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1343070/68f6354b2f35b5d95c44185453cf2cb4192c22f5/header.jpg?t=1766086757', 'Lead a platoon of WWII tanks in this immersive TPP and FPP game. Engage in realistic, tactical combat across historic battlefields. Play through campaign or challenge yourself in skirmish mode as either German or US forces.', 'Action', '29,99€',
-        '19 Sep, 2025', NULL,
+        '19 Sep, 2025', 1758240000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3198850, 'Play Together', 314, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3198850, 'Play Together', 317, 1668, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3198850/b3aeeda43b27534a23d438597b503db64b792933/header.jpg?t=1785970945', 'Play Together is a popular casual social networking game enjoyed by players worldwide. Express yourself through character customization, decorate your home and host Home Parties for a fun time with friends. Enjoy tons of content with friends from all across the globe!', NULL, 'Free',
-        '13 Jan, 2025', NULL,
+        '13 Jan, 2025', 1736726400, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4210580, 'Ore Factory Squad ⛏️', 315, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4210580, 'Ore Factory Squad ⛏️', 318, 1238, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4210580/b305646840dc9db685bc40596da7bdaea388c694/header.jpg?t=1786011641', 'Ore Factory Squad is a co-op mining and factory-building game with procedural mining and fun at its core! Play alone or with friends, buy properties, dig deep for valuable resources, complete contracts, upgrade and automate production lines and grow your factory from zero to industry!', 'Indie', '12,99€',
-        '16 Jul, 2026', NULL,
+        '16 Jul, 2026', 1784160000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3683770, 'Boba Cafe Simulator', 316, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3683770, 'Boba Cafe Simulator', 319, 1201, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3683770/b21fdafae2937a996d164151925e426571340447/header.jpg?t=1785758738', 'You’re reborn—back at the beginning of your startup journey. In your last life, poor management led to your shop being crushed by competitors. This time, the sweet scent of condensed milk runs through your veins, and you’re set on one goal: turn “Sugarville” into the top name in the industry.', 'Casual', '16,49€',
-        '24 Jul, 2026', NULL,
+        '24 Jul, 2026', 1784851200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1605850, 'ZeroSpace', 317, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1605850, 'ZeroSpace', 320, 1094, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1605850/5259105134f303692a1f160e79264b05b803f0b0/header.jpg?t=1785798364', 'ZeroSpace is a hybrid sci-fi RTS / RPG game that allows you to play as the commander of The Protectorate, a galactic force dedicated to securing humanity’s place in the galaxy. The Orion sector is locked in a vicious power struggle between many alien factions, ready to fight to the death.', 'Action', '40,99€',
-        '20 Jul, 2026', NULL,
+        '20 Jul, 2026', 1784505600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4517460, 'Total Football Online', 318, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4517460, 'Total Football Online', 321, 1030, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4517460/f243cb4ce0d8322a17620d4ea470e41a966b84f1/header.jpg?t=1784169681', 'Build your All-Star lineup in Total Football Online! Easy to pick up, it lets you dive into pure football fun at your fingertips. With events and player updates syncing with real-world tournaments, get ready for a truly immersive football experience.', 'Action', 'Free',
-        '10 Jun, 2026', NULL,
+        '10 Jun, 2026', 1781049600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3749720, 'The Division Resurgence', 319, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3749720, 'The Division Resurgence', 322, 917, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3749720/1d49ae3163dfd9dfcb6ba31ddbdf32fb67046d06/header.jpg?t=1786004353', 'Jump into this free‑to‑play looter‑shooter RPG featuring tactical combat, deep progression, and an exclusive canon storyline, playable solo or with friends.', 'Action', 'Free',
-        '5 Aug, 2026', NULL,
+        '5 Aug, 2026', 1785888000, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3412160, 'The House Always Wins', 320, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3412160, 'The House Always Wins', 323, 873, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3412160/077149af4f6e0aa8fbadf9b2ce2540529f049388/header_alt_assets_0.jpg?t=1785944700', 'Build a top-tier business solo or in co-op (1–4 players). Start from scratch, keep the slot machines spinning and deal with chaotic events like vandals and alien invasions. Grow your fortune and show everyone why the house always wins.', 'Casual', '12,99€',
-        '21 May, 2026', NULL,
+        '21 May, 2026', 1779321600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4512570, 'A Game About Chopping Trees', 321, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4512570, 'A Game About Chopping Trees', 324, 861, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4512570/3bb6001526b9f15a81b0c59d006012b8702d2059/header.jpg?t=1786027051', 'Grab your axe, hop on the handcar, and lose yourself in the forest. Chop trees, upgrade your gear, and enjoy the ride - alone or with a friend', 'Casual', '8,15€',
-        '15 Jul, 2026', NULL,
+        '15 Jul, 2026', 1784073600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4836540, 'Company of Heroes 3: Final Stand', 322, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4836540, 'Company of Heroes 3: Final Stand', 325, 812, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4836540/6947d6be8800b8ed737f04c110ad929ae3c86123/header.jpg?t=1785526365', 'Company of Heroes 3: Final Stand delivers a standalone roguelite wave-defense experience for solo and cooperative play. Command and survive against fast-paced escalating enemy waves, intimidating bosses, and dynamic battlefield events. Are you ready to make your final stand?', 'Action', '26,09€',
-        '29 Jul, 2026', NULL,
+        '29 Jul, 2026', 1785283200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2808550, 'Sudden Strike 5', 323, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2808550, 'Sudden Strike 5', 326, 734, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2808550/44da8ebab362939b50d275b0a57fc359cb8f2d05/header_alt_assets_0.jpg?t=1785412566', 'Sudden Strike 5 delivers real-time tactics in epic WWII battles. A host of tactical options and more than 300 playable units open-up multiple approaches to reach your objectives in a 25 mission campaign on historical battlefields in Europe and North Africa.', 'Action', '49,99€',
-        '23 Apr, 2026', 76,
+        '23 Apr, 2026', 1776902400, 76,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4324480, 'Dirty Business', 324, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4324480, 'Dirty Business', 327, 732, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4324480/0bf41369aa9d8f70fd5b1dfcf9b71b0a5b1074f3/header.jpg?t=1785492302', 'Build a criminal empire from a hidden underground hangar. Produce drugs, craft weapons, print fake money, operate cartel airstrip and more. Hire workers, expand your gang, upgrade your base and take control of city distribution solo or in co-op.', 'Simulation', '15,49€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2964090, 'World of Warships: Legends', 325, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2964090, 'World of Warships: Legends', 328, 574, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2964090/5bc2527ed6a1f6dd7e90ffd2d76271f102299970/header.jpg?t=1785751898', 'Join this free-to-play PvP online naval shooter with fast-paced combat, easy-to-learn gameplay, intuitive controls, and cross-platform play on Steam, console, and mobile. Choose from 600+ warships and 150+ Commanders, and master tactics on diverse maps. Play now and become a legend!', 'Action', 'Free',
-        '4 May, 2026', NULL,
+        '4 May, 2026', 1777852800, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (1501310, 'The Ranchers', 326, 'Mixed',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (1501310, 'The Ranchers', 329, 482, 'Mixed',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1501310/b8258752d3b30de139ef8d46fab2ca8843cc996a/header.jpg?t=1785430809', 'The Ranchers is an open world country-life sim for 1-4 players. Raise animals, grow tasty crops, craft helpful tools and build your dream house. Explore the open world and earn the villagers'' respect and esteem.', 'Action', '25,49€',
-        '30 Jul, 2026', NULL,
+        '30 Jul, 2026', 1785369600, NULL,
         '["Multi-player","Co-op","Online Co-op","Cross-Platform Multiplayer"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (3453910, 'Happy''s Humble Burger Cult', 327, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (3453910, 'Happy''s Humble Burger Cult', 330, 439, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3453910/b34b3ff6030ef996ab3446447741af2231cdbd11/header.jpg?t=1785934040', 'The original cooking horror returns in an unhinged co-op experience for 1-4 players. Grill burgers, serve customers, and hit your quota before the kitchen turns into a nightmare. When Asset Joy begins her hunt, try to escape alive and extract your hard-earned cash to survive another shift.', 'Action', '9,99€',
-        '16 Jul, 2026', NULL,
+        '16 Jul, 2026', 1784160000, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (4668890, 'Mall Together', 328, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (4668890, 'Mall Together', 331, 328, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4668890/348b9eb36ec3023a50088501f495ac1b4477da67/header.jpg?t=1785422847', 'Run your mall. Open new stores, sign contracts with leading brands, hire teammates, and meet customer needs. Play with friends or go solo, and enjoy the growth of your mall.', 'Casual', '10,61€',
-        '24 Jul, 2026', NULL,
+        '24 Jul, 2026', 1784851200, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (2819470, 'Aquapark Tycoon', 329, 'Very Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (2819470, 'Aquapark Tycoon', 332, 216, 'Very Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2819470/264f3ff0f058226da13e4a42a40a1de811eb1123/header.jpg?t=1784729390', 'Build the ultimate waterpark paradise in this classic tycoon simulation game! Design &amp; customize water slides, pools, and saunas to fulfill your guests'' needs. Combine creativity, strategy, and management to make a splash in the world of water parks and become the ultimate Aquapark Tycoon!', 'Indie', '23,45€',
-        '22 Jul, 2026', NULL,
+        '22 Jul, 2026', 1784678400, NULL,
         '["Multi-player","Co-op","Online Co-op","LAN Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();
 
 INSERT INTO coop_apps
-  (appid, name, popularity_rank, review_hint, header_image, short_description, genre,
-   price, release_date, metacritic, coop_categories, crawled_at)
-VALUES (247970, 'Korea. IL-2 Series', 330, 'Mostly Positive',
+  (appid, name, popularity_rank, review_count, review_hint, header_image, short_description,
+   genre, price, release_date, release_ts, metacritic, coop_categories, crawled_at)
+VALUES (247970, 'Korea. IL-2 Series', 333, 203, 'Mostly Positive',
         'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/247970/c0d86dfb1e69d6165de8556949746d46e1d28f96/header.jpg?t=1786004002', 'Korea. IL-2 Series is a next-generation flight simulator set during the Korean War. Climb into the cockpit of early jet fighters and shape the outcome of legendary aerial battles.', 'Action', '79,99€',
-        '4 Aug, 2026', NULL,
+        '4 Aug, 2026', 1785801600, NULL,
         '["Multi-player","Co-op","Online Co-op"]', unixepoch())
 ON CONFLICT(appid) DO UPDATE SET
   name = excluded.name, popularity_rank = excluded.popularity_rank,
-  review_hint = excluded.review_hint,
+  review_count = excluded.review_count, review_hint = excluded.review_hint,
   header_image = excluded.header_image, short_description = excluded.short_description,
   genre = excluded.genre, price = excluded.price, release_date = excluded.release_date,
+  release_ts = excluded.release_ts,
   metacritic = excluded.metacritic, coop_categories = excluded.coop_categories,
   crawled_at = unixepoch();

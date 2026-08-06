@@ -49,6 +49,27 @@ if (fs.existsSync(crawled)) {
     (105600,'Terraria',8,'Sandbox','9,99€','16 May, 2011',NULL,NULL,'["Online Co-op"]')`);
 }
 
+// Give every group-1 game real Steam metadata, so the rating card can be worked
+// on locally whichever game the queue happens to surface first — the layout of
+// that card depends entirely on a trailer being present, and seed.sql has none.
+db.exec(`UPDATE games SET
+    trailer_url = 'https://video.akamai.steamstatic.com/store_trailers/924970/519586/c7aa4fb6d755acacbf63aeb1ac3f4d31eaf084ab/1750596823/hls_264_master.m3u8?t=1670349696',
+    header_image = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/105600/header.jpg',
+    short_description = 'Back 4 Blood is a thrilling cooperative first-person shooter from the creators of the critically acclaimed Left 4 Dead franchise. Experience the intense 4 player co-op narrative campaign, competitive multiplayer as human or Ridden, and frenetic gameplay that keeps you in the action.'
+  WHERE group_id = 1`);
+// steam_appid on one row only: UNIQUE (group_id, steam_appid) forbids sharing an
+// appid. 105600 is Terraria, which the crawled catalogue actually contains, so the
+// LEFT JOIN onto coop_apps has something to match and the Steam-verdict chip
+// renders — with a made-up appid it silently stays blank.
+// Targets the game the queue surfaces first — the queue puts backlog games ahead
+// of played ones, so plain name order picks the wrong row — making the chip
+// visible without clicking through. 105600 is Terraria, which the crawled
+// catalogue contains — a made-up appid joins to nothing and stays silently blank.
+db.exec(`UPDATE games SET steam_appid = 105600
+          WHERE id = (SELECT id FROM games WHERE group_id = 1
+                       ORDER BY CASE status WHEN 'backlog' THEN 0 ELSE 1 END,
+                                name COLLATE NOCASE LIMIT 1)`);
+
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -86,7 +107,11 @@ function groupCtx(slug) {
 }
 
 function libraryFor(gid, need) {
-  const games = q('SELECT * FROM games WHERE group_id=? ORDER BY name COLLATE NOCASE', gid);
+  // Mirrors the real handler's LEFT JOIN onto the catalogue for Steam's verdict.
+  const games = q(
+    `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count
+       FROM games g LEFT JOIN coop_apps c ON c.appid = g.steam_appid
+      WHERE g.group_id=? ORDER BY g.name COLLATE NOCASE`, gid);
   const ratings = q(
     'SELECT r.game_id, r.steam_id, r.score, r.comment FROM ratings r JOIN games g ON g.id=r.game_id WHERE g.group_id=?', gid);
   const members = q(

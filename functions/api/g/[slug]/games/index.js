@@ -11,7 +11,15 @@ export async function onRequestGet({ env, data }) {
   const gid = data.group.group_id;
 
   const [gamesRes, ratingsRes, membersRes] = await Promise.all([
-    env.DB.prepare('SELECT * FROM games WHERE group_id = ? ORDER BY name COLLATE NOCASE').bind(gid).all(),
+    // LEFT JOIN the global catalogue for Steam's own review verdict and count.
+    // Left, not inner: a hand-added game may have no catalogue row, and it must
+    // still appear. The group's own columns win — a group can correct a player
+    // count locally without the catalogue overwriting it.
+    env.DB.prepare(
+      `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count
+         FROM games g LEFT JOIN coop_apps c ON c.appid = g.steam_appid
+        WHERE g.group_id = ? ORDER BY g.name COLLATE NOCASE`
+    ).bind(gid).all(),
     env.DB.prepare(
       `SELECT r.game_id, r.steam_id, r.score, r.comment
          FROM ratings r JOIN games g ON g.id = r.game_id

@@ -62,6 +62,28 @@ function toast(msg) {
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
+/** 1029444 -> "1.0M". Steam review counts run to seven figures. */
+const compact = (n) =>
+  n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : String(n);
+
+/**
+ * Personal display preferences. Deliberately localStorage rather than a column:
+ * these change nothing anyone else can see and are worthless to sync, so they do
+ * not deserve a schema, a migration or a round-trip. Keyed per account so a
+ * shared browser does not leak one person's preference to another.
+ */
+const PREF_DEFAULTS = { hideOthers: false };
+const prefKey = () => `coopq:prefs:${state.me?.steamId || 'anon'}`;
+let prefs = { ...PREF_DEFAULTS };
+
+function loadPrefs() {
+  try { prefs = { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(prefKey()) || '{}') }; }
+  catch { prefs = { ...PREF_DEFAULTS }; }
+}
+function savePrefs(patch) {
+  prefs = { ...prefs, ...patch };
+  try { localStorage.setItem(prefKey(), JSON.stringify(prefs)); } catch { /* private mode */ }
+}
 
 /**
  * Trailer playback. Steam retired progressive mp4s, so `trailer_url` is now
@@ -142,6 +164,7 @@ async function boot() {
 
   state.me = me.user;
   state.groups = me.groups;
+  loadPrefs();   // keyed on the account, so only valid once state.me is set
 
   // Arrived via an invite link.
   const join = params.get('join');
@@ -444,13 +467,25 @@ function renderQueue() {
   $('#rate-notes').textContent = caveat;
 
   const others = Object.entries(g.votes).filter(([id]) => id !== state.me.steamId);
-  $('#rate-others').innerHTML = others.length
-    ? others.map(([id, s]) =>
-        `<span class="other-vote"><i class="dot" style="background:${colorOf(id)}"></i>${esc(nameOf(id))} <b>${fmt(s, 1)}</b></span>`
-      ).join('')
-    : '<span class="other-vote" style="color:var(--text-muted)">Nobody else has rated this yet</span>';
+  if (prefs.hideOthers) {
+    // Say that opinions exist without revealing them, so the queue still tells
+    // you whether you are the first to look at this.
+    $('#rate-others').innerHTML = `<span class="other-vote" style="color:var(--text-muted)">${
+      others.length
+        ? `${others.length} other ${others.length === 1 ? 'rating' : 'ratings'} hidden`
+        : 'Nobody else has rated this yet'}</span>`;
+  } else {
+    $('#rate-others').innerHTML = others.length
+      ? others.map(([id, s]) =>
+          `<span class="other-vote"><i class="dot" style="background:${colorOf(id)}"></i>${esc(nameOf(id))} <b>${fmt(s, 1)}</b></span>`
+        ).join('')
+      : '<span class="other-vote" style="color:var(--text-muted)">Nobody else has rated this yet</span>';
+  }
 
-  const start = others.length ? Math.round(g.raw * 2) / 2 : 7.5;
+  // The slider normally opens on the group's current average, which is a second
+  // and less obvious source of anchoring: hiding the numbers but still starting
+  // the handle on them would defeat the point. Neutral 7.5 when hidden.
+  const start = (others.length && !prefs.hideOthers) ? Math.round(g.raw * 2) / 2 : 7.5;
   $('#score-range').value = start;
   $('#score-out').textContent = fmt(start, 1);
 }
@@ -467,6 +502,12 @@ function metaChips(g) {
   if (g.price)        chips.push(`<span class="chip">${esc(g.price)}</span>`);
   if (g.release_date) chips.push(`<span class="chip">${esc(g.release_date)}</span>`);
   if (g.metacritic)   chips.push(`<span class="chip">MC ${g.metacritic}</span>`);
+  // Steam's own verdict, from the catalogue. Worth showing next to the group's
+  // score: it is the outside view, on a far larger sample than four friends.
+  if (g.steam_review_hint) {
+    chips.push(`<span class="chip">${esc(g.steam_review_hint)}${
+      g.steam_review_count ? ` · ${compact(g.steam_review_count)} reviews` : ''}</span>`);
+  }
   if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
   return chips.join('');
 }
@@ -762,7 +803,22 @@ async function renderMembers() {
       <input id="s-size" class="input" type="number" min="2" max="64" value="${d.group.maxPlayers}" ${isOwner ? '' : 'disabled'}>
     </div>
     <p class="field-help">Games that can't fit this many get flagged on Play next.</p>
-    <button class="btn btn-primary" id="s-save" style="margin-top:12px">Save</button>`;
+    <button class="btn btn-primary" id="s-save" style="margin-top:12px">Save</button>
+
+    <hr class="settings-rule">
+    <label class="toggle" for="s-hide-others">
+      <input type="checkbox" id="s-hide-others" ${prefs.hideOthers ? 'checked' : ''}>
+      Hide everyone else's ratings while I rate
+    </label>
+    <p class="field-help">Only affects you, and applies immediately — nothing to save.
+      Also stops the slider from opening on the group's current average, which
+      anchors you just as much as seeing the numbers.</p>`;
+
+  $('#s-hide-others').addEventListener('change', (e) => {
+    savePrefs({ hideOthers: e.target.checked });
+    toast(e.target.checked ? "Others' ratings hidden while you rate" : "Others' ratings visible again");
+    if (state.view === 'queue') renderQueue();
+  });
 
   $('#s-save').addEventListener('click', async () => {
     const patch = { myName: $('#s-myname').value };

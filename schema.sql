@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS steam_apps;
 DROP TABLE IF EXISTS coop_apps;
+DROP TABLE IF EXISTS crawl_state;
 
 -- ── people ──────────────────────────────────────────────────────────────────
 -- steam_id is a SteamID64, or 'seed:<group>:<name>' for a placeholder member
@@ -77,7 +78,8 @@ CREATE TABLE coop_apps (
   appid             INTEGER PRIMARY KEY,
   name              TEXT NOT NULL,
   popularity_rank   INTEGER,          -- 1 = most reviewed co-op game on Steam
-  review_hint       TEXT,
+  review_count      INTEGER,          -- total Steam reviews; the popularity signal
+  review_hint       TEXT,             -- Steam's score summary, e.g. 'Very Positive'
   header_image      TEXT,
   short_description TEXT,
   genre             TEXT,
@@ -95,6 +97,16 @@ CREATE TABLE coop_apps (
 CREATE INDEX idx_coop_apps_rank ON coop_apps(popularity_rank);
 CREATE INDEX idx_coop_apps_name ON coop_apps(name COLLATE NOCASE);
 CREATE INDEX idx_coop_apps_released ON coop_apps(release_ts);
+CREATE INDEX idx_coop_apps_reviews  ON coop_apps(review_count);
+
+-- Cursor and last-run summary for the cron crawler in crawler/. A Worker
+-- invocation is a cold start with no memory of the previous one, so the
+-- discovery page it should fetch next has to live in the database.
+CREATE TABLE crawl_state (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 
 -- ── a group's library ───────────────────────────────────────────────────────
 -- Metadata is denormalised onto the row rather than joined from steam_apps so

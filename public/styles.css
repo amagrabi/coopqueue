@@ -1,5 +1,5 @@
 /* ============================================================================
-   g4m1ng — dark-first UI.
+   CoopQ — dark-first UI.
    Chart colours come from a validated categorical palette: the four player
    hues clear the CVD-separation, normal-vision and 3:1 contrast gates against
    the #1a1a19 surface. Do not re-pick them by eye.
@@ -166,12 +166,24 @@ kbd {
 }
 /* Fixed height, not aspect-ratio: an aspect-ratio box that hits max-height shrinks
    its width too and leaves a gap beside the card. */
-.rate-media { position: relative; height: min(48vh, 400px); background: #000; display: grid; place-items: center; }
+/* overflow:hidden is load-bearing. The media box has a fixed height, but a
+   <video> is a replaced element that sizes itself from the stream's intrinsic
+   aspect ratio, and inside `place-items: center` it is not bound by the box —
+   height:100% resolved to 448px in a 243px container on a short window, so the
+   trailer covered the game's title and the first lines of its description. */
+.rate-media { position: relative; height: min(48vh, 400px); background: #000; display: grid; place-items: center; overflow: hidden; }
 /* Nothing to show: collapse to a slim strip instead of a viewport-eating black void. */
 .rate-media.is-blank { height: auto; min-height: 64px; padding: 18px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .rate-media.is-blank .no-trailer { position: static; background: none; padding: 0; text-align: center; }
-.rate-media video, .rate-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Pinned to the box rather than laid out in it, so the intrinsic aspect ratio of
+   the stream can never decide how tall this gets. */
+.rate-media video, .rate-media img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
 .rate-media video { object-fit: contain; background: #000; }
+/* The blank state has no video or image, so it lays out normally again. */
+.rate-media.is-blank { display: block; }
 .no-trailer {
   position: absolute; inset: auto 12px 12px auto; font-size: 12px; color: var(--text-secondary);
   background: rgba(0,0,0,.7); padding: 5px 10px; border-radius: 999px;
@@ -481,3 +493,6 @@ td.miss { color: #4a4a47; }
   .group-btn { max-width: 130px; }
   .group-menu { left: auto; right: 0; }
 }
+
+/* Divider between the group's settings and the viewer's own preferences. */
+.settings-rule { border: 0; border-top: 1px solid var(--border); margin: 20px 0 14px; }
