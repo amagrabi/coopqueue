@@ -1,4 +1,4 @@
--- g4m1ng — Cloudflare D1 schema (multi-tenant)
+-- CoopQ — Cloudflare D1 schema (multi-tenant)
 -- Apply with:  npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
 --
 -- Tenancy model: everything a group owns hangs off groups.id. A person is one

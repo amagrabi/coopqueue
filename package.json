@@ -1,5 +1,5 @@
 {
-  "name": "g4m1ng",
+  "name": "coopq",
   "version": "1.0.0",
   "private": true,
   "description": "Multi-tenant co-op game tracker. Cloudflare Pages + D1 + Steam login.",

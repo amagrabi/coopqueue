@@ -1,4 +1,4 @@
-# g4m1ng
+# CoopQ
 
 A co-op game tracker for groups of friends. Sign in with Steam, create a group,
 rate games in a queue with the trailer playing, suggest new ones by pasting a

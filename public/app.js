@@ -1,5 +1,5 @@
 /* ============================================================================
-   g4m1ng — client. No framework, no build step: edit, push, done.
+   CoopQ — client. No framework, no build step: edit, push, done.
    Routing is hash-based (#/g/<slug>/<view>) so the whole thing stays a static
    file with no server-side rewrite rules.
    ========================================================================== */

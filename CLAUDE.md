@@ -4,6 +4,25 @@ Context for Claude Code working in this repo. Read `README.md` first for what
 the product does and how to deploy it; this file covers the things that are not
 obvious from the code and the state the project is in.
 
+## The name
+
+The product is **CoopQ**. Almost every `g4m1ng` left in this repo is deliberate
+and must not be "tidied up" — they are three different identifiers that happen to
+share the old name:
+
+- the **Cloudflare Pages project** and the **D1 database**, both `g4m1ng`
+  (`wrangler.toml`, the `db:*` scripts). Pages projects cannot be renamed; doing
+  it means a new project, re-adding secrets and rebinding D1, and it kills
+  `g4m1ng.pages.dev`. Attach a custom domain instead and treat the `pages.dev`
+  host as an implementation detail.
+- the **session cookie** `g4_session` (`lib/auth.js`). Renaming it signs everyone
+  out for no benefit.
+- **group 1's slug and name**, which is genuinely what those four friends call
+  themselves — nothing to do with the product name.
+
+Only branding was renamed: page title, the two `.brand` elements, the Steam
+user-agent, `package.json` name, README title.
+
 ## What this is
 
 A multi-tenant co-op game tracker. Groups of friends rate games they've played,
