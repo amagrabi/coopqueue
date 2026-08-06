@@ -1,0 +1,4 @@
+# Local development secrets — never commit the real .dev.vars
+SESSION_SECRET="dev-only-change-me"
+STEAM_API_KEY=""
+ALLOWED_STEAM_IDS=""

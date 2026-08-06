@@ -1,0 +1,21 @@
+{
+  "name": "g4m1ng",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-tenant co-op game tracker. Cloudflare Pages + D1 + Steam login.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "db:create": "wrangler d1 create g4m1ng",
+    "db:init": "wrangler d1 execute g4m1ng --remote --file=./schema.sql",
+    "db:seed": "wrangler d1 execute g4m1ng --remote --file=./seed.sql",
+    "db:init:local": "wrangler d1 execute g4m1ng --local --file=./schema.sql && wrangler d1 execute g4m1ng --local --file=./seed.sql",
+    "db:backup": "wrangler d1 export g4m1ng --remote --output=backup.sql",
+    "deploy": "wrangler pages deploy",
+    "test": "node test/isolation.mjs",
+    "test:ui": "node test/shots.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

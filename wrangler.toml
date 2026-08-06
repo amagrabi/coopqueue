@@ -1,0 +1,16 @@
+name = "g4m1ng"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "public"
+
+# Created in step 2 of the README with:
+#   npx wrangler d1 create g4m1ng
+# Paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "g4m1ng"
+database_id = "PASTE_YOUR_DATABASE_ID_HERE"
+
+# Secrets are NOT set here — never commit them. Set them once each with:
+#   npx wrangler pages secret put SESSION_SECRET
+#   npx wrangler pages secret put STEAM_API_KEY
+#   npx wrangler pages secret put ALLOWED_STEAM_IDS
