@@ -23,6 +23,10 @@ They are three unrelated identifiers that happen to share the old name:
 - **group 1's slug and name**, which is genuinely what those four friends call
   themselves — nothing to do with the product name.
 
+The GitHub repository is **`amagrabi/coopqueue`** (private). The local checkout
+directory is still `~/code/g4m1ng` — renaming it would invalidate every git
+worktree path under `.claude/worktrees/`, so it is left alone deliberately.
+
 Deleting a Pages project does **not** touch D1: they are separate resources, and
 the row counts were identical either side of the deletion. A custom domain is
 still the right long-term answer; then the `pages.dev` host stops mattering.
@@ -97,10 +101,14 @@ have more than a handful of groups.
 contrast against the `#1a1a19` surface. Do not pick new ones by eye; if you need
 more, re-run a palette validator rather than guessing.
 
-**5. `public/vendor/hls.light.min.js` is the one vendored dependency — keep it
-that way.** "No dependencies at runtime" held until Steam moved trailers to
-adaptive-only streaming; playing them anywhere except Safari now requires a
-streaming library, and the rating queue is built around the trailer. It is
+**5. `public/vendor/hls.min.js` is the one vendored dependency — keep it that
+way, and keep it the FULL build.** "No dependencies at runtime" held until Steam
+moved trailers to adaptive-only streaming; playing them anywhere except Safari now
+requires a streaming library, and the rating queue is built around the trailer.
+It must not be swapped for `hls.light.min.js` to save 55 KB: Steam serves audio as
+a *separate* HLS rendition, which the light build parses but cannot play — it
+reported 0 audio tracks and decoded 0 audio bytes in Chromium while video played
+fine, so trailers ran silently and the mute button had nothing to unmute. It is
 committed as a static asset rather than fetched from a CDN so the site stays a
 self-contained bundle with no build step, and it costs nothing: Pages does not
 meter static assets, and hls.js pulls segments from Steam's CDN straight to the
@@ -158,7 +166,15 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
   (the DASH manifest is genuinely segmented `.m4s` chunks, and every legacy
   `cdn.akamai.steamstatic.com/steam/apps/<movie_id>/movie480.mp4` path 404s).
   `trailer_url` therefore holds an HLS manifest, played via the vendored hls.js
-  in `public/vendor/` — see the note on that in Invariants.
+  in `public/vendor/` — see the note on that in Invariants, including why it has
+  to be the full build and not the light one.
+- **A `<video>` is not bound by a fixed-height container.** It is a replaced
+  element that sizes itself from the stream's intrinsic aspect ratio, and inside
+  `.rate-media`'s `place-items: center` a `height: 100%` resolved to 448px in a
+  243px box on a short window — the trailer then covered the game's title and the
+  first lines of its description. The media children are pinned with
+  `position: absolute` and the box clips; do not "simplify" that back to flow
+  layout.
 - **Do not trust `canPlayType` for HLS.** Chromium answers
   `canPlayType('application/vnd.apple.mpegurl')` with `"maybe"` — truthy — while
   being completely unable to play HLS. `attachTrailer()` therefore tries
@@ -210,7 +226,13 @@ uploads but the schedule is rejected with error 10063.
 
 Group 1 `g4m1ng` holds 114 games (92 seeded + 22 recommendations) and 232
 ratings. **Ama is claimed** by SteamID64 `76561198049961191` (owner, 77 ratings
-repointed); Leo (48), Pat (82) and Dave (25) are still unclaimed seeds. `/enrich`
+repointed). Leo (48), Pat (82) and Dave (25) are still unclaimed seeds, but each
+now has a `seed_assignments` row (migration 007), so they will be claimed
+automatically the first time they sign in — no prompt.
+
+The catalogue holds 337 games with real review counts. The crawler re-ranks only
+once every row has a `review_count`; a handful are still NULL, so the seeded ranks
+stand until the cron fills them in, then re-ranking takes over by itself. `/enrich`
 has been run to completion: **87 of 114 games linked, all 87 with a trailer and
 header art**; the remaining 27 were too ambiguous to auto-match and need linking
 by hand from the Library.
