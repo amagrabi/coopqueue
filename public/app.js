@@ -308,7 +308,7 @@ const closeGroupMenu = () => {
 };
 
 /* ───────────────────────────── navigation ────────────────────────────── */
-const VIEWS = ['queue', 'next', 'library', 'stats', 'members'];
+const VIEWS = ['queue', 'next', 'library', 'browse', 'stats', 'members'];
 
 function setView(view) {
   if (!VIEWS.includes(view)) view = 'queue';
@@ -318,7 +318,7 @@ function setView(view) {
   $$('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
   $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
   ({ queue: renderQueue, next: renderNext, library: renderLibrary,
-     stats: renderStats, members: renderMembers }[view])();
+     browse: () => renderBrowse(true), stats: renderStats, members: renderMembers }[view])();
 }
 
 let wired = false;
@@ -349,6 +349,15 @@ function wireOnce() {
   $('#lib-score').addEventListener('change', renderLibrary);
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
+
+  let browseTimer;
+  $('#browse-search').addEventListener('input', () => {
+    clearTimeout(browseTimer);
+    browseTimer = setTimeout(() => renderBrowse(true), 280);
+  });
+  $('#browse-sort').addEventListener('change', () => renderBrowse(true));
+  $('#browse-fits').addEventListener('change', () => renderBrowse(true));
+  $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
 
   let searchTimer;
   $('#add-input').addEventListener('input', (e) => {
@@ -828,6 +837,114 @@ async function addGame(appid, btn) {
     setView('queue');
     toast(`Added ${r.name}. Set its player count so we know if we can all play.`);
   } catch (e) { $('#add-status').textContent = e.message; btn.disabled = false; }
+}
+
+/* ══════════════════════════════ BROWSE ════════════════════════════════ */
+/**
+ * The global catalogue. /api/coop is group-blind by design, so "already in your
+ * pool" is worked out here by comparing appids against the group library the
+ * client already holds — no group data crosses that endpoint.
+ */
+const browse = { page: 0, items: [], hasMore: false };
+
+// Latest request wins. Refusing to start a new fetch while one is in flight
+// looks like a safe guard but silently drops keystrokes — type during a slow
+// response and the search you asked for never happens. Sequence-numbering lets
+// every request start and discards only the answers that arrived too late.
+let browseSeq = 0;
+
+async function renderBrowse(reset) {
+  if (reset) { browse.page = 0; browse.items = []; browse.hasMore = false; }
+
+  const q = $('#browse-search').value.trim();
+  const sort = $('#browse-sort').value;
+  // "we can all play" can only mean games with a *verified* cap that covers the
+  // group. Unknown caps are left out rather than optimistically included.
+  const minPlayers = $('#browse-fits').checked ? (state.group.maxPlayers || 0) : 0;
+
+  const params = new URLSearchParams({ page: String(browse.page), sort });
+  if (q) params.set('q', q);
+  if (minPlayers) params.set('minPlayers', String(minPlayers));
+
+  const seq = ++browseSeq;
+  $('#browse-status').textContent = browse.page ? 'Loading more…' : 'Loading catalogue…';
+  let d;
+  try { d = await api(`/api/coop?${params}`); }
+  catch (e) {
+    if (seq === browseSeq) $('#browse-status').textContent = e.message;
+    return;
+  }
+  if (seq !== browseSeq) return;   // superseded by a later search; drop this answer
+
+  const got = d.games || [];   // never let a malformed page turn into a hard crash
+  browse.items = browse.page ? browse.items.concat(got) : got;
+  browse.hasMore = !!d.hasMore;
+
+  if (!browse.items.length) {
+    $('#browse-grid').innerHTML = '';
+    $('#browse-status').textContent = d.total === 0
+      ? 'The catalogue is empty — run scripts/crawl-coop.mjs to fill it.'
+      : 'Nothing in the catalogue matches that.';
+    $('#browse-more').hidden = true;
+    return;
+  }
+
+  const pooled = new Set(state.games.map((g) => g.steam_appid).filter(Boolean));
+  $('#browse-status').textContent =
+    `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}.`;
+
+  $('#browse-grid').innerHTML = browse.items.map((g) => {
+    const inPool = pooled.has(g.appid);
+    const cap = g.max_players
+      ? `${g.max_players}p co-op`
+      : '<span class="chip">player count unverified</span>';
+    return `
+      <article class="browse-card">
+        ${g.header_image ? `<img src="${esc(g.header_image)}" alt="" loading="lazy">` : '<div class="browse-noart"></div>'}
+        <div class="browse-body">
+          <h3>${esc(g.name)}</h3>
+          <div class="rank-meta">
+            ${g.max_players ? `<span class="chip chip-good">${esc(cap)}</span>` : cap}
+            ${g.genre ? `<span class="chip">${esc(g.genre)}</span>` : ''}
+            ${g.price ? `<span class="chip">${esc(g.price)}</span>` : ''}
+          </div>
+          ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
+        </div>
+        <div class="browse-act">
+          ${inPool
+            ? '<span class="chip chip-good">in your pool</span>'
+            : `<button class="btn btn-sm btn-primary" data-pool="${g.appid}">+ Add to pool</button>`}
+        </div>
+      </article>`;
+  }).join('');
+
+  $$('#browse-grid [data-pool]').forEach((b) => b.addEventListener('click', () => poolGame(b)));
+  $('#browse-more').hidden = !browse.hasMore;
+}
+
+/** Add a catalogue game to this group's pool, carrying any verified player cap. */
+async function poolGame(btn) {
+  const appid = Number(btn.dataset.pool);
+  const entry = browse.items.find((g) => g.appid === appid);
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    // Passing maxPlayers through means a pooled game arrives with a real cap
+    // where one is known, so the viability check works without further input.
+    const r = await gapi('/games', {
+      method: 'POST',
+      body: { input: String(appid), maxPlayers: entry?.max_players ?? null },
+    });
+    await loadGroup();
+    btn.outerHTML = '<span class="chip chip-good">in your pool</span>';
+    toast(entry?.max_players
+      ? `Added ${r.name} — it's in everyone's rating queue now.`
+      : `Added ${r.name}. Set its player count so we know if we can all play.`);
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false;
+    btn.textContent = '+ Add to pool';
+  }
 }
 
 /* ══════════════════════════════ DETAIL ════════════════════════════════ */

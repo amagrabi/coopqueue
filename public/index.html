@@ -125,6 +125,7 @@
       <button class="tab" data-view="queue"   role="tab">Rate <span class="pill" id="queue-count"></span></button>
       <button class="tab" data-view="next"    role="tab">Play next</button>
       <button class="tab" data-view="library" role="tab">Library</button>
+      <button class="tab" data-view="browse"  role="tab">Browse</button>
       <button class="tab" data-view="stats"   role="tab">Stats</button>
       <button class="tab" data-view="members" role="tab">Group</button>
     </nav>
@@ -270,6 +271,34 @@
     </section>
 
     <!-- ══════════════ STATS ══════════════ -->
+    <!-- ══════════════ BROWSE ══════════════ -->
+    <section class="view" data-view="browse">
+      <div class="view-head">
+        <div>
+          <h2>Browse co-op games</h2>
+          <p class="view-sub">The most-reviewed online co-op games on Steam. Add the ones this group
+            might actually play — only games in your pool appear in anyone's rating queue, which is
+            what stops a big catalogue from burying the votes that matter.</p>
+        </div>
+        <div class="filters">
+          <input id="browse-search" class="input" type="search" placeholder="Search the catalogue…" autocomplete="off">
+          <select id="browse-sort" class="input">
+            <option value="rank">Most popular</option>
+            <option value="name">A–Z</option>
+            <option value="new">Newest</option>
+          </select>
+          <label class="toggle">
+            <input type="checkbox" id="browse-fits"> Only ones we can all play
+          </label>
+        </div>
+      </div>
+      <p id="browse-status" class="add-status"></p>
+      <div id="browse-grid" class="browse-grid"></div>
+      <div class="browse-foot">
+        <button class="btn" id="browse-more" hidden>Load more</button>
+      </div>
+    </section>
+
     <section class="view" data-view="stats">
       <div class="tiles" id="stat-tiles"></div>
       <div class="grid-2">

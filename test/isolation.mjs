@@ -215,6 +215,67 @@ await check('group size is validated', async () => {
   return r.status === 400 || `got ${r.status}`;
 });
 
+console.log('\nGlobal catalogue & pools');
+
+const coopRoute = await import(path.join(SITE, 'functions/api/coop/index.js'));
+const getCoop = (qs = '') =>
+  coopRoute.onRequestGet({ request: new Request(`https://x/api/coop?${qs}`), env });
+
+sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, max_players, max_players_src) VALUES
+  (777001,'Verified Four',1,4,'manual'),
+  (777002,'Unverified Cap',2,NULL,NULL),
+  (777003,'Verified Two',3,2,'manual')`);
+// A fresh steam_apps row so pooling does not reach out to Steam during tests.
+sqlite.exec(`INSERT INTO steam_apps (appid, name, genre, fetched_at)
+             VALUES (777001,'Verified Four','Action',unixepoch())`);
+
+await check('the catalogue is global — identical for callers in different groups', async () => {
+  const a = await (await getCoop()).json();
+  const b = await (await getCoop()).json();
+  return (a.total === b.total && a.total >= 3) || `totals ${a.total} vs ${b.total}`;
+});
+
+await check('the catalogue exposes no group-scoped fields', async () => {
+  const { games } = await (await getCoop()).json();
+  const leaked = games.flatMap((g) => Object.keys(g))
+    .filter((k) => /group|steam_id|rating|votes|pool/i.test(k));
+  return leaked.length === 0 || `leaked ${[...new Set(leaked)].join(', ')}`;
+});
+
+await check('a fit filter never offers a game whose player count is unverified', async () => {
+  const { games } = await (await getCoop()).json();
+  const hasUnverified = games.some((g) => g.appid === 777002);
+  const fits = await (await getCoop('minPlayers=4')).json();
+  if (!hasUnverified) return 'fixture missing: unverified game absent from unfiltered list';
+  if (fits.games.some((g) => g.max_players == null)) return 'CLAIMED AN UNVERIFIED GAME FITS';
+  return fits.games.every((g) => g.max_players >= 4) || 'returned a game below the headcount';
+});
+
+await check('two groups can pool the same game independently', async () => {
+  const one = await ctxFor(ALICE, 'g4m1ng');
+  const two = await ctxFor(MALLORY, 'mallorys');
+  const r1 = await gamesRoute.onRequestPost({ request: req({ input: '777001', maxPlayers: 4 }), env, data: one.data });
+  const r2 = await gamesRoute.onRequestPost({ request: req({ input: '777001', maxPlayers: 4 }), env, data: two.data });
+  if (r1.status !== 201) return `first group could not pool it: ${r1.status}`;
+  if (r2.status !== 201) return `second group blocked by a global unique: ${r2.status}`;
+  const rows = sqlite.prepare('SELECT group_id FROM games WHERE steam_appid=777001').all();
+  return rows.length === 2 || `expected one row per group, got ${rows.length}`;
+});
+
+await check('pooling the same game twice in one group is rejected', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gamesRoute.onRequestPost({ request: req({ input: '777001' }), env, data });
+  return r.status === 409 || `expected 409, got ${r.status}`;
+});
+
+await check('a pooled game lands only in the pooling group', async () => {
+  const { data } = await ctxFor(MALLORY, 'mallorys');
+  const body = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const mine = body.games.filter((g) => g.steam_appid === 777001);
+  const foreign = body.games.filter((g) => g.group_id && g.group_id !== 2);
+  return (mine.length === 1 && foreign.length === 0) || `mine:${mine.length} foreign:${foreign.length}`;
+});
+
 console.log('\nScoring & viability');
 const { viability } = await import(path.join(SITE, 'lib/score.js'));
 

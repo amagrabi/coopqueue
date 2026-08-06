@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS memberships;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS steam_apps;
+DROP TABLE IF EXISTS coop_apps;
 
 -- ── people ──────────────────────────────────────────────────────────────────
 -- steam_id is a SteamID64, or 'seed:<group>:<name>' for a placeholder member
@@ -64,6 +65,33 @@ CREATE TABLE steam_apps (
   coop_categories   TEXT,                     -- JSON array, Steam's own co-op tags
   fetched_at        INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+-- ── the global co-op catalogue ──────────────────────────────────────────────
+-- Browsable list of co-op games on Steam, ranked by popularity, from which any
+-- group pulls candidates into its own pool. Not group-scoped and not a cache:
+-- steam_apps holds metadata for games someone already looked at, this holds
+-- games nobody has looked at yet. Kept in sync with migrations/001-coop-apps.sql
+-- — change both, since existing databases only ever see the migration.
+CREATE TABLE coop_apps (
+  appid             INTEGER PRIMARY KEY,
+  name              TEXT NOT NULL,
+  popularity_rank   INTEGER,          -- 1 = most reviewed co-op game on Steam
+  review_hint       TEXT,
+  header_image      TEXT,
+  short_description TEXT,
+  genre             TEXT,
+  price             TEXT,
+  release_date      TEXT,
+  metacritic        INTEGER,
+  coop_categories   TEXT,             -- JSON array of Steam's co-op tags: a HINT
+  max_players       INTEGER,          -- verified online co-op cap; NULL = unknown
+  max_players_src   TEXT,             -- provenance; NULL means nobody checked
+  coop_note         TEXT,
+  crawled_at        INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX idx_coop_apps_rank ON coop_apps(popularity_rank);
+CREATE INDEX idx_coop_apps_name ON coop_apps(name COLLATE NOCASE);
 
 -- ── a group's library ───────────────────────────────────────────────────────
 -- Metadata is denormalised onto the row rather than joined from steam_apps so

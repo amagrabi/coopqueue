@@ -299,6 +299,28 @@ td.miss { color: #4a4a47; }
 .bar-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bar-row[data-tone="good"] .bar-fill { background: var(--good); }
 .bar-row[data-tone="bad"]  .bar-fill { background: var(--critical); }
+/* ── browse: the global co-op catalogue ─────────────────────────────────── */
+.browse-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.browse-card {
+  display: flex; flex-direction: column;
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.browse-card img, .browse-noart { width: 100%; aspect-ratio: 460 / 215; object-fit: cover; display: block; }
+.browse-noart { background: var(--surface-2); }
+.browse-body { padding: 12px 14px 0; flex: 1; }
+.browse-body h3 { font-size: 14.5px; margin-bottom: 8px; }
+/* Descriptions vary wildly in length; clamp so the grid stays a grid. */
+.browse-body p {
+  font-size: 12.5px; color: var(--text-muted); margin: 9px 0 0; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.browse-act { padding: 12px 14px; display: flex; justify-content: flex-end; align-items: center; }
+.browse-foot { display: flex; justify-content: center; margin-top: 18px; }
+
 /* Secondary text inside a bar label, e.g. the raw 25/114 behind a percentage. */
 .bar-sub { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 

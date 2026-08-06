@@ -31,6 +31,24 @@ db.exec(fs.readFileSync(path.join(SITE, 'seed.sql'), 'utf8'));
 db.exec(`INSERT INTO users (steam_id, display_name, avatar) VALUES
   ('${ME}','Amadeus',NULL), ('${OTHER}','Someone Else',NULL)`);
 
+// The global catalogue, so the Browse view has something to show. Uses the real
+// crawl output when it has been generated, otherwise a handful of rows — enough
+// to exercise pooling, the verified/unverified split and the "fits us" filter.
+const crawled = path.join(SITE, 'migrations', '002-coop-seed.sql');
+if (fs.existsSync(crawled)) {
+  db.exec(fs.readFileSync(crawled, 'utf8'));
+} else {
+  db.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, genre, price, release_date, max_players, max_players_src, coop_categories) VALUES
+    (413150,'Stardew Valley',1,'Simulation','13,99€','26 Feb, 2016',4,'manual','["Online Co-op"]'),
+    (620,'Portal 2',2,'Action','9,99€','19 Apr, 2011',2,'manual','["Online Co-op"]'),
+    (892970,'Valheim',3,'Survival','16,79€','2 Feb, 2021',10,'manual','["Online Co-op"]'),
+    (1086940,'Baldur''s Gate 3',4,'RPG','59,99€','3 Aug, 2023',4,'manual','["Online Co-op"]'),
+    (548430,'Deep Rock Galactic',5,'Action','27,99€','13 May, 2020',4,'manual','["Online Co-op"]'),
+    (1966720,'Lethal Company',6,'Horror','9,75€','23 Oct, 2023',4,'manual','["Online Co-op"]'),
+    (322330,'Do Not Starve Together',7,'Survival','12,99€','21 Apr, 2016',NULL,NULL,'["Online Co-op"]'),
+    (105600,'Terraria',8,'Sandbox','9,99€','16 May, 2011',NULL,NULL,'["Online Co-op"]')`);
+}
+
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -109,6 +127,30 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, {
       user: { steamId: ME, displayName: 'Amadeus', avatar: null },
       groups: SCENARIO === 'fresh' ? [] : groups,
+    });
+  }
+
+  // The global catalogue. Group-blind, exactly like the real handler — the
+  // Browse view works out "already in your pool" client-side.
+  if (p === '/api/coop') {
+    const term = (url.searchParams.get('q') || '').trim().toLowerCase();
+    const sort = url.searchParams.get('sort') || 'rank';
+    const page = Math.max(0, Number(url.searchParams.get('page')) || 0);
+    const minPlayers = Math.max(0, Number(url.searchParams.get('minPlayers')) || 0);
+    const PAGE = 24;
+
+    let rows = q('SELECT * FROM coop_apps');
+    if (term) rows = rows.filter((g) => g.name.toLowerCase().includes(term));
+    if (minPlayers) rows = rows.filter((g) => g.max_players != null && g.max_players >= minPlayers);
+    rows.sort({
+      rank: (a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9),
+      name: (a, b) => a.name.localeCompare(b.name),
+      new:  (a, b) => String(b.release_date || '').localeCompare(String(a.release_date || '')),
+    }[sort] || ((a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9)));
+
+    const slice = rows.slice(page * PAGE, page * PAGE + PAGE + 1);
+    return send(res, 200, {
+      games: slice.slice(0, PAGE), page, hasMore: slice.length > PAGE, total: rows.length,
     });
   }
 

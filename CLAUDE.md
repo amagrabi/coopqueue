@@ -42,11 +42,23 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 22 tenancy/permission/scoring assertions — ALWAYS run before deploying
-npm run test:ui          # renders every screen headless, fails on any console error
+npm test                 # 28 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
+
+npm run db:migrate -- --file=./migrations/001-coop-apps.sql   # apply one migration
+npm run crawl:coop -- --pages 8 --out migrations/002-coop-seed.sql
+node scripts/seed-player-caps.mjs --from migrations/002-coop-seed.sql \
+                                 --out migrations/003-player-caps.sql
 ```
+
+**`schema.sql` can never be applied to a live database** — it opens with
+`DROP TABLE`, so running `db:init` against production wipes every group and
+rating. Anything that has to reach an existing database goes in `migrations/` as
+an additive, idempotent file applied with `db:migrate`. New tables must be added
+to *both* `schema.sql` (for fresh installs and both test suites, which build from
+it) and a migration (for production) — they are kept in sync by hand.
 
 `npm run dev` (wrangler pages dev) works but Steam OpenID cannot redirect back to
 `localhost`, so use `test/harness.mjs` for anything UI. It serves the real

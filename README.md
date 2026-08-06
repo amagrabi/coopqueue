@@ -25,6 +25,21 @@ pushed into a separate block rather than silently sorted to the bottom.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
+Filterable by whose votes a game already has, by group score, and by whether
+anyone has logged hours.
+
+**Browse.** The most-reviewed online co-op games on Steam, as a global
+catalogue. Pull the ones your group might play into its **pool** — and only
+pooled games ever appear in anyone's rating queue. That opt-in step is the whole
+point: a catalogue of thousands would otherwise bury the handful of votes that
+decide what you actually play. Games whose player cap nobody has verified say so
+rather than guessing, and the "only ones we can all play" filter leaves them out
+instead of claiming they fit.
+
+**Coverage.** Your own unrated count sits above the rating queue, and the Group
+tab ranks everyone by how much of the library they have scored. Rating coverage
+is the thing that decides whether any of the scoring means anything, so it is
+not hidden in a stats page.
 
 **Stats.** Per-person baselines, genre track record, and a dot plot of your
 biggest arguments.
