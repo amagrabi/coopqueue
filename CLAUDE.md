@@ -59,7 +59,17 @@ have more than a handful of groups.
 contrast against the `#1a1a19` surface. Do not pick new ones by eye; if you need
 more, re-run a palette validator rather than guessing.
 
-**5. `max_players` means max *simultaneous online co-op* players.** Not the Steam
+**5. `public/vendor/hls.light.min.js` is the one vendored dependency — keep it
+that way.** "No dependencies at runtime" held until Steam moved trailers to
+adaptive-only streaming; playing them anywhere except Safari now requires a
+streaming library, and the rating queue is built around the trailer. It is
+committed as a static asset rather than fetched from a CDN so the site stays a
+self-contained bundle with no build step, and it costs nothing: Pages does not
+meter static assets, and hls.js pulls segments from Steam's CDN straight to the
+browser, never through a Worker. Anything else wanting a package should still
+justify itself against that bar.
+
+**6. `max_players` means max *simultaneous online co-op* players.** Not the Steam
 store's headline number, not local/couch co-op. Steam's own co-op categories are
 stored as a hint in `steam_apps.coop_categories` and deliberately never used as
 truth, because they are frequently wrong. Couch-only and one-copy games are not
@@ -107,11 +117,31 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
 - **Steam no longer serves progressive trailer files.** `movies[]` entries now
   carry `dash_av1` / `dash_h264` / `hls_h264` manifests; the old `mp4.max` and
   `webm.max` keys are simply absent, and there is no derivable single-file mp4
-  (the DASH manifest is genuinely segmented `.m4s` chunks). `trailer_url`
-  therefore holds an HLS manifest, which only Safari plays in a bare `<video>`.
-  `playable()` in `app.js` feature-detects and falls back to the header image.
-  Making trailers work in Chrome means adding hls.js — the first runtime
-  dependency the project would have.
+  (the DASH manifest is genuinely segmented `.m4s` chunks, and every legacy
+  `cdn.akamai.steamstatic.com/steam/apps/<movie_id>/movie480.mp4` path 404s).
+  `trailer_url` therefore holds an HLS manifest, played via the vendored hls.js
+  in `public/vendor/` — see the note on that in Invariants.
+- **Do not trust `canPlayType` for HLS.** Chromium answers
+  `canPlayType('application/vnd.apple.mpegurl')` with `"maybe"` — truthy — while
+  being completely unable to play HLS. `attachTrailer()` therefore tries
+  `Hls.isSupported()` *first* and only falls back to native playback for iOS
+  Safari, which has real native HLS but no MSE for hls.js to use. Reversing that
+  order produces a video element that silently never starts in Chrome.
+- **A seeded instance cannot be entered through the product.** `seed.sql` ships
+  `invite_code = NULL` (joining disabled) and group 1's only owner is the
+  placeholder `seed:1:ama`, which can never log in — so there is no member who
+  can rotate the code and no link to join with. The first real human has to be
+  let in out-of-band, once:
+  `wrangler d1 execute g4m1ng --remote --command "UPDATE groups SET invite_code='<10 chars from ABCDEFGHJKLMNPQRSTUVWXYZ23456789>' WHERE id=1"`,
+  then `/?join=CODE` → claim prompt. Signing in without that lands you in the
+  "you're not in a group yet" onboarding, where creating a group silently makes a
+  *second*, empty one (`g4m1ng-2`) instead.
+- `showOnboard()` and the members panel read `state.me.displayName` with no null
+  guard, and the `hashchange` listener calls `openFromHash()` without checking
+  whether anyone is signed in. A hash change while `state.me` is null therefore
+  throws and renders a headless "Welcome," card. Not reachable by a normal
+  signed-out visitor (boot catches the 401 and shows the landing page before any
+  hashchange fires), so it is latent rather than urgent.
 - **`npm run setup` is only re-runnable up to a point.** The seed and
   recommendations imports are nested inside the "schema did not exist" branch, so
   a run that dies after the schema is applied can never offer them again; the
@@ -133,8 +163,14 @@ preview deploy boots with no session support. `ALLOWED_STEAM_IDS` is unset, so
 anyone can sign in and create their own groups.
 
 Group 1 `g4m1ng` holds 114 games (92 seeded + 22 recommendations) and 232
-ratings, with `invite_code = NULL` — joining is disabled until an owner rotates
-it from the Group tab. Ama/Leo/Pat/Dave are still unclaimed seed identities.
+ratings. **Ama is claimed** by SteamID64 `76561198049961191` (owner, 77 ratings
+repointed); Leo (48), Pat (82) and Dave (25) are still unclaimed seeds. `/enrich`
+has been run to completion: **87 of 114 games linked, all 87 with a trailer and
+header art**; the remaining 27 were too ambiguous to auto-match and need linking
+by hand from the Library.
+
+There is also an empty group 2 `g4m1ng-2` — an artifact of signing in before the
+seeded group was enterable (see the bootstrap gotcha below). Safe to delete.
 
 Neither `d1 create` parsing nor the `d1 list --json` branch turned out to be the
 problem. What actually broke is in the git log for `e06be5f`; the short version
@@ -146,8 +182,11 @@ is that no unresolved import can be caught locally (no build step, and
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
-Not yet verified by anyone: the Steam sign-in round-trip, claiming a seed
-identity, invite-link creation, and `/enrich`. All four need a real Steam login.
+Verified end to end against production: Steam sign-in (display name and avatar
+resolve, so `STEAM_API_KEY` works), `POST /api/groups/join`, claiming a seed
+identity, `PATCH /api/g/:slug/members {invite:'on'}` to rotate the invite link,
+`/enrich`, and a trailer playing in the rating queue in **Chromium** — the
+browser that could not play one before hls.js.
 
 ## Next up, roughly in value order
 
