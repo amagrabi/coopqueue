@@ -102,35 +102,68 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
 - An `aspect-ratio` box that hits `max-height` also shrinks its width, leaving a
   gap. `.rate-media` uses a fixed height for that reason.
 - Playwright: use `executablePath: '/opt/pw-browsers/chromium-*/chrome-linux/chrome'`
-  rather than downloading a browser.
+  rather than downloading a browser. That path is Linux-only, so `test/shots.mjs`
+  cannot run on a Mac as written.
+- **Steam no longer serves progressive trailer files.** `movies[]` entries now
+  carry `dash_av1` / `dash_h264` / `hls_h264` manifests; the old `mp4.max` and
+  `webm.max` keys are simply absent, and there is no derivable single-file mp4
+  (the DASH manifest is genuinely segmented `.m4s` chunks). `trailer_url`
+  therefore holds an HLS manifest, which only Safari plays in a bare `<video>`.
+  `playable()` in `app.js` feature-detects and falls back to the header image.
+  Making trailers work in Chrome means adding hls.js — the first runtime
+  dependency the project would have.
+- **`npm run setup` is only re-runnable up to a point.** The seed and
+  recommendations imports are nested inside the "schema did not exist" branch, so
+  a run that dies after the schema is applied can never offer them again; the
+  re-run sees existing tables and only offers to wipe. Import them by hand with
+  `wrangler d1 execute --remote --file=./seed.sql` instead of accepting the wipe.
+- **`wrangler pages deploy` infers the branch from git.** Anything other than the
+  production branch silently becomes a preview deploy reading a *different* set
+  of secrets, so it boots without `SESSION_SECRET` and reports success anyway.
+  `scripts/setup.mjs` now pins `--branch main`; do the same for any manual deploy
+  from a feature branch, or use `npm run deploy` from `main`.
 
 ## State
 
-Deployed: not yet at time of writing — `npm run setup` has been written and
-syntax-checked but never executed against a real Cloudflare account. Expect the
-first run to need small fixes, most likely in the `wrangler d1 create` output
-parsing (it looks for the first UUID in stdout) or the `d1 list --json` branch.
+**Live at <https://g4m1ng.pages.dev>** (Cloudflare account
+amadeus.magrabi@googlemail.com, D1 `g4m1ng` = `f16e7e1e-e2c3-463b-b1e4-158bc961de92`,
+committed into `wrangler.toml`). `SESSION_SECRET` and `STEAM_API_KEY` are set on
+the **production** environment only; the preview environment has neither, so a
+preview deploy boots with no session support. `ALLOWED_STEAM_IDS` is unset, so
+anyone can sign in and create their own groups.
 
-Both test suites pass: 22/22 tenancy assertions, and the UI renders all four auth
-scenarios with no console errors and no cross-group leakage.
+Group 1 `g4m1ng` holds 114 games (92 seeded + 22 recommendations) and 232
+ratings, with `invite_code = NULL` — joining is disabled until an owner rotates
+it from the Group tab. Ama/Leo/Pat/Dave are still unclaimed seed identities.
+
+Neither `d1 create` parsing nor the `d1 list --json` branch turned out to be the
+problem. What actually broke is in the git log for `e06be5f`; the short version
+is that no unresolved import can be caught locally (no build step, and
+`test/isolation.mjs` does not import `functions/api/steam/search.js`), so
+`npm run deploy` is the first thing that ever type-checks the bundle.
+
+22/22 tenancy assertions pass. `npm run test:ui` does **not** run on macOS: it
+imports `playwright`, which is not in `package.json`, and hardcodes a Linux
+Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
+
+Not yet verified by anyone: the Steam sign-in round-trip, claiming a seed
+identity, invite-link creation, and `/enrich`. All four need a real Steam login.
 
 ## Next up, roughly in value order
 
-1. **Run `npm run setup` and fix whatever breaks.** Nothing else matters until
-   it's live.
-2. **Rate-limit writes.** Cloudflare Rate Limiting rules are free. Right now the
+1. **Rate-limit writes.** Cloudflare Rate Limiting rules are free. Right now the
    only protection is soft caps (20 owned groups/person, 64 members/group, 2000
    games/group) enforced in application code.
-3. **Scheduled D1 backups.** A cron trigger running `d1 export`. Free tier has no
+2. **Scheduled D1 backups.** A cron trigger running `d1 export`. Free tier has no
    automatic backups; losing the database means losing everything.
-4. **Steam playtime + achievement sync.** `IPlayerService/GetOwnedGames` and
+3. **Steam playtime + achievement sync.** `IPlayerService/GetOwnedGames` and
    `ISteamUserStats/GetPlayerAchievements`, keyed on the SteamID64s already
    stored. Would make `hours` real instead of hand-typed, and enables a
    "who already owns this" badge.
-5. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
+4. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
    group has members. Rating coverage is the app's core problem — in the original
    spreadsheet it ranged from 89% to 27% per person.
-6. **Public read-only group pages.** Also the cheapest growth loop the site has.
+5. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
 ## Conventions
 
