@@ -15,6 +15,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
+import { recommend } from '../lib/recommend.js';
+import { classifyCoop } from '../lib/coop.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
@@ -38,15 +40,20 @@ const crawled = path.join(SITE, 'migrations', '002-coop-seed.sql');
 if (fs.existsSync(crawled)) {
   db.exec(fs.readFileSync(crawled, 'utf8'));
 } else {
-  db.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, genre, price, release_date, max_players, max_players_src, coop_categories) VALUES
-    (413150,'Stardew Valley',1,'Simulation','13,99€','26 Feb, 2016',4,'manual','["Online Co-op"]'),
-    (620,'Portal 2',2,'Action','9,99€','19 Apr, 2011',2,'manual','["Online Co-op"]'),
-    (892970,'Valheim',3,'Survival','16,79€','2 Feb, 2021',10,'manual','["Online Co-op"]'),
-    (1086940,'Baldur''s Gate 3',4,'RPG','59,99€','3 Aug, 2023',4,'manual','["Online Co-op"]'),
-    (548430,'Deep Rock Galactic',5,'Action','27,99€','13 May, 2020',4,'manual','["Online Co-op"]'),
-    (1966720,'Lethal Company',6,'Horror','9,75€','23 Oct, 2023',4,'manual','["Online Co-op"]'),
-    (322330,'Do Not Starve Together',7,'Survival','12,99€','21 Apr, 2016',NULL,NULL,'["Online Co-op"]'),
-    (105600,'Terraria',8,'Sandbox','9,99€','16 May, 2011',NULL,NULL,'["Online Co-op"]')`);
+  /* Real tag lists, not invented ones: the "Recommended for us" sort ranks on
+     tag overlap, so made-up tags would make the local ordering meaningless. The
+     last row is deliberately PvP-primary so the co-op filter has something to
+     hide — without one, ticking the box looks like it does nothing. */
+  db.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, genre, price, release_date, max_players, max_players_src, coop_categories, review_count, tags, is_coop, tags_at) VALUES
+    (413150,'Stardew Valley',1,'Simulation','13,99€','26 Feb, 2016',4,'manual','["Online Co-op"]',780000,'["Farming Sim","Pixel Graphics","Multiplayer","Life Sim","RPG","Relaxing"]',1,1),
+    (620,'Portal 2',2,'Action','9,99€','19 Apr, 2011',2,'manual','["Online Co-op"]',320000,'["Puzzle","Co-op","First-Person","Comedy","Sci-fi","Singleplayer"]',1,1),
+    (892970,'Valheim',3,'Survival','16,79€','2 Feb, 2021',10,'manual','["Online Co-op"]',480000,'["Open World Survival Craft","Survival","Online Co-Op","Open World","Multiplayer","Building"]',1,1),
+    (1086940,'Baldur''s Gate 3',4,'RPG','59,99€','3 Aug, 2023',4,'manual','["Online Co-op"]',650000,'["RPG","Character Customization","Choices Matter","Story Rich","Turn-Based Combat","Co-op"]',1,1),
+    (548430,'Deep Rock Galactic',5,'Action','27,99€','13 May, 2020',4,'manual','["Online Co-op"]',270000,'["Dwarf","Co-op","PvE","FPS","Procedural Generation","Class-Based"]',1,1),
+    (1966720,'Lethal Company',6,'Horror','9,75€','23 Oct, 2023',4,'manual','["Online Co-op"]',400000,'["Horror","Co-op","Comedy","Online Co-Op","Survival Horror","Multiplayer"]',1,1),
+    (322330,'Do Not Starve Together',7,'Survival','12,99€','21 Apr, 2016',NULL,NULL,'["Online Co-op"]',240000,'["Survival","Multiplayer","Open World Survival Craft","Co-op","Crafting","Sandbox"]',1,1),
+    (105600,'Terraria',8,'Sandbox','9,99€','16 May, 2011',NULL,NULL,'["Online Co-op"]',1030000,'["Open World Survival Craft","Sandbox","Survival","2D","Multiplayer","Adventure"]',1,1),
+    (1172470,'Apex Legends',9,'Action','Free','5 Nov, 2020',3,'manual','["Online Co-op"]',760000,'["Free to Play","Battle Royale","Multiplayer","FPS","Shooter","First-Person"]',0,1)`);
 }
 
 // Give every group-1 game real Steam metadata, so the rating card can be worked
@@ -57,18 +64,65 @@ db.exec(`UPDATE games SET
     header_image = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/105600/header.jpg',
     short_description = 'Back 4 Blood is a thrilling cooperative first-person shooter from the creators of the critically acclaimed Left 4 Dead franchise. Experience the intense 4 player co-op narrative campaign, competitive multiplayer as human or Ridden, and frenetic gameplay that keeps you in the action.'
   WHERE group_id = 1`);
-// steam_appid on one row only: UNIQUE (group_id, steam_appid) forbids sharing an
-// appid. 105600 is Terraria, which the crawled catalogue actually contains, so the
-// LEFT JOIN onto coop_apps has something to match and the Steam-verdict chip
-// renders — with a made-up appid it silently stays blank.
-// Targets the game the queue surfaces first — the queue puts backlog games ahead
-// of played ones, so plain name order picks the wrong row — making the chip
-// visible without clicking through. 105600 is Terraria, which the crawled
-// catalogue contains — a made-up appid joins to nothing and stays silently blank.
+/* Link the library to the catalogue by name. Real appids, not invented ones: about
+   20 of group 1's games are in the crawled catalogue under exactly the same name,
+   which is unsurprising — the catalogue is the popular co-op games and this is a
+   co-op group's library.
+
+   This is what makes the "Recommended for us" sort testable locally. It ranks on
+   tag overlap between rated games and candidates, so with no appid there is no
+   catalogue row, no tags, and every candidate scores null — the taste path would
+   silently never render and only the popularity fallback would ever be visible.
+
+   `WHERE steam_appid IS NULL` plus the NOT IN guard respect
+   UNIQUE (group_id, steam_appid), which forbids two rows sharing an appid. */
+db.exec(`UPDATE games SET steam_appid = (SELECT c.appid FROM coop_apps c WHERE c.name = games.name)
+          WHERE group_id = 1 AND steam_appid IS NULL
+            AND EXISTS (SELECT 1 FROM coop_apps c WHERE c.name = games.name)
+            AND (SELECT c.appid FROM coop_apps c WHERE c.name = games.name)
+                NOT IN (SELECT steam_appid FROM games WHERE group_id = 1 AND steam_appid IS NOT NULL)`);
+
+// Then one guaranteed link for the rating card: the queue puts backlog games ahead
+// of played ones, so plain name order picks the wrong row. 105600 is Terraria, which
+// the crawled catalogue contains, so the Steam-verdict chip renders without clicking
+// through — a made-up appid joins to nothing and stays silently blank.
 db.exec(`UPDATE games SET steam_appid = 105600
-          WHERE id = (SELECT id FROM games WHERE group_id = 1
+          WHERE steam_appid IS NULL
+            AND 105600 NOT IN (SELECT steam_appid FROM games
+                                WHERE group_id = 1 AND steam_appid IS NOT NULL)
+            AND id = (SELECT id FROM games WHERE group_id = 1
                        ORDER BY CASE status WHEN 'backlog' THEN 0 ELSE 1 END,
                                 name COLLATE NOCASE LIMIT 1)`);
+
+/* Real tag lists for catalogue rows the crawl has not tagged yet, so the taste
+   ranking has something to match on locally. Copied from production rather than
+   made up — invented tags would make the local ordering meaningless, which is the
+   one thing this fixture exists to let someone check. */
+const FIXTURE_TAGS = [
+  ['Valheim', ['Open World Survival Craft', 'Survival', 'Online Co-Op', 'Open World', 'Multiplayer', 'Building']],
+  ['Grounded', ['Survival', 'Multiplayer', 'Co-op', 'Open World Survival Craft', 'Base-Building', 'Crafting']],
+  ['Raft', ['Survival', 'Multiplayer', 'Open World Survival Craft', 'Co-op', 'Crafting', 'Open World']],
+  ['Deep Rock Galactic', ['Dwarf', 'Co-op', 'PvE', 'FPS', 'Procedural Generation', 'Class-Based']],
+  ['The Ascent', ['Top-Down Shooter', 'Cyberpunk', 'RPG', 'Action', 'Co-op', 'Shooter']],
+  ['Satisfactory', ['Base-Building', 'Automation', 'Open World', 'Multiplayer', 'Crafting', 'Co-op']],
+  ['Green Hell', ['Open World Survival Craft', 'Survival', 'Multiplayer', 'Online Co-Op', 'Open World', 'Crafting']],
+  ['Risk of Rain 2', ['Third-Person Shooter', 'Action Roguelike', 'Multiplayer', 'Co-op', 'Action', 'Rogue-lite']],
+  ['Chained Together', ['Co-op', 'Adventure', 'Casual', 'Platformer', 'Puzzle-Platformer', 'Simulation']],
+  ['Enshrouded', ['Open World', 'Survival', 'Base-Building', 'Multiplayer', 'Online Co-Op', 'Crafting']],
+  ['Palworld', ['Open World', 'Survival', 'Creature Collector', 'Multiplayer', 'Open World Survival Craft', 'Online Co-Op']],
+  ['Castle Crashers®', ['2D', 'Online Co-Op', 'Co-op', "Beat 'em up", 'Hack and Slash', 'Funny']],
+  ['Age of Empires IV: Anniversary Edition', ['Strategy', 'RTS', 'Base-Building', 'Multiplayer', 'War', 'Singleplayer']],
+  ['Sea of Thieves: 2026 Edition', ['Multiplayer', 'Open World', 'Adventure', 'Pirates', 'Co-op', 'Online Co-Op']],
+  ['Marvel Rivals', ['Free to Play', 'Multiplayer', 'Hero Shooter', 'Third-Person Shooter', 'Action', 'Shooter']],
+];
+{
+  const stmt = db.prepare('UPDATE coop_apps SET tags = ?, is_coop = ?, tags_at = 1 WHERE name = ? AND tags IS NULL');
+  for (const [name, tags] of FIXTURE_TAGS) {
+    // Classified by the shipped rule, so Marvel Rivals lands on the PvP side here
+    // exactly as it does in production and the co-op filter has something to hide.
+    stmt.run(JSON.stringify(tags), classifyCoop(tags) ? 1 : 0, name);
+  }
+}
 
 // A couple of collectively-shrugged-at games, so the "nobody has an opinion"
 // panel has something to show locally.
@@ -119,7 +173,8 @@ const readBody = async (req) => { let b = ''; for await (const c of req) b += c;
 
 function groupCtx(slug) {
   return one(
-    `SELECT g.id AS group_id, g.slug, g.name, g.invite_code, g.max_players, m.short_name, m.role
+    `SELECT g.id AS group_id, g.slug, g.name, g.invite_code, g.max_players, g.blind_rating,
+            m.short_name, m.role
        FROM groups g JOIN memberships m ON m.group_id=g.id AND m.steam_id=?
       WHERE g.slug=?`, ME, slug);
 }
@@ -185,6 +240,7 @@ const server = http.createServer(async (req, res) => {
     let rows = q('SELECT * FROM coop_apps');
     if (term) rows = rows.filter((g) => g.name.toLowerCase().includes(term));
     if (minPlayers) rows = rows.filter((g) => g.max_players != null && g.max_players >= minPlayers);
+    if (url.searchParams.get('coopOnly') !== '0') rows = rows.filter((g) => g.is_coop !== 0);
     rows.sort({
       rank: (a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9),
       name: (a, b) => a.name.localeCompare(b.name),
@@ -224,7 +280,8 @@ const server = http.createServer(async (req, res) => {
       const L = libraryFor(gid, need);
       return send(res, 200, {
         games: L.games, members: L.members,
-        group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role },
+        group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
+                 blindRating: !!ctx.blind_rating },
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
@@ -251,6 +308,44 @@ const server = http.createServer(async (req, res) => {
     }
     if (sub === '/playtime' && req.method === 'POST') {
       return send(res, 200, { ok: true, members: [], gamesEstimated: 0 });
+    }
+
+    // Taste ranking. Shares lib/recommend.js with the real route, so the Browse
+    // view's "Recommended for us" order can be checked here rather than only
+    // against production.
+    if (sub.startsWith('/recommend') && req.method === 'GET') {
+      const term = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const page = Math.max(0, Number(url.searchParams.get('page')) || 0);
+      const minPlayers = Math.max(0, Number(url.searchParams.get('minPlayers')) || 0);
+      const PAGE = 24;
+
+      let rows = q('SELECT * FROM coop_apps');
+      if (term) rows = rows.filter((g) => g.name.toLowerCase().includes(term));
+      if (minPlayers) rows = rows.filter((g) => g.max_players != null && g.max_players >= minPlayers);
+      if (url.searchParams.get('coopOnly') !== '0') rows = rows.filter((g) => g.is_coop !== 0);
+
+      const history = q(`SELECT g.steam_appid AS appid, AVG(r.score) AS score
+                           FROM games g JOIN ratings r ON r.game_id=g.id
+                          WHERE g.group_id=? AND g.archived_at IS NULL
+                            AND g.steam_appid IS NOT NULL GROUP BY g.id`, gid);
+      const tagsFor = new Map();
+      for (const r of q(`SELECT c.appid, c.tags FROM coop_apps c
+                           JOIN games g ON g.steam_appid=c.appid AND g.group_id=?
+                          WHERE c.tags IS NOT NULL`, gid)) {
+        try {
+          const t = JSON.parse(r.tags);
+          if (Array.isArray(t)) tagsFor.set(r.appid, t);
+        } catch { /* ignore a malformed row */ }
+      }
+
+      const out = recommend(rows, history, tagsFor);
+      return send(res, 200, {
+        games: out.games.slice(page * PAGE, page * PAGE + PAGE),
+        page, total: out.games.length,
+        hasMore: out.games.length > page * PAGE + PAGE,
+        basis: out.basis, ratedGames: out.ratedGames, needed: out.needed,
+        likes: out.likes, dislikes: out.dislikes,
+      });
     }
 
     if (sub.startsWith('/comments')) {
@@ -385,8 +480,28 @@ const server = http.createServer(async (req, res) => {
              FROM memberships m JOIN users u ON u.steam_id=m.steam_id
             WHERE m.group_id=? ORDER BY m.is_seed, m.short_name COLLATE NOCASE`, gid),
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
+                 blindRating: !!ctx.blind_rating,
                  inviteCode: ctx.role === 'owner' ? ctx.invite_code : null },
       });
+    }
+    // Enough of the members PATCH to exercise the settings panel locally.
+    if (sub === '/members' && req.method === 'PATCH') {
+      const b = await readBody(req);
+      if (b.myName != null) {
+        db.prepare('UPDATE memberships SET short_name=? WHERE group_id=? AND steam_id=?')
+          .run(String(b.myName).slice(0, 16), gid, ME);
+      }
+      if (b.blindRating != null) {
+        if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can change blind rating' });
+        db.prepare('UPDATE groups SET blind_rating=? WHERE id=?').run(b.blindRating ? 1 : 0, gid);
+      }
+      if (b.name != null && ctx.role === 'owner') {
+        db.prepare('UPDATE groups SET name=? WHERE id=?').run(String(b.name).slice(0, 60), gid);
+      }
+      if (b.maxPlayers != null && ctx.role === 'owner') {
+        db.prepare('UPDATE groups SET max_players=? WHERE id=?').run(Number(b.maxPlayers), gid);
+      }
+      return send(res, 200, { ok: true });
     }
     if (sub === '/stats') {
       const L = libraryFor(gid, need);

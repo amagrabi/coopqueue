@@ -723,6 +723,235 @@ await check('deleting one group leaves the other untouched', async () => {
   return g1 > 0 || 'group 1 lost its games when group 2 was deleted';
 });
 
+console.log('\nBlind rating (an owner-only group rule)');
+
+await check('blind rating is off by default', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await membersRoute.onRequestGet({ env, data });
+  const b = (await r.json()).group.blindRating;
+  return b === false || `default was ${b}`;
+});
+
+await check('the owner can turn blind rating on', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await membersRoute.onRequestPatch({ request: req({ blindRating: true }), env, data });
+  const row = sqlite.prepare('SELECT blind_rating FROM groups WHERE id=1').get();
+  return (r.status === 200 && row.blind_rating === 1) || `status ${r.status}, col ${row.blind_rating}`;
+});
+
+await check('a plain member cannot change blind rating', async () => {
+  // Mallory joined group 1 in the invite tests above, as a member and not an owner.
+  const { data } = await ctxFor(MALLORY, 'g4m1ng');
+  const before = sqlite.prepare('SELECT blind_rating FROM groups WHERE id=1').get().blind_rating;
+  const r = await membersRoute.onRequestPatch({ request: req({ blindRating: false }), env, data });
+  const after = sqlite.prepare('SELECT blind_rating FROM groups WHERE id=1').get().blind_rating;
+  return (r.status === 403 && after === before) || `status ${r.status}, ${before} -> ${after}`;
+});
+
+console.log('\nCo-op classification');
+
+const { classifyCoop, parseStoreTags } = await import(path.join(SITE, 'lib/coop.js'));
+/* Real tag orders, as Steam lists them. The first four games are the regression: an
+   earlier rule required a co-op tag in the top 5 and classified all of them as NOT
+   co-op, which hid most of this group's own library behind a filter that defaults
+   to on. The PvP cases are the other half — a rule that keeps everything is no
+   filter at all. */
+const CLASSIFY = [
+  ['Terraria', 1, ['Open World Survival Craft', 'Sandbox', 'Survival', '2D', 'Multiplayer', 'Pixel Graphics', 'Adventure']],
+  ['Stardew Valley', 1, ['Farming Sim', 'Pixel Graphics', 'Multiplayer', 'Life Sim', 'RPG', 'Relaxing']],
+  ['ELDEN RING', 1, ['Souls-like', 'Open World', 'Dark Fantasy', 'RPG', 'Difficult', 'Action RPG']],
+  ["Baldur's Gate 3", 1, ['RPG', 'Character Customization', 'Choices Matter', 'Story Rich', 'Turn-Based Combat', 'Co-op']],
+  ['Deep Rock Galactic', 1, ['Dwarf', 'Co-op', 'PvE', 'FPS', 'Procedural Generation', 'Class-Based']],
+  ['PEAK', 1, ['Multiplayer', 'Online Co-Op', 'Co-op', 'Physics', 'Adventure', 'Exploration', 'First-Person']],
+  ['Overwatch 2', 0, ['Free to Play', 'Hero Shooter', 'FPS', 'Multiplayer', 'Team-Based', 'First-Person']],
+  ['Rainbow Six Siege', 0, ['FPS', 'PvP', 'Multiplayer', 'Shooter', 'Tactical', 'eSports']],
+  ['Counter-Strike 2', 0, ['FPS', 'Shooter', 'Multiplayer', 'Competitive', 'Action', 'Team-Based']],
+  ['Apex Legends', 0, ['Free to Play', 'Multiplayer', 'Battle Royale', 'FPS', 'Shooter', 'First-Person']],
+  ['THE FINALS', 0, ['Destruction', 'Free to Play', 'FPS', 'Multiplayer', 'Shooter', 'PvP', 'Team-Based']],
+];
+
+for (const [name, want, tags] of CLASSIFY) {
+  await check(`${name} classifies as ${want ? 'co-op' : 'PvP'}`, async () => {
+    const got = classifyCoop(tags);
+    return got === !!want || `got ${got}`;
+  });
+}
+
+await check('a PvP tag past the window is an optional mode, not the genre', async () => {
+  /* Rust tags PvP at 7 and Destiny 2 at 9, and this group plays both co-operatively.
+     Widening the window to catch them would be the old bug in the other direction. */
+  const rust = ['Survival', 'Crafting', 'Multiplayer', 'Open World', 'Open World Survival Craft', 'Building', 'PvP'];
+  const destiny = ['Free to Play', 'Open World', 'Looter Shooter', 'Multiplayer', 'MMORPG', 'FPS', 'Co-op', 'Adventure', 'PvP'];
+  return (classifyCoop(rust) && classifyCoop(destiny)) || 'excluded on a PvP tag past rank 6';
+});
+
+console.log('\nStore-page tag parsing');
+
+await check('tags come out of a store page in Steam\'s own order', async () => {
+  // The real markup shape, down to the inline `style` that broke a first attempt.
+  const html = `<div class="glance_tags_label">Popular user-defined tags:</div>
+    <div class="glance_tags popular_tags" data-appid="105600">
+    <a href="/tags/en/Sandbox/" class="app_tag" style="display: none;"> Sandbox </a>
+    <a href="/tags/en/Survival/" class="app_tag"> Survival </a>
+    <a href="/tags/en/Co-op/" class="app_tag"> Co-op </a></div>`;
+  const got = parseStoreTags(html);
+  return (JSON.stringify(got?.tags) === '["Sandbox","Survival","Co-op"]' && got.isCoop === true)
+    || `got ${JSON.stringify(got)}`;
+});
+
+await check('a page with no tag block is unclassified, not "not co-op"', async () => {
+  /* An age gate or a delisted app serves a page with no tags. The browse filter
+     keeps NULLs visible, so returning a verdict here would hide real co-op games —
+     and recording "no tags" would stop the crawler ever retrying the row. */
+  return parseStoreTags('<html><body>Please enter your birth date</body></html>') === null
+    || 'invented a verdict from a page with no tags';
+});
+
+await check('the tag list is capped, so one page cannot bloat a row', async () => {
+  const many = Array.from({ length: 40 }, (_, i) => `<a class="app_tag"> Tag${i} </a>`).join('');
+  const got = parseStoreTags(`<div class="glance_tags popular_tags">${many}</div>`, 12);
+  return got.tags.length === 12 || `kept ${got.tags.length}`;
+});
+
+console.log('\nRecommendations');
+
+const recommendRoute = await import(path.join(SITE, 'functions/api/g/[slug]/recommend.js'));
+const { recommend } = await import(path.join(SITE, 'lib/recommend.js'));
+const DAN = '76561198000000555';
+const recReq = (qs = '') => new Request(`https://x/api/g/g4m1ng/recommend${qs}`);
+
+await check('recommendations are group-scoped: a non-member never reaches them', async () => {
+  // Same 404-not-403 boundary as everything else below /api/g/:slug.
+  const { passed, out } = await ctxFor(MALLORY, 'carols');
+  return (!passed && out.status === 404) || `passed ${passed}, status ${out?.status}`;
+});
+
+await check('a thin history is reported as popularity, not dressed up as taste', async () => {
+  const out = recommend(
+    [{ appid: 1, popularity_rank: 2, tags: '["Survival"]' },
+     { appid: 2, popularity_rank: 1, tags: '["RPG"]' }],
+    [{ appid: 9, score: 8 }],                       // one rated game, below MIN_HISTORY
+    new Map([[9, ['Survival']]]),
+  );
+  return (out.basis === 'popularity' && out.games[0].appid === 2)
+    || `basis ${out.basis}, first ${out.games[0]?.appid}`;
+});
+
+await check('tags the group rates highly rank above tags it rates poorly', async () => {
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 9 },   // Survival: loved
+    { appid: 13, score: 3 }, { appid: 14, score: 3 },   // Racing: disliked
+    { appid: 15, score: 6 },
+  ];
+  const tagsFor = new Map([
+    [11, ['Survival']], [12, ['Survival']], [13, ['Racing']], [14, ['Racing']], [15, ['Puzzle']],
+  ]);
+  const out = recommend(
+    [{ appid: 1, name: 'a racer', review_count: 5e5, tags: '["Racing"]' },
+     { appid: 2, name: 'a survival game', review_count: 10, tags: '["Survival"]' }],
+    history, tagsFor,
+  );
+  // Note the review counts: the racer is far more popular, so this also asserts
+  // popularity cannot overturn a real taste signal.
+  return (out.basis === 'taste' && out.games[0].appid === 2 && out.games[0].why[0] === 'Survival')
+    || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
+});
+
+await check('a tag seen once is ignored, so one game cannot define a taste', async () => {
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 5 }, { appid: 13, score: 5 },
+    { appid: 14, score: 5 }, { appid: 15, score: 5 },
+  ];
+  const out = recommend(
+    [{ appid: 1, tags: '["Roguelike"]' }],
+    history,
+    new Map([[11, ['Roguelike']], [12, ['X']], [13, ['X']], [14, ['X']], [15, ['X']]]),
+  );
+  return out.games[0].fit === null || `scored a one-game tag: ${out.games[0].fit}`;
+});
+
+await check('the order never contradicts the fit it displays', async () => {
+  /* Popularity is a tiebreak, and it has to stay below the resolution of the number
+     the card shows. Unweighted it reordered real differences, producing a list whose
+     own fit column read 0.23, 0.23, 0.25, 0.23 — defensible internally and plainly
+     broken to look at. Review counts here span five orders of magnitude, which is
+     the full spread the popularity term ever sees. */
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 8 },
+    { appid: 14, score: 4 }, { appid: 15, score: 4 }, { appid: 16, score: 6 },
+  ];
+  const tagsFor = new Map([
+    [11, ['Survival', 'Crafting']], [12, ['Survival']], [13, ['Crafting']],
+    [14, ['Shooter']], [15, ['Shooter', 'Action']], [16, ['Action']],
+  ]);
+  const out = recommend([
+    { appid: 1, review_count: 10, tags: '["Survival","Crafting"]' },
+    { appid: 2, review_count: 2_000_000, tags: '["Survival"]' },
+    { appid: 3, review_count: 500, tags: '["Crafting","Action"]' },
+    { appid: 4, review_count: 900_000, tags: '["Shooter"]' },
+    { appid: 5, review_count: 50, tags: '["Shooter","Action"]' },
+  ], history, tagsFor);
+
+  const fits = out.games.map((g) => g.fit);
+  const bad = fits.findIndex((f, i) => i && f > fits[i - 1]);
+  return bad === -1 || `fit column is not descending: ${JSON.stringify(fits)}`;
+});
+
+await check('untasted candidates sort below every ranked one', async () => {
+  const history = [
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
+    { appid: 14, score: 5 }, { appid: 15, score: 5 },
+  ];
+  const out = recommend(
+    // The unknown game is hugely more popular, and must still lose to a match.
+    [{ appid: 1, review_count: 5e6, tags: '["Nothing We Have Played"]' },
+     { appid: 2, review_count: 1, tags: '["Survival"]' }],
+    history,
+    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Y']], [14, ['Y']], [15, ['Y']]]),
+  );
+  return out.games[0].appid === 2 || `popularity beat a taste match: first ${out.games[0]?.appid}`;
+});
+
+await check('the recommender only ever reads THIS group\'s ratings', async () => {
+  /* The tenancy invariant, at the level that matters for this route: another
+     group's ratings must not shape group 1's suggestions. Asserted against the real
+     handler rather than the pure function, because the group_id filter lives in the
+     SQL. Its own fixture group — group 2 is gone by now, deleted by the tests above.
+
+     One tag, on a game only the other group has rated, and rated high enough that
+     it would be group 1's top preference if it leaked at all. */
+  sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${DAN}','Dan')`);
+  sqlite.exec(`INSERT INTO groups (id, slug, name, max_players) VALUES (301,'dans','Dans Crew',4)`);
+  sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+               VALUES (301,'${DAN}','Dan','owner')`);
+  sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, is_coop, tags)
+               VALUES (9102,'Dans Favourite',1,1,'["Only Dan Likes This"]')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES (9100,301,'Dans Pick',9102)`);
+  sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (9100,'${DAN}',10)`);
+
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const d = await (await recommendRoute.onRequestGet({
+    request: recReq('?coopOnly=0'), env, data })).json();
+  const leaked = [...(d.likes || []), ...(d.dislikes || [])]
+    .some((l) => l.tag === 'Only Dan Likes This');
+
+  sqlite.exec('DELETE FROM ratings WHERE game_id=9100');
+  sqlite.exec('DELETE FROM games WHERE id=9100');
+  sqlite.exec('DELETE FROM coop_apps WHERE appid=9102');
+  return !leaked || 'another group\'s rating shaped group 1\'s tag preferences';
+});
+
+await check('the co-op filter is on by default and can be turned off', async () => {
+  sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, is_coop, tags)
+               VALUES (9101,'A PvP Shooter',1,0,'["PvP"]')`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const on = await (await recommendRoute.onRequestGet({ request: recReq(), env, data })).json();
+  const off = await (await recommendRoute.onRequestGet({ request: recReq('?coopOnly=0'), env, data })).json();
+  const has = (d) => (d.games || []).some((g) => g.appid === 9101);
+  sqlite.exec('DELETE FROM coop_apps WHERE appid=9101');
+  return (!has(on) && has(off)) || `default showed it: ${has(on)}; coopOnly=0 hid it: ${!has(off)}`;
+});
+
 console.log('\nScoring & viability');
 const { viability } = await import(path.join(SITE, 'lib/score.js'));
 

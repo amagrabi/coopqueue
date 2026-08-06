@@ -20,6 +20,7 @@ export async function onRequestGet({ env, data }) {
       name: data.group.name,
       maxPlayers: data.group.max_players,
       role: data.group.role,
+      blindRating: !!data.group.blind_rating,
       // Only an owner needs the code, and only they can rotate it.
       inviteCode: data.group.role === 'owner' ? data.group.invite_code : null,
     },
@@ -81,6 +82,14 @@ export async function onRequestPatch({ request, env, data }) {
     const cap = Number(patch.maxPlayers);
     if (!Number.isInteger(cap) || cap < 2 || cap > 64) return bad('group size must be 2–64');
     await env.DB.prepare('UPDATE groups SET max_players = ? WHERE id = ?').bind(cap, gid).run();
+  }
+
+  if (patch.blindRating != null) {
+    // A group rule, so owner-only: one member rating blind while the others see
+    // the numbers achieves nothing, which is why this is not a personal setting.
+    if (!isOwner) return bad('only the group owner can change blind rating', 403);
+    await env.DB.prepare('UPDATE groups SET blind_rating = ? WHERE id = ?')
+      .bind(patch.blindRating ? 1 : 0, gid).run();
   }
 
   if (patch.invite != null) {

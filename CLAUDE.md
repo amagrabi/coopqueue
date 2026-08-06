@@ -50,7 +50,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 33 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 93 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -62,7 +62,13 @@ node scripts/seed-player-caps.mjs --from migrations/002-coop-seed.sql \
 
 node scripts/validate-palette.mjs      # re-check player-colour separation (invariant 4)
 
-cd crawler && npx wrangler deploy      # the 15-min cron catalogue crawler
+# tags and the co-op flag (invariant 7). backfill reads Steam store pages, ~1.7s
+# apart; reclassify needs no network at all, it re-derives the flag from stored tags.
+node scripts/backfill-tags.mjs --out migrations/015-steam-tags.sql
+node scripts/backfill-tags.mjs --all   # re-read every row, not just untagged ones
+node scripts/reclassify-coop.mjs --out migrations/016-reclassify.sql
+
+cd crawler && npx wrangler deploy      # the hourly cron catalogue crawler
 cd crawler && npx wrangler tail        # watch cron runs live
 ```
 
@@ -104,14 +110,20 @@ clear 3:1 contrast against the `#1a1a19` surface. They do **not** all clear CVD
 separation from each other — measured, the worst pair is ΔE 2.2 under
 deuteranopia, so the palette is safe for a handful of series and not for eight.
 
-`SERIES` in `app.js` therefore hands them out in a non-numeric order chosen by
-exhaustive search, maximising the worst pairwise CIELAB ΔE across normal,
-deuteranopic and protanopic simulation, so that each prefix is the best available
-for that group size. Numeric order gave a four-person group blue/orange/aqua/
-yellow, where orange vs yellow is ΔE 33.9 normally but **9.2** under
-deuteranopia — two people whose columns looked identical to some readers. The
-current order scores 25.1 for four. Re-run that search before reordering or adding
-hues; do not pick by eye.
+`SERIES` in `app.js` therefore hands them out in a non-numeric order, currently
+blue / orange / magenta / green. Run `scripts/validate-palette.mjs` before
+reordering or adding hues; do not pick by eye. It reads `SERIES` straight out of
+`app.js`, because a second hardcoded copy of the order went stale once and had the
+validator cheerfully reporting on an assignment the site no longer used.
+
+**Optimising the worst case across all three vision types is not sufficient on its
+own**, and the script says so in its own output. That objective picks blue/orange/
+magenta/**red**: ΔE 25.1 at worst for a dichromat, but magenta vs red is only ΔE
+25.4 in *normal* vision, and "Leo and Pat are both red-ish" was the actual reported
+complaint. The live order keeps normal-vision separation high first (worst pair
+ΔE 52.3, and Leo vs Pat specifically is 119.8) and then takes the best CVD figure
+available under that constraint (ΔE 16.1, up from 9.2 for plain numeric order).
+Both numbers are printed; a change has to justify itself on both.
 
 **5. `public/vendor/hls.min.js` is the one vendored dependency — keep it that
 way, and keep it the FULL build.** "No dependencies at runtime" held until Steam
@@ -133,6 +145,32 @@ stored as a hint in `steam_apps.coop_categories` and deliberately never used as
 truth, because they are frequently wrong. Couch-only and one-copy games are not
 "blocked" — `viability()` returns `'workaround'` for them.
 
+**7. Steam user tags come from the store page HTML, via `parseStoreTags`, and they
+are the only usable signal for "is this co-op".** Three things were measured here
+and all three are load-bearing:
+
+- **Tags are in no Steam JSON API.** Not `appdetails`, not the search endpoint.
+  Only the `glance_tags` block on `store.steampowered.com/app/<id>/`. `genres` is
+  no substitute — 235 of 337 catalogue rows are simply "Action".
+- **SteamSpy is not a viable source**, despite publishing the same tags as clean
+  JSON. It had tags for 219 of 337 rows and returned `tags: []` for **all 118** of
+  the rest, which are overwhelmingly the unreleased and newly released games
+  (ARC Raiders, Borderlands 4, Grounded 2, Overwatch) — precisely the rows a
+  catalogue with a recent-releases crawl keeps acquiring. Steam's own page has tags
+  for every one of them.
+- **`is_coop` is set by EXCLUDING PvP genres, never by requiring a co-op tag.**
+  `classifyCoop` in `lib/coop.js` carries the numbers; the short version is that
+  requiring a co-op tag hid 20 of 42 games this group demonstrably plays together
+  (Terraria, Stardew Valley, Elden Ring, Baldur's Gate 3), because 24% of real
+  co-op games carry no co-op tag at all. Excluding PvP hid 2, both genuinely PvP.
+  Steam's categories cannot help: Apex Legends, Euro Truck Simulator 2 and Terraria
+  all report exactly `['Multi-player', 'Co-op', 'Online Co-op']`.
+
+The window is the top **6** tags. Untagged rows (`is_coop IS NULL`) stay *visible*
+under the co-op filter — hiding them would empty a freshly crawled catalogue — so a
+row with no tag block must be left NULL rather than recorded as "no tags", or the
+crawler will never retry it.
+
 ## Architecture notes
 
 - **Sessions** are HMAC-SHA256-signed cookies (`lib/auth.js`), 90-day expiry, no
@@ -148,7 +186,14 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
   played good games and may hand the next one a 4, and the number was impossible
   to reconstruct from the column beside it. `n` is surfaced instead, so thin
   evidence is visible rather than silently discounted. `calibrate()` survives but
-  only *describes* people on the Stats page — it decides no ranking.
+  only *describes* people on the Stats page — it decides no ranking, and the
+  library payload no longer calls it at all.
+
+  Two knock-on effects of that removal, both easy to miss: the Library score filter
+  now offers **9+**, because a plain average reaches the top of the scale (group 1's
+  best game is 9.5) where the shrunk score topped out around 8.8 and made 9+ come
+  back permanently empty; and the landing page no longer advertises calibration,
+  which it went on describing for a while after the feature was gone.
 - **Seed identities** are rows like `seed:1:ama` in both `users` and
   `memberships` with `is_seed = 1`. `claim.js` repoints their ratings onto a real
   SteamID64 and deletes the placeholder. Order matters in that batch: the real
@@ -222,6 +267,23 @@ truth, because they are frequently wrong. Couch-only and one-copy games are not
   of secrets, so it boots without `SESSION_SECRET` and reports success anyway.
   `scripts/setup.mjs` now pins `--branch main`; do the same for any manual deploy
   from a feature branch, or use `npm run deploy` from `main`.
+- **A single `SELECT` of every `tags` column is too big for the D1 HTTP API.** It
+  fails with a Cloudflare API error rather than a truncated result.
+  `scripts/reclassify-coop.mjs` chunks on `appid % N` for that reason.
+- **A store page served without cookies is an age gate, and an age gate has no
+  tags.** `STORE_HEADERS` sends `birthtime=0; mature_content=1`. Without it the
+  affected games silently come back untagged rather than erroring.
+- **Do not extract the tag block with a lazy `[\s\S]*?</div>`.** `glance_tags` first
+  matches the wrapper, and the nearest `</div>` closes the *label* div that precedes
+  every anchor — so the match is a window containing no tags at all, and the parse
+  returns empty for every game. `parseStoreTags` anchors on
+  `class="glance_tags popular_tags"` and takes a fixed byte window instead.
+- **A tiebreak has to be smaller than the number it is displayed beside.** The
+  recommender's popularity term originally spanned 0.14–0.50 against fit values of
+  roughly ±0.4, so it silently reordered genuine matches and the visible fit column
+  read 0.23, 0.23, 0.25, 0.23. See `POP_WEIGHT`.
+- **`wrangler d1 execute --json` prints human-readable preamble before the JSON.**
+  Every script here slices from the first `[` rather than parsing the whole stream.
 
 ## State
 
@@ -234,7 +296,7 @@ session support. `ALLOWED_STEAM_IDS` is unset, so anyone can sign in and create
 their own groups.
 
 A second Worker, **`coopq-crawler`** (`crawler/`), binds the same D1 and keeps the
-catalogue fresh on a 15-minute Cron Trigger. It is a Worker and not a Pages
+catalogue fresh on an hourly Cron Trigger. It is a Worker and not a Pages
 Function because **Pages Functions cannot carry Cron Triggers**. Registering any
 cron also requires the account to have a workers.dev subdomain, which is created
 by opening the Workers page in the dashboard once — until that happens the script
@@ -246,7 +308,10 @@ repointed). Leo (48), Pat (82) and Dave (25) are still unclaimed seeds, but each
 now has a `seed_assignments` row (migration 007), so they will be claimed
 automatically the first time they sign in — no prompt.
 
-The catalogue holds 337 games with real review counts. The crawler re-ranks only
+The catalogue holds 337 games with real review counts, **all 337 tagged** from
+Steam store pages, of which 9 classify as PvP-primary and are hidden by the default
+co-op filter: Rainbow Six Siege, Apex Legends, Marvel Rivals, Overwatch, THE FINALS,
+SMITE 2, Enlisted, F1 25 and PvZ Garden Warfare 2. The crawler re-ranks only
 once every row has a `review_count`; a handful are still NULL, so the seeded ranks
 stand until the cron fills them in, then re-ranking takes over by itself. `/enrich`
 has been run to completion: **87 of 114 games linked, all 87 with a trailer and
@@ -262,7 +327,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-22/22 tenancy assertions pass. `npm run test:ui` does **not** run on macOS: it
+93/93 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -292,9 +357,10 @@ pre-filled because its 114 games already are the pool.
 
 Mapping onto what exists: `games` is already per-group with
 `UNIQUE (group_id, steam_appid)`, so **it is the pool** — no new group-scoped
-table, and the tenancy boundary is untouched. What is missing is the global side,
-one table alongside `steam_apps`: `coop_apps(appid PK, name, popularity_rank,
-review_count, release_date, type, coop_categories, verified_max_players)`.
+table, and the tenancy boundary is untouched. The global side is `coop_apps`,
+alongside `steam_apps` (**built**; see `schema.sql` for the columns it actually
+has, which now include `tags`, `is_coop` and `release_ts` that this plan did not
+anticipate — the cap column is `max_players`, not `verified_max_players`).
 
 Discovery works, with three traps that `scripts/crawl-coop.mjs` exists to handle.
 All three were measured against live Steam, not assumed:
@@ -329,9 +395,12 @@ than from memory. Extending it is a one-line edit per game. Ambiguous games
 `max_players` and the nuance in `coop_note`; genuinely unclear ones are left out.
 
 Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/add
-UI (**done**) → crawl cron → Steam playtime/achievements → recent-releases button
-→ comments. Note the Steam stats step depends on every member setting Steam
-privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
+UI (**done**) → crawl cron (**done**, hourly) → Steam playtime (**done**) /
+achievements → recent-releases button (**done** — the crawler's second discovery
+pass) → comments (**done**). Note the Steam stats step depends on every member
+setting Steam privacy → *Game details* to Public, **and** unticking the separate
+"always keep my total playtime private"; `GetOwnedGames` returns an empty list for
+the first and a full list of zeroes for the second.
 
 ## Backups and data safety
 
@@ -355,14 +424,24 @@ privacy → *Game details* to Public; `GetOwnedGames` returns nothing otherwise.
    games/group) enforced in application code.
 2. **Scheduled D1 backups.** A cron trigger running `d1 export`. Free tier has no
    automatic backups; losing the database means losing everything.
-3. **Steam playtime + achievement sync.** `IPlayerService/GetOwnedGames` and
-   `ISteamUserStats/GetPlayerAchievements`, keyed on the SteamID64s already
-   stored. Would make `hours` real instead of hand-typed, and enables a
-   "who already owns this" badge.
-4. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
+3. **Verified player caps, at scale.** Only **55 of 337** catalogue rows have one,
+   so most cards read "player count unverified" and the "only ones we can all play"
+   filter excludes them — correctly, per invariant 6, but it makes the filter look
+   broken. Steam genuinely does not publish a co-op player cap anywhere
+   machine-readable: `categories` is the closest thing and it is a yes/no, which is
+   why the crawler deliberately never writes `max_players`. **IGDB** is the
+   candidate: its `multiplayer_modes.onlinecoopmax` is exactly this number, and the
+   API is free with Twitch developer credentials (client id + secret, which the
+   owner has to create — nobody has verified its coverage against this catalogue
+   yet). Failing that, `scripts/seed-player-caps.mjs` is a hand-curated list and
+   extending it is one line per game.
+4. **Achievement sync.** `ISteamUserStats/GetPlayerAchievements`, keyed on the
+   SteamID64s already stored. Playtime sync is done (see Group hours); this would
+   add a "who already owns this" badge and completion figures.
+5. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
    group has members. Rating coverage is the app's core problem — in the original
    spreadsheet it ranged from 89% to 27% per person.
-5. **Public read-only group pages.** Also the cheapest growth loop the site has.
+6. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
 ## Group hours
 
@@ -410,6 +489,50 @@ almost nobody has open.
 Ten assertions cover it, four of them the attacks that matter: commenting on,
 reading, and deleting another group's thread by guessing a game id, and that the
 thread never returns a foreign row.
+
+## Blind rating
+
+`groups.blind_rating` (migration 013) hides everyone else's scores in the rating
+queue until you have voted. It is a **group** setting, owner-only, and not a
+personal preference — one person rating blind while the others see the numbers
+achieves nothing, so a per-person toggle would be a setting that does not do what
+its name says. Default off. Three assertions: the default, the owner can set it, and
+a plain member gets 403 with the column unchanged.
+
+## Recommendations, and the co-op filter
+
+"Recommended for us" is the default sort on **Find new games**. The ranking is
+`lib/recommend.js` — a pure function, shared with `test/harness.mjs` so the local
+ordering is the shipped ordering — behind
+`functions/api/g/[slug]/recommend.js`.
+
+**Why it is a separate route and not `sort=fit` on `/api/coop`.** The catalogue
+endpoint is deliberately group-blind: no slug, no membership read, nothing
+group-scoped, asserted by two tests. Ranking needs the group's ratings, so it has
+to sit *below* the tenancy boundary. Bolting it onto `/api/coop` would put library
+data behind an endpoint with no tenancy check at all. Both routes select
+`CATALOGUE_COLS` and apply the same filters, so the card shape and the eligible set
+do not change when you switch sort order.
+
+How it ranks: per-tag preference is the group's mean score for library games
+carrying that tag minus the group's overall mean, shrunk by `n/(n+3)`. Tags seen
+fewer than twice are dropped, so one game cannot invent a taste. Below five rated
+games it does not pretend — it returns `basis: 'popularity'` and the UI says so.
+The response carries `why` (the two tags that drove each card), `likes` and
+`dislikes`, and the UI shows all of them: a list labelled "recommended" that will
+not say why is asking for trust it has not earned.
+
+**`POP_WEIGHT` is 0.02 and the magnitude is load-bearing.** Raw
+`1/log10(10 + reviews)` spans ~0.14–0.50 while fit spans roughly ±0.4, so
+unweighted it does not break ties, it reorders real ones — the first run produced a
+list whose own fit column read 0.23, 0.23, 0.25, 0.23. At 0.02 the term stays below
+the resolution of the fit the card displays, so visible fit always wins and
+popularity only separates games that look equally good. An assertion checks the
+displayed column is descending.
+
+The **Co-op only** toggle is on by default and filters on `is_coop` — see invariant
+7 for why that flag is computed by excluding PvP genres, and why untagged rows stay
+visible rather than being hidden.
 
 ## Archiving, not deleting
 

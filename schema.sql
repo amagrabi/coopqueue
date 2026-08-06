@@ -38,6 +38,10 @@ CREATE TABLE groups (
   name         TEXT NOT NULL,
   invite_code  TEXT UNIQUE,                   -- NULL disables joining by link
   max_players  INTEGER NOT NULL DEFAULT 4,    -- the group's own co-op headcount
+  -- Owner-set: hide everyone's ratings from each other while rating, so nobody is
+  -- anchored. A group rule rather than a personal preference, because one person
+  -- rating blind while the rest see the numbers achieves nothing.
+  blind_rating INTEGER NOT NULL DEFAULT 0,
   created_by   TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
   created_at   INTEGER NOT NULL DEFAULT (unixepoch())
 );
@@ -91,6 +95,14 @@ CREATE TABLE coop_apps (
   release_ts        INTEGER,          -- parsed epoch seconds; sorting the string is NOT chronological
   metacritic        INTEGER,
   coop_categories   TEXT,             -- JSON array of Steam's co-op tags: a HINT
+  -- Steam user tags, most-voted first, scraped off the store page — they are in no
+  -- Steam JSON API, and `genre` is too coarse to substitute (235 of 337 rows are
+  -- "Action"). These are what the Recommended sort matches against a group's taste.
+  tags              TEXT,             -- JSON array of tag names
+  -- 0 only for games whose top tags are a PvP genre. Requiring a co-op tag instead
+  -- was measured wrong: 24% of real co-op games carry none. See lib/coop.js.
+  is_coop           INTEGER,
+  tags_at           INTEGER,
   max_players       INTEGER,          -- verified online co-op cap; NULL = unknown
   max_players_src   TEXT,             -- provenance; NULL means nobody checked
   coop_note         TEXT,

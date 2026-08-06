@@ -1,5 +1,5 @@
 import { json, bad, body } from '../../../../../lib/http.js';
-import { calibrate, globalStats, scoreGame, viability } from '../../../../../lib/score.js';
+import { globalStats, scoreGame, viability } from '../../../../../lib/score.js';
 import { getAppDetails, parseAppId, searchStore } from '../../../../../lib/steam.js';
 
 /**
@@ -34,7 +34,8 @@ export async function onRequestGet({ env, data }) {
   ]);
 
   const ratings = ratingsRes.results || [];
-  const cal = calibrate(ratings);
+  // No calibrate() here: the library shows the plain average. Per-person baselines
+  // are only used to *describe* raters on the Stats page, which computes its own.
   const glob = globalStats(ratings);
 
   const byGame = new Map();
@@ -58,7 +59,10 @@ export async function onRequestGet({ env, data }) {
   return json({
     games,
     members: membersRes.results || [],
-    group: { slug: data.group.slug, name: data.group.name, maxPlayers: need, role: data.group.role },
+    group: {
+      slug: data.group.slug, name: data.group.name, maxPlayers: need, role: data.group.role,
+      blindRating: !!data.group.blind_rating,
+    },
     model: { mean: Math.round(glob.mean * 100) / 100, sd: Math.round(glob.sd * 100) / 100 },
   });
 }

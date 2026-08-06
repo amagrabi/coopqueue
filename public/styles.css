@@ -330,8 +330,26 @@ td.miss { color: #4a4a47; }
   font-size: 12.5px; color: var(--text-muted); margin: 9px 0 0; line-height: 1.45;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Why a recommendation ranked where it did. Not clamped like the description
+   above — it is one short line by construction (two tags at most). The
+   descendant selector is load-bearing: `.browse-body p` would otherwise win on
+   specificity and reapply the line-clamp. */
+.browse-body .browse-fit {
+  font-size: 12px; color: var(--series-3); margin: 9px 0 0; line-height: 1.4;
+  display: block; overflow: visible;
+}
 .browse-act { padding: 12px 14px; display: flex; justify-content: flex-end; align-items: center; }
 .browse-foot { display: flex; justify-content: center; margin-top: 18px; }
+
+/* The ranking's own explanation, above the grid. */
+.browse-why {
+  font-size: 13px; color: var(--text-muted); line-height: 1.9;
+  margin: 10px 0 0; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+}
+/* A tag and its score are one unit. Without this, "Third-Person Shooter -0.34"
+   breaks across two lines mid-chip, borders and all. */
+.browse-why .chip { white-space: nowrap; }
 
 /* Secondary text inside a bar label, e.g. the raw 25/114 behind a percentage. */
 .bar-sub { color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -596,3 +614,10 @@ tr.is-archived td { opacity: .55; }
 /* An estimate is visually distinct from a number somebody typed. */
 .est { color: var(--text-muted); border-bottom: 1px dotted var(--baseline); cursor: help; }
 .pt-fix { display: block; margin-top: 3px; }
+
+/* A one-line kicker above the headline: someone landing here cold should know
+   what kind of product this is before reading a sentence. */
+.hero-kicker {
+  margin: 0 0 10px; font-size: 13px; font-weight: 650; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--series-1);
+}

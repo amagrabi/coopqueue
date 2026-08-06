@@ -23,16 +23,26 @@ const state = {
 /* Fixed categorical slots, assigned by position in the member list. Colour
    follows the person, never their rank, so filtering never repaints anyone.
 
-   The ORDER is not 1..8 and that is the point. Taking the palette in numeric
-   order gave a four-person group blue/orange/aqua/yellow, and orange vs yellow
-   measures ΔE 33.9 to normal vision but only 9.2 under deuteranopia — which is
-   why they read as the same colour to some people. This order was picked by
-   exhaustive search over the eight validated hues, maximising the worst pairwise
-   CIELAB ΔE across normal, deuteranopic and protanopic simulation, so that every
-   prefix is the best available for that group size. Four people now get a worst
-   pair of ΔE 25.1 instead of 9.2. Re-run the search before reordering. */
-const SERIES = ['var(--series-1)', 'var(--series-4)', 'var(--series-5)', 'var(--series-8)',
-                'var(--series-2)', 'var(--series-6)', 'var(--series-3)', 'var(--series-7)'];
+   The order is chosen by scripts/validate-palette.mjs, and it has been revised
+   twice for reasons worth keeping:
+
+   1. Numeric order gave a four-person group blue/orange/aqua/yellow. Orange vs
+      yellow is ΔE 34 to normal vision but only 9 under deuteranopia — two
+      columns that read identically to some people.
+   2. Fixing that by maximising the worst ΔE across all three vision conditions
+      picked blue/yellow/magenta/red, whose weakest pair scored 25 under every
+      condition — including normal vision, where magenta vs red is only ΔE 25.
+      Balanced for colour blindness, too alike for everyone else.
+
+   This order optimises the worst *normal-vision* pair while holding the
+   colour-blind floor above ~15: blue/orange/magenta/green scores ΔE 52 normal,
+   16 deuteranopic, 17 protanopic. Double the sighted separation of the previous
+   order for an acceptable CVD cost.
+
+   Violet was tried for the third slot and is measurably worse, not better: it
+   collapses against blue under protanopia at ΔE 2. */
+const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-5)', 'var(--series-6)',
+                'var(--series-4)', 'var(--series-8)', 'var(--series-3)', 'var(--series-7)'];
 const colorOf = (steamId) => {
   const i = state.members.findIndex((m) => m.steam_id === steamId);
   return i >= 0 && i < SERIES.length ? SERIES[i] : 'var(--text-muted)';
@@ -85,25 +95,6 @@ const when = (epoch) => {
 /** 1029444 -> "1.0M". Steam review counts run to seven figures. */
 const compact = (n) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : String(n);
-
-/**
- * Personal display preferences. Deliberately localStorage rather than a column:
- * these change nothing anyone else can see and are worthless to sync, so they do
- * not deserve a schema, a migration or a round-trip. Keyed per account so a
- * shared browser does not leak one person's preference to another.
- */
-const PREF_DEFAULTS = { hideOthers: false };
-const prefKey = () => `coopq:prefs:${state.me?.steamId || 'anon'}`;
-let prefs = { ...PREF_DEFAULTS };
-
-function loadPrefs() {
-  try { prefs = { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(prefKey()) || '{}') }; }
-  catch { prefs = { ...PREF_DEFAULTS }; }
-}
-function savePrefs(patch) {
-  prefs = { ...prefs, ...patch };
-  try { localStorage.setItem(prefKey(), JSON.stringify(prefs)); } catch { /* private mode */ }
-}
 
 /**
  * Trailer playback. Steam retired progressive mp4s, so `trailer_url` is now
@@ -184,7 +175,6 @@ async function boot() {
 
   state.me = me.user;
   state.groups = me.groups;
-  loadPrefs();   // keyed on the account, so only valid once state.me is set
 
   // Arrived via an invite link.
   const join = params.get('join');
@@ -410,6 +400,7 @@ function wireOnce() {
   });
   $('#browse-sort').addEventListener('change', () => renderBrowse(true));
   $('#browse-fits').addEventListener('change', () => renderBrowse(true));
+  $('#browse-coop').addEventListener('change', () => renderBrowse(true));
   // Re-render only; the server result is unchanged, this filter is client-side.
   $('#browse-hide-owned').addEventListener('change', () => renderBrowse(false));
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
@@ -569,7 +560,7 @@ function renderQueue() {
   $('#rate-notes').textContent = caveat;
 
   const others = Object.entries(g.votes).filter(([id]) => id !== state.me.steamId);
-  if (prefs.hideOthers) {
+  if (state.group.blindRating) {
     // Say that opinions exist without revealing them, so the queue still tells
     // you whether you are the first to look at this.
     $('#rate-others').innerHTML = `<span class="other-vote" style="color:var(--text-muted)">${
@@ -587,7 +578,7 @@ function renderQueue() {
   // The slider normally opens on the group's current average, which is a second
   // and less obvious source of anchoring: hiding the numbers but still starting
   // the handle on them would defeat the point. Neutral 7.5 when hidden.
-  const start = (others.length && !prefs.hideOthers) ? Math.round(g.raw * 2) / 2 : 7.5;
+  const start = (others.length && !state.group.blindRating) ? Math.round(g.raw * 2) / 2 : 7.5;
   $('#score-range').value = start;
   $('#score-out').textContent = fmt(start, 1);
 }
@@ -1056,13 +1047,16 @@ async function renderMembers() {
     </div>` : ''}
 
     <hr class="settings-rule">
-    <label class="toggle" for="s-hide-others">
-      <input type="checkbox" id="s-hide-others" ${prefs.hideOthers ? 'checked' : ''}>
-      Hide everyone else's ratings while I rate
+    <label class="toggle" for="s-blind">
+      <input type="checkbox" id="s-blind" ${d.group.blindRating ? 'checked' : ''} ${isOwner ? '' : 'disabled'}>
+      Everyone rates blind
     </label>
-    <p class="field-help">Only affects you, and applies immediately — nothing to save.
-      Also stops the slider from opening on the group's current average, which
-      anchors you just as much as seeing the numbers.</p>`;
+    <p class="field-help">${isOwner
+      ? 'Hides everyone\'s ratings from each other while rating, for the whole group, and stops the '
+        + 'slider opening on the current average — which anchors just as much as seeing the numbers. '
+        + 'Applies immediately.'
+      : 'Only the group owner can change this. It applies to everyone, because one person rating '
+        + 'blind while the rest see the numbers achieves nothing.'}</p>`;
 
   if (isOwner) $('#s-delete').addEventListener('click', async () => {
     const typed = $('#s-del-name').value.trim();
@@ -1088,10 +1082,13 @@ async function renderMembers() {
   renderPlaytime();
   $('#pt-sync').addEventListener('click', syncPlaytime);
 
-  $('#s-hide-others').addEventListener('change', (e) => {
-    savePrefs({ hideOthers: e.target.checked });
-    toast(e.target.checked ? "Others' ratings hidden while you rate" : "Others' ratings visible again");
-    if (state.view === 'queue') renderQueue();
+  if (isOwner) $('#s-blind').addEventListener('change', async (e) => {
+    try {
+      await gapi('/members', { method: 'PATCH', body: { blindRating: e.target.checked } });
+      await loadGroup();
+      toast(e.target.checked ? 'Everyone now rates blind' : 'Ratings visible to everyone again');
+      if (state.view === 'queue') renderQueue();
+    } catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
   });
 
   $('#s-save').addEventListener('click', async () => {
@@ -1287,11 +1284,18 @@ async function renderBrowse(reset) {
   const params = new URLSearchParams({ page: String(browse.page), sort });
   if (q) params.set('q', q);
   if (minPlayers) params.set('minPlayers', String(minPlayers));
+  if (!$('#browse-coop').checked) params.set('coopOnly', '0');
 
   const seq = ++browseSeq;
   $('#browse-status').textContent = browse.page ? 'Loading more…' : 'Loading catalogue…';
   let d;
-  try { d = await api(`/api/coop?${params}`); }
+  try {
+    /* Two endpoints, one grid. Ranking by taste needs the group's ratings, so it
+       has to come from below the tenancy boundary; /api/coop is deliberately
+       group-blind and stays that way. Same card shape from both — they share
+       CATALOGUE_COLS — so only the URL differs here. */
+    d = sort === 'fit' ? await gapi(`/recommend?${params}`) : await api(`/api/coop?${params}`);
+  }
   catch (e) {
     if (seq === browseSeq) $('#browse-status').textContent = e.message;
     return;
@@ -1326,6 +1330,26 @@ async function renderBrowse(reset) {
     `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}`
     + (hiddenCount ? `, ${hiddenCount} on this page already in your library` : '') + '.';
 
+  /* Say what the ranking is doing. A list claiming to be "recommended" without
+     showing its reasoning asks people to trust a number they cannot check — and
+     when the group has barely rated anything, the honest answer is that this is
+     just the popularity order. */
+  const why = $('#browse-why');
+  if (sort !== 'fit') why.hidden = true;
+  else if (d.basis === 'popularity') {
+    why.hidden = false;
+    why.textContent = `Not enough ratings yet to tell what this group likes `
+      + `(${d.ratedGames} of ${d.needed} games rated) — showing the most popular instead.`;
+  } else {
+    why.hidden = false;
+    const chips = (list, cls) => (list || [])
+      .map((t) => `<span class="chip ${cls}">${esc(t.tag)} ${t.points > 0 ? '+' : ''}${t.points}</span>`)
+      .join('');
+    why.innerHTML = `Ranked against ${d.ratedGames} games you have rated. `
+      + `This group rates these higher than its own average: ${chips(d.likes, 'chip-good') || '—'}`
+      + (d.dislikes?.length ? ` and lower: ${chips(d.dislikes, 'chip-bad')}` : '');
+  }
+
   if (!shown.length) {
     $('#browse-grid').innerHTML = '';
     $('#browse-status').textContent = hideOwned
@@ -1351,6 +1375,9 @@ async function renderBrowse(reset) {
             ${g.price ? `<span class="chip">${esc(g.price)}</span>` : ''}
             ${g.review_hint ? `<span class="chip">${esc(g.review_hint)}</span>` : ''}
           </div>
+          ${g.why?.length
+            ? `<p class="browse-fit">Matches your taste for ${g.why.map(esc).join(' and ')}</p>`
+            : ''}
           ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
         </div>
         <div class="browse-act">

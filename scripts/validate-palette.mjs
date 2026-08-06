@@ -1,6 +1,11 @@
 // Which 4 of the 8 validated --series-* colours are most separable, for normal
 // vision AND for the two common colour-vision deficiencies?
 // CIELAB ΔE76 + Viénot(1999) dichromat simulation in linear RGB.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const SERIES = {
   1: '#3987e5', 2: '#d95926', 3: '#199e70', 4: '#c98500',
@@ -66,14 +71,31 @@ const worstPair = (set) => {
   return { worst, pair };
 };
 
-console.log('CURRENT first-four assignment (members sort alphabetically):');
-const current = ['1', '2', '3', '4'];
+/* Read the live order out of public/app.js rather than restating it here. A second
+   copy of it silently went stale once already, and a validator reporting on an
+   assignment the site does not use is worse than no validator. */
+const appJs = fs.readFileSync(path.join(here, '..', 'public', 'app.js'), 'utf8');
+const block = /const SERIES = \[([\s\S]*?)\];/.exec(appJs);
+if (!block) throw new Error('could not find SERIES in public/app.js');
+const live = [...block[1].matchAll(/--series-(\d)/g)].map((m) => m[1]);
+
+console.log(`LIVE order from public/app.js: ${live.map((k) => NAME[k]).join(', ')}`);
+console.log('\nCURRENT first-four assignment (members sort alphabetically):');
+const current = live.slice(0, 4);
 const cw = worstPair(current);
 console.log('  ', current.map((k) => NAME[k]).join(', '));
 console.log(`   worst pair: ${NAME[cw.pair[0]]} vs ${NAME[cw.pair[1]]} = ΔE ${cw.worst.toFixed(1)} (${cw.pair[2]})`);
-console.log('   Dave=orange vs Pat=yellow specifically:');
+// Slots 3 and 4 are the ones that collided in this group: Leo and Pat.
+console.log(`   3rd (${NAME[current[2]]}) vs 4th (${NAME[current[3]]}) specifically:`);
 for (const kind of ['normal', 'deuteranopia', 'protanopia']) {
-  console.log(`     ${kind.padEnd(13)} ΔE ${dE(lab[kind]['2'], lab[kind]['4']).toFixed(1)}`);
+  console.log(`     ${kind.padEnd(13)} ΔE ${dE(lab[kind][current[2]], lab[kind][current[3]]).toFixed(1)}`);
+}
+console.log('\n   every pair in the live first four, normal vision:');
+for (let i = 0; i < 4; i++) {
+  for (let j = i + 1; j < 4; j++) {
+    console.log(`     ${NAME[current[i]].padEnd(8)} vs ${NAME[current[j]].padEnd(8)}`
+      + ` ΔE ${dE(lab.normal[current[i]], lab.normal[current[j]]).toFixed(1)}`);
+  }
 }
 
 // Exhaustive search over 4-subsets, maximising the worst pairwise ΔE.
@@ -87,10 +109,34 @@ for (let a = 0; a < keys.length; a++)
      const w = worstPair(set);
      if (!best || w.worst > best.w.worst) best = { set, w };
    }
-console.log('\nBEST 4-subset of the existing validated palette:');
+console.log('\nBEST 4-subset by worst-case-across-all-vision-types:');
 console.log('  ', best.set.map((k) => `series-${k} (${NAME[k]})`).join(', '));
 console.log(`   worst pair: ${NAME[best.w.pair[0]]} vs ${NAME[best.w.pair[1]]} = ΔE ${best.w.worst.toFixed(1)} (${best.w.pair[2]})`);
-console.log(`   improvement over current: ΔE ${cw.worst.toFixed(1)} -> ${best.w.worst.toFixed(1)}`);
+console.log(`   vs live order: ΔE ${cw.worst.toFixed(1)} -> ${best.w.worst.toFixed(1)}`);
+
+/* Do NOT adopt that subset without reading this.
+   Maximising the worst case across all three vision types is the wrong objective on
+   its own, and it has already misled once. It picks magenta AND red, which are far
+   apart to a dichromat and both plainly "reddish" to everyone else — which was the
+   actual reported complaint ("Leo and Pat look too similar, both red-ish"). The live
+   order is chosen to keep normal-vision separation high first, then take the best
+   CVD worst case available under that constraint. Both numbers are printed so a
+   future change has to look at both. */
+const worstNormal = (set) => {
+  let w = Infinity, p = null;
+  for (let i = 0; i < set.length; i++) {
+    for (let j = i + 1; j < set.length; j++) {
+      const d = dE(lab.normal[set[i]], lab.normal[set[j]]);
+      if (d < w) { w = d; p = [set[i], set[j]]; }
+    }
+  }
+  return { w, p };
+};
+const bn = worstNormal(best.set);
+const ln = worstNormal(current);
+console.log(`   but in NORMAL vision its closest pair is ${NAME[bn.p[0]]} vs ${NAME[bn.p[1]]}`
+  + ` at ΔE ${bn.w.toFixed(1)}, against ${ln.w.toFixed(1)} for the live order`);
+console.log('   -> the live order is deliberately not this subset. See the note here.');
 
 // Also report a robust order for up to 8, greedily maximising min distance.
 const order = ['1'];

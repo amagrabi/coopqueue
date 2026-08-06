@@ -23,12 +23,12 @@
  * human-verified (invariant 6) and a crawl must not flatten them.
  */
 import {
-  UA, searchUrl, detailsUrl, reviewsUrl,
-  parseSearchItems, shapeDetails, parseReviews, OBVIOUS_NON_GAME,
+  UA, searchUrl, detailsUrl, reviewsUrl, storeTagsUrl, STORE_HEADERS,
+  parseSearchItems, shapeDetails, parseReviews, parseStoreTags, OBVIOUS_NON_GAME,
 } from '../lib/coop.js';
 
-/** Games refreshed per run. 2 subrequests each, +2 for discovery. Cap is 50. */
-const BATCH = 13;
+/** Games refreshed per run. 3 subrequests each, +2 for discovery. Cap is 50. */
+const BATCH = 9;
 /** Search pages to rotate through for discovery, one per run. */
 const DISCOVERY_PAGES = 8;
 /** Below this many reviews a game is abandoned shovelware; not worth listing. */
@@ -59,6 +59,13 @@ async function getJson(url) {
   const r = await fetch(url, { headers: UA });
   if (!r.ok) return null;
   return r.json().catch(() => null);
+}
+
+/** Store-page HTML, for the tags that exist nowhere in Steam's JSON APIs. */
+async function getStoreHtml(url) {
+  const r = await fetch(url, { headers: STORE_HEADERS, redirect: 'follow' });
+  if (!r.ok) return null;
+  return r.text().catch(() => null);
 }
 
 /**
@@ -144,6 +151,7 @@ async function upsert(db, appid, out, floor = MIN_REVIEWS) {
 
   const reviews = parseReviews(await getJson(reviewsUrl(appid)));
   out.subrequests++;
+
   const total = reviews?.total ?? 0;
   if (total < floor) {
     out.thin++;
@@ -152,24 +160,43 @@ async function upsert(db, appid, out, floor = MIN_REVIEWS) {
     return false;
   }
 
+  /* Steam user tags, read off the store page. Steam's own genre is too coarse to
+     sort or recommend on — most of a co-op catalogue is simply "Action" — and tags
+     appear in no Steam JSON API. SteamSpy publishes them as JSON but had nothing
+     for any of the 118 newest rows in this catalogue; see lib/coop.js.
+
+     Deliberately after the review floor: this is a ~200KB page, and a game about to
+     be dropped for being too thin should not cost a subrequest to describe. */
+  const tags = parseStoreTags(await getStoreHtml(storeTagsUrl(appid)));
+  out.subrequests++;
+  if (tags) out.tagged = (out.tagged || 0) + 1;
+
   // popularity_rank is recomputed table-wide after the batch, not here — a rank
   // is a position among all rows and cannot be known from one game.
   await db.prepare(
     `INSERT INTO coop_apps (appid, name, review_count, review_hint, header_image,
                             short_description, genre, price, release_date, release_ts,
-                            metacritic, coop_categories, crawled_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,unixepoch())
+                            metacritic, coop_categories, tags, is_coop, tags_at, crawled_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,unixepoch())
      ON CONFLICT(appid) DO UPDATE SET
        name = excluded.name, review_count = excluded.review_count,
        review_hint = excluded.review_hint, header_image = excluded.header_image,
        short_description = excluded.short_description, genre = excluded.genre,
        price = excluded.price, release_date = excluded.release_date,
        release_ts = excluded.release_ts, metacritic = excluded.metacritic,
-       coop_categories = excluded.coop_categories, crawled_at = unixepoch()`
+       coop_categories = excluded.coop_categories,
+       -- Keep whatever tags we already had if SteamSpy did not answer this time.
+       tags = COALESCE(excluded.tags, coop_apps.tags),
+       is_coop = COALESCE(excluded.is_coop, coop_apps.is_coop),
+       tags_at = COALESCE(excluded.tags_at, coop_apps.tags_at),
+       crawled_at = unixepoch()`
   ).bind(
     appid, shaped.name, total, reviews?.desc ?? null, shaped.header_image,
     shaped.short_description, shaped.genre, shaped.price, shaped.release_date,
-    shaped.release_ts, shaped.metacritic, JSON.stringify(shaped.coop_categories || [])
+    shaped.release_ts, shaped.metacritic, JSON.stringify(shaped.coop_categories || []),
+    tags ? JSON.stringify(tags.tags) : null,
+    tags ? (tags.isCoop ? 1 : 0) : null,
+    tags ? Math.floor(Date.now() / 1000) : null
   ).run();
   return true;
 }
