@@ -56,77 +56,96 @@ treated as the truth, because they routinely are not.
 
 ---
 
+## Accounts and login
+
+**There is no registration.** No email, no password, no confirmation link —
+nothing to store and nothing to reset. Everyone signs in with **Steam OpenID**,
+which is free, needs no approval from Valve, and is the same "Sign in through
+Steam" flow people already know from Humble Bundle and SteamDB.
+
+What actually happens on first sign-in:
+
+1. The person clicks *Sign in through Steam* and lands on Valve's own login
+   page. They type their Steam password **on steamcommunity.com**, never here —
+   this site never sees a credential of any kind.
+2. Steam redirects back with a claim, which the server hands straight back to
+   Steam (`mode=check_authentication`). Nothing in that redirect is trusted
+   until Valve confirms it. This matters: without the callback check, OpenID is
+   trivially forgeable by editing the URL.
+3. On success we store one row — their SteamID64, display name and avatar — and
+   set a signed session cookie good for 90 days.
+
+That account is just an identity. It grants access to nothing until they either
+**create a group** or **join one with an invite link**. Groups are private by
+default: a non-member asking for `/api/g/some-group/games` gets a 404, not a
+403, so a private group can't even be confirmed to exist by guessing the URL.
+
+So for your four: you sign in, claim the "Ama" identity, create an invite link
+on the Group tab, and send it to the other three. They click it, sign in with
+Steam, and land straight in the group with the claim prompt waiting.
+
+Using Steam rather than email has one more payoff. Because a SteamID64 is a real
+Steam account, the v2 features come almost free: actual playtime per person,
+achievement completion, and "who already owns this" all come from Steam's public
+Web API keyed on the ID you already have.
+
+If you want the instance private while you try it out, set `ALLOWED_STEAM_IDS`
+and only those Steam accounts can sign in at all. Leave it unset to let anyone
+create their own groups.
+
+---
+
 ## Setup
 
-You need a free Cloudflare account and a free Steam Web API key. About 15
-minutes. Every command runs from this folder.
-
-### 1. Install and sign in
+One command does the whole thing:
 
 ```bash
 npm install
+npm run setup
+```
+
+It will open a browser once for the Cloudflare login, then create the Pages
+project and the D1 database, write the database id into `wrangler.toml`, apply
+the schema, offer to import the 92-game seed data, generate and store
+`SESSION_SECRET`, prompt for an optional Steam API key, and deploy. It prints
+your live URL at the end.
+
+The script is safe to re-run — every step checks for existing state first, so if
+something fails you can fix it and run it again without duplicating anything.
+It will never wipe existing data without asking.
+
+You need a free Cloudflare account (no card) and, optionally, a free Steam Web
+API key from <https://steamcommunity.com/dev/apikey>. The key is used only for
+display names and avatars; skip it and people show up as `Player 1234`.
+
+### Deploying from GitHub instead
+
+For a real product you probably want pushes to deploy themselves. After running
+`npm run setup` once, go to Workers & Pages → **g4m1ng** → Settings → Builds,
+connect the GitHub repo, set the build command to nothing and the output
+directory to `public`. Every push to `main` then deploys, and pull requests get
+preview URLs. The D1 binding comes from the committed `wrangler.toml`; secrets
+stay in the dashboard.
+
+### Doing it by hand
+
+<details>
+<summary>If you would rather run the steps yourself</summary>
+
+```bash
 npx wrangler login
-```
-
-### 2. Create the database
-
-```bash
-npx wrangler d1 create g4m1ng
-```
-
-Copy the printed `database_id` into `wrangler.toml`, replacing
-`PASTE_YOUR_DATABASE_ID_HERE`.
-
-### 3. Create the tables
-
-```bash
+npx wrangler pages project create g4m1ng --production-branch main
+npx wrangler d1 create g4m1ng            # paste the id into wrangler.toml
 npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
-```
-
-Optionally also load `seed.sql`, which creates one group (`g4m1ng`) with 92
-games and 232 ratings imported from the original spreadsheet. The four people
-exist as placeholders; the first time each signs in, the app asks which one they
-are and moves their ratings onto their real Steam account. Skip this file to
-start empty.
-
-```bash
-npx wrangler d1 execute g4m1ng --remote --file=./seed.sql   # optional
-```
-
-### 4. Set the secrets
-
-```bash
-# signs the session cookie — any long random string
-openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET
-
-# from https://steamcommunity.com/dev/apikey — free, instant, any domain works
-npx wrangler pages secret put STEAM_API_KEY
-```
-
-`STEAM_API_KEY` only fetches display names and avatars; everything else uses
-Steam's public store endpoints, which need no key. Without it people show up as
-`Player 1234` and nothing else breaks.
-
-**Optional — keep the instance private:**
-
-```bash
-npx wrangler pages secret put ALLOWED_STEAM_IDS   # comma-separated SteamID64s
-```
-
-Only those accounts can sign in at all. Leave it unset for a public site; access
-to any actual data is controlled per group by membership regardless.
-
-### 5. Deploy
-
-```bash
+npx wrangler d1 execute g4m1ng --remote --file=./seed.sql      # optional
+openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name g4m1ng
+npx wrangler pages secret put STEAM_API_KEY --project-name g4m1ng
 npm run deploy
 ```
 
-You get a `https://g4m1ng.pages.dev` URL. For your own domain, add it under
-Workers & Pages → your project → Custom domains. Cloudflare charges nothing for
-the hosting; you just pay a registrar for the domain (~€10/year).
+</details>
 
-### 6. Backfill the Steam art
+### After the first deploy
 
 Imported games have names but no Steam links, so the queue has no trailers for
 them yet. Sign in, open your group, and:
@@ -141,6 +160,10 @@ and only unambiguous name matches link automatically. Repeat until `remaining`
 is 0. Anything in `needsReview` you link by hand: open the game in the Library
 and paste its store URL. Being conservative here is deliberate; a wrong appid
 means the wrong trailer plays in the queue.
+
+For a custom domain, add it under Workers & Pages → g4m1ng → Custom domains.
+Cloudflare charges nothing for the hosting; you just pay a registrar for the
+domain (~€10/year).
 
 ---
 
@@ -202,6 +225,7 @@ lib/
   steam.js     Steam Web API and store endpoints, cache-first
   http.js      JSON responses, body parsing, score clamping
 public/        index.html · app.js · styles.css — no build step
+scripts/setup.mjs                one-command Cloudflare provisioning
 schema.sql · seed.sql
 test/          harness.mjs · isolation.mjs · shots.mjs
 ```

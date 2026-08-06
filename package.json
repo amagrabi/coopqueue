@@ -5,6 +5,7 @@
   "description": "Multi-tenant co-op game tracker. Cloudflare Pages + D1 + Steam login.",
   "type": "module",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "wrangler pages dev",
     "db:create": "wrangler d1 create g4m1ng",
     "db:init": "wrangler d1 execute g4m1ng --remote --file=./schema.sql",
