@@ -403,6 +403,11 @@ function wireOnce() {
   $('#browse-hide-pooled').addEventListener('change', () => renderBrowse(false));
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
 
+  $('#man-add').addEventListener('click', addManual);
+  $('#man-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addManual(); }
+  });
+
   let searchTimer;
   $('#add-input').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
@@ -996,6 +1001,9 @@ async function renderMembers() {
 
 /* ══════════════════════════════ ADD GAME ══════════════════════════════ */
 function openAdd() {
+  $('#add-manual').open = false;
+  ['#man-name', '#man-genre', '#man-players'].forEach((sel) => { $(sel).value = ''; });
+  $('#man-status').textContent = '';
   $('#add-input').value = '';
   $('#add-results').innerHTML = '';
   $('#add-status').textContent = 'Search Steam, or paste a store link.';
@@ -1039,6 +1047,32 @@ async function addGame(appid, btn) {
     setView('queue');
     toast(`Added ${r.name}. Set its player count so we know if we can all play.`);
   } catch (e) { $('#add-status').textContent = e.message; btn.disabled = false; }
+}
+
+/** Add a game that has no Steam page at all. */
+async function addManual() {
+  const name = $('#man-name').value.trim();
+  if (name.length < 2) { $('#man-status').textContent = 'Give the game a name.'; return; }
+  const btn = $('#man-add');
+  btn.disabled = true;
+  $('#man-status').textContent = 'Adding…';
+  try {
+    const r = await gapi('/games', {
+      method: 'POST',
+      body: {
+        manual: true,
+        name,
+        genre: $('#man-genre').value.trim() || null,
+        maxPlayers: Number($('#man-players').value) || null,
+      },
+    });
+    await loadGroup();
+    $('#add-dialog').close();
+    setView('queue');
+    toast(`Added ${r.name} by hand. No trailer — set a player count from the Library if it needs one.`);
+  } catch (e) {
+    $('#man-status').textContent = e.message;
+  } finally { btn.disabled = false; }
 }
 
 /* ══════════════════════════════ BROWSE ════════════════════════════════ */

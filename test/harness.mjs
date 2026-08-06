@@ -179,6 +179,22 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  // Steam search, stubbed from the catalogue so the add dialog is testable —
+  // including its "already in your library" flag, which needs a hit whose appid
+  // the group already has.
+  if (p === '/api/steam/search') {
+    const term = (url.searchParams.get('q') || '').trim().toLowerCase();
+    if (term.length < 2) return send(res, 200, { results: [] });
+    const rows = q(`SELECT appid, name, header_image, price, release_date FROM coop_apps
+                     WHERE name LIKE ? ORDER BY popularity_rank LIMIT 8`, `%${term}%`);
+    return send(res, 200, {
+      results: rows.map((r) => ({
+        appid: r.appid, name: r.name, image: r.header_image,
+        price: r.price, release: r.release_date,
+      })),
+    });
+  }
+
   const gm = p.match(/^\/api\/g\/([^/]+)(\/.*)?$/);
   if (gm) {
     const ctx = groupCtx(decodeURIComponent(gm[1]));
@@ -193,6 +209,19 @@ const server = http.createServer(async (req, res) => {
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role },
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
+    }
+    if (sub === '/games' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (!b.manual) return send(res, 400, { error: 'the harness only implements manual adds' });
+      const name = String(b.name || '').trim();
+      if (name.length < 2) return send(res, 400, { error: 'give the game a name' });
+      if (one('SELECT 1 FROM games WHERE group_id=? AND name=? COLLATE NOCASE', gid, name)) {
+        return send(res, 409, { error: `${name} is already on your list` });
+      }
+      db.prepare(`INSERT INTO games (group_id, name, genre, status, max_players, enriched_at)
+                  VALUES (?,?,?,'backlog',?,unixepoch())`)
+        .run(gid, name, b.genre || null, b.maxPlayers || null);
+      return send(res, 201, { ok: true, name, manual: true });
     }
     if (sub === '/skip' && req.method === 'GET') {
       return send(res, 200, { queue: q(

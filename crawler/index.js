@@ -27,12 +27,28 @@ import {
   parseSearchItems, shapeDetails, parseReviews, OBVIOUS_NON_GAME,
 } from '../lib/coop.js';
 
-/** Games refreshed per run. 2 subrequests each, +1 for discovery. Cap is 50. */
-const BATCH = 14;
+/** Games refreshed per run. 2 subrequests each, +2 for discovery. Cap is 50. */
+const BATCH = 13;
 /** Search pages to rotate through for discovery, one per run. */
 const DISCOVERY_PAGES = 8;
-/** Below this many reviews a game is unreleased or abandoned; not worth listing. */
+/** Below this many reviews a game is abandoned shovelware; not worth listing. */
 const MIN_REVIEWS = 200;
+
+/**
+ * A second discovery pass, sorted by release date, with its own much lower floor.
+ *
+ * The top-sellers pass cannot find new releases, and that is not a tuning problem
+ * — a game released this week has almost no reviews yet, so MIN_REVIEWS rejects it
+ * by design. Measured against live Steam: "Gears of War: E-Day" sat in the co-op
+ * top sellers with 0 reviews. Without this pass the catalogue would only ever
+ * learn about a game months after it came out.
+ *
+ * The floor is not zero, because Steam's co-op category is full of unreleased
+ * listings and asset flips. A handful of reviews is enough to show a real game
+ * that real people can actually buy.
+ */
+const NEW_RELEASE_MIN_REVIEWS = 15;
+const NEW_RELEASE_PAGES = 2;
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data, null, 2), {
@@ -60,21 +76,26 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
     "SELECT value FROM crawl_state WHERE key = 'discovery_page'").first();
   const page = Number(cursorRow?.value ?? 0) % DISCOVERY_PAGES;
 
-  const search = await getJson(searchUrl({ start: page * 50, count: 50 }));
+  // Two passes: what sells, and what just came out. The second exists because the
+  // first structurally cannot see new releases — see NEW_RELEASE_MIN_REVIEWS.
+  const sellers = await getJson(searchUrl({ start: page * 50, count: 50 }));
   out.subrequests++;
-  const candidates = parseSearchItems(search);
+  const newest = await getJson(
+    searchUrl({ start: (page % NEW_RELEASE_PAGES) * 50, count: 50, sort: 'Released_DESC' }));
+  out.subrequests++;
 
-  if (candidates.length) {
-    // Only appids we have never seen are worth spending calls on; the refresh
-    // half of this function keeps the ones we already have up to date.
-    const known = new Set(
-      (await db.prepare('SELECT appid FROM coop_apps').all()).results?.map((r) => r.appid) ?? []);
-    const fresh = candidates.filter((c) => !known.has(c.appid) && !OBVIOUS_NON_GAME.test(c.name));
-    // Leave most of the subrequest budget for refreshing.
-    for (const c of fresh.slice(0, 4)) {
-      const added = await upsert(db, c.appid, out);
-      if (added) out.discovered++;
-    }
+  const known = new Set(
+    (await db.prepare('SELECT appid FROM coop_apps').all()).results?.map((r) => r.appid) ?? []);
+  const pick = (json, floor) => parseSearchItems(json)
+    .filter((c) => !known.has(c.appid) && !OBVIOUS_NON_GAME.test(c.name))
+    .map((c) => ({ ...c, floor }));
+
+  // Leave most of the subrequest budget for refreshing; discovery is the smaller
+  // half of the job once the catalogue exists.
+  const fresh = [...pick(sellers, MIN_REVIEWS).slice(0, 3),
+                 ...pick(newest, NEW_RELEASE_MIN_REVIEWS).slice(0, 2)];
+  for (const c of fresh) {
+    if (await upsert(db, c.appid, out, c.floor)) out.discovered++;
   }
 
   await db.prepare(
@@ -86,9 +107,12 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
   const remaining = Math.max(0, batch - out.discovered);
   if (remaining) {
     const stale = await db.prepare(
-      'SELECT appid FROM coop_apps ORDER BY crawled_at ASC LIMIT ?').bind(remaining).all();
+      'SELECT appid, review_count FROM coop_apps ORDER BY crawled_at ASC LIMIT ?').bind(remaining).all();
     for (const row of stale.results || []) {
-      if (await upsert(db, row.appid, out)) out.refreshed++;
+      // Refresh judges an existing row by the floor it got in under, or new
+      // releases would be added by one pass and deleted by the next.
+      const lenient = (row.review_count ?? 0) < MIN_REVIEWS ? NEW_RELEASE_MIN_REVIEWS : MIN_REVIEWS;
+      if (await upsert(db, row.appid, out, lenient)) out.refreshed++;
     }
   }
 
@@ -100,8 +124,12 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
   return out;
 }
 
-/** Fetch and store one appid. Returns true when a row was written. */
-async function upsert(db, appid, out) {
+/**
+ * Fetch and store one appid. Returns true when a row was written.
+ * `floor` is the review count below which the game is not worth listing — lower
+ * for a brand-new release than for something that has been out for years.
+ */
+async function upsert(db, appid, out, floor = MIN_REVIEWS) {
   const details = await getJson(detailsUrl(appid));
   out.subrequests++;
   const shaped = shapeDetails(appid, details);
@@ -117,7 +145,7 @@ async function upsert(db, appid, out) {
   const reviews = parseReviews(await getJson(reviewsUrl(appid)));
   out.subrequests++;
   const total = reviews?.total ?? 0;
-  if (total < MIN_REVIEWS) {
+  if (total < floor) {
     out.thin++;
     await db.prepare('DELETE FROM coop_apps WHERE appid = ? AND max_players IS NULL')
       .bind(appid).run();

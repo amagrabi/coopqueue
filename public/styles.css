@@ -535,3 +535,13 @@ td.miss { color: #4a4a47; }
 /* Already-owned search hits stay readable but clearly not actionable. */
 .add-hit.is-have { opacity: .65; cursor: default; }
 .add-hit.is-have:hover { background: var(--surface-2); }
+
+/* ── add by hand ────────────────────────────────────────────────────────── */
+.add-manual { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+.add-manual > summary {
+  cursor: pointer; font-size: 13.5px; font-weight: 550; color: var(--text-secondary);
+}
+.add-manual > summary:hover { color: var(--text-primary); }
+.add-manual[open] > summary { margin-bottom: 10px; }
+.add-manual .field { margin-top: 10px; }
+.field-opt { color: var(--text-muted); font-weight: 400; }

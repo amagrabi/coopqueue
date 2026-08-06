@@ -393,6 +393,31 @@
            placeholder="Game name, or paste a Steam link…">
     <div id="add-results" class="add-results"></div>
     <p id="add-status" class="add-status"></p>
+
+    <!-- Not everything a group plays is on Steam: Valorant is Riot-only, Rocket
+         League left for Epic in 2020, and board games are not on there at all. -->
+    <details id="add-manual" class="add-manual">
+      <summary>Not on Steam? Add it by hand</summary>
+      <p class="field-help">No trailer or store art, and it stays out of the fit
+        check unless you set a player count. You can link it to Steam later from
+        the Library if it turns up.</p>
+      <label class="field">
+        <span>Name</span>
+        <input class="input" id="man-name" maxlength="120" placeholder="Schach">
+      </label>
+      <div class="onboard-split">
+        <label class="field">
+          <span>Genre <span class="field-opt">optional</span></span>
+          <input class="input" id="man-genre" maxlength="40" placeholder="Board game">
+        </label>
+        <label class="field">
+          <span>Max players <span class="field-opt">optional</span></span>
+          <input class="input" id="man-players" type="number" min="1" max="64" placeholder="2">
+        </label>
+      </div>
+      <button class="btn btn-primary" id="man-add">Add to library</button>
+      <p id="man-status" class="add-status"></p>
+    </details>
   </div>
 </dialog>
 

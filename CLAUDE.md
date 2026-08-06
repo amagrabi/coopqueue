@@ -266,6 +266,15 @@ is that no unresolved import can be caught locally (no build step, and
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
+Steam-link coverage is **105 of 114**. The 9 that remain have no usable Steam page
+and are the reason the manual-add path exists: Valorant (Riot client only), Rocket
+League (left Steam for Epic in 2020), Spellbreak (servers shut down, page gone),
+Overwatch 2 and Diablo 4 (search returns edition/season packs, not the game),
+Farming Simulator (which one?), Supervive, Sea of Thieves: Monkey Island (an
+expansion, not an app) and Schach — German for chess, never on Steam at all.
+`scripts/fix-game-names.mjs` fixed the other 18, which were only ever spelling
+mismatches the conservative enrich matcher would not guess at.
+
 Verified end to end against production: Steam sign-in (display name and avatar
 resolve, so `STEAM_API_KEY` works), `POST /api/groups/join`, claiming a seed
 identity, `PATCH /api/g/:slug/members {invite:'on'}` to rotate the invite link,

@@ -63,15 +63,44 @@ export async function onRequestGet({ env, data }) {
   });
 }
 
-/** Add a game from a Steam URL, a bare appid, or a plain name. */
+/** Add a game from a Steam URL, a bare appid, a plain name, or by hand. */
 export async function onRequestPost({ request, env, data }) {
-  const { input, maxPlayers, status } = await body(request);
-  if (!input || !String(input).trim()) return bad('give me a Steam link, an appid, or a game name');
-
+  const { input, maxPlayers, status, manual, name, genre } = await body(request);
   const gid = data.group.group_id;
 
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM games WHERE group_id = ?').bind(gid).first();
   if ((count?.n ?? 0) >= 2000) return bad('this group has hit the 2000-game limit', 429);
+
+  /* ── added by hand, no Steam page ─────────────────────────────────────────
+     Not every game a group plays is on Steam. Valorant lives in Riot's client,
+     Rocket League left Steam for Epic in 2020, and one entry in the original
+     spreadsheet was "Schach" — German for chess. Forcing those through the Steam
+     matcher either fails or, worse, links something that merely sounds similar.
+
+     steam_appid stays NULL, which viability() and the enrich queue both already
+     understand, and enriched_at is stamped so /enrich does not keep trying to
+     guess a match for a game that deliberately has none. It can still be linked
+     later by pasting a store URL from the Library. */
+  if (manual) {
+    const clean = String(name || '').trim();
+    if (clean.length < 2) return bad('give the game a name');
+    if (clean.length > 120) return bad('that name is too long');
+
+    const dupe = await env.DB.prepare(
+      'SELECT id FROM games WHERE group_id = ? AND name = ? COLLATE NOCASE').bind(gid, clean).first();
+    if (dupe) return bad(`${clean} is already on your list`, 409);
+
+    const res = await env.DB.prepare(
+      `INSERT INTO games (group_id, name, genre, status, max_players, added_by, enriched_at)
+       VALUES (?,?,?,?,?,?,unixepoch())`
+    ).bind(gid, clean, genre?.trim() || null, status || 'backlog',
+           Number.isFinite(Number(maxPlayers)) && Number(maxPlayers) > 0 ? Number(maxPlayers) : null,
+           data.user.steam_id).run();
+
+    return json({ ok: true, id: res.meta.last_row_id, name: clean, manual: true }, 201);
+  }
+
+  if (!input || !String(input).trim()) return bad('give me a Steam link, an appid, or a game name');
 
   let appid = parseAppId(input);
   if (!appid) {

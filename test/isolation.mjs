@@ -276,6 +276,40 @@ await check('a pooled game lands only in the pooling group', async () => {
   return (mine.length === 1 && foreign.length === 0) || `mine:${mine.length} foreign:${foreign.length}`;
 });
 
+await check('a game with no Steam page can be added by hand', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gamesRoute.onRequestPost({
+    request: req({ manual: true, name: 'Kniffel Deluxe', genre: 'Board game', maxPlayers: 2 }), env, data });
+  if (r.status !== 201) return `expected 201, got ${r.status}`;
+  const row = sqlite.prepare("SELECT * FROM games WHERE group_id=1 AND name='Kniffel Deluxe'").get();
+  if (!row) return 'row not written';
+  if (row.steam_appid != null) return 'invented a steam_appid';
+  // enriched_at must be stamped, or /enrich will keep hunting for a match that
+  // deliberately does not exist and burn Steam quota on every run.
+  return row.enriched_at != null || 'enriched_at not stamped, /enrich will retry forever';
+});
+
+await check('a hand-added game is not added twice under the same name', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gamesRoute.onRequestPost({
+    request: req({ manual: true, name: 'kniffel deluxe' }), env, data });   // different case
+  return r.status === 409 || `expected 409, got ${r.status}`;
+});
+
+await check('a hand-added game needs a real name', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gamesRoute.onRequestPost({ request: req({ manual: true, name: ' ' }), env, data });
+  return r.status === 400 || `expected 400, got ${r.status}`;
+});
+
+await check('adding by hand cannot reach another group', async () => {
+  const { data } = await ctxFor(MALLORY, 'mallorys');
+  await gamesRoute.onRequestPost({ request: req({ manual: true, name: 'Mallory Board Game' }), env, data });
+  const leaked = sqlite.prepare(
+    "SELECT 1 FROM games WHERE group_id=1 AND name='Mallory Board Game'").get();
+  return !leaked || 'hand-added game landed in the wrong group';
+});
+
 console.log('\nPre-assigned identities');
 
 const { applySeedAssignment } = await import(path.join(SITE, 'lib/groups.js'));
