@@ -272,6 +272,7 @@ function renderChrome() {
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
   $('#group-name').textContent = state.group.name;
   $('#queue-count').textContent = state.queue.length || '';
+  renderMyCoverage();
   renderGroupMenu();
   renderLibHead();
   wireOnce();
@@ -344,6 +345,9 @@ function wireOnce() {
   $('#lib-search').addEventListener('input', renderLibrary);
   $('#lib-status').addEventListener('change', renderLibrary);
   $('#lib-sort').addEventListener('change', renderLibrary);
+  $('#lib-mine').addEventListener('change', renderLibrary);
+  $('#lib-score').addEventListener('change', renderLibrary);
+  $('#lib-played').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
 
   let searchTimer;
@@ -468,6 +472,7 @@ async function saveRating() {
     state.queue.splice(state.qIndex, 1);
     $('#queue-count').textContent = state.queue.length || '';
     g.votes[state.me.steamId] = score;
+    renderMyCoverage();   // the bar should move on every save, that is the point
     toast(`${g.name}: ${fmt(score, 1)}`);
     renderQueue();
     gapi('/games').then((lib) => { state.games = lib.games; state.model = lib.model; });
@@ -532,15 +537,54 @@ function renderLibHead() {
     `<th class="c-num">Avg</th><th class="c-num">Weighted</th><th class="c-num">Hrs</th>`;
 }
 
+/**
+ * My own coverage, shown above the rating queue. Deliberately my number rather
+ * than the group's: the group bars on the Group tab create the comparison, this
+ * one just makes the personal debt impossible to miss while I am standing in
+ * front of the thing that clears it.
+ */
+function renderMyCoverage() {
+  const box = $('#my-coverage');
+  const total = state.games.length;
+  if (!total) { box.hidden = true; return; }
+
+  const rated = state.games.filter((g) => g.votes[state.me.steamId] != null).length;
+  const pct = Math.round((rated / total) * 100);
+  const left = total - rated;
+
+  $('#my-cov-left').textContent = left
+    ? `${left} game${left === 1 ? '' : 's'} you haven't rated`
+    : 'You have rated everything';
+  $('#my-cov-pct').textContent = `${rated} of ${total} · ${pct}%`;
+  $('#my-cov-fill').style.width = `${pct}%`;
+  $('#my-cov-fill').style.background = colorOf(state.me.steamId);
+  box.hidden = false;
+}
+
 function renderLibrary() {
   const q = $('#lib-search').value.trim().toLowerCase();
   const status = $('#lib-status').value;
   const sort = $('#lib-sort').value;
+  const mine = $('#lib-mine').value;
+  const minScore = Number($('#lib-score').value) || 0;
+  const played = $('#lib-played').value;
 
-  const rows = state.games.filter((g) =>
-    (!status || g.status === status) &&
-    (!q || g.name.toLowerCase().includes(q) || (g.genre || '').toLowerCase().includes(q))
-  );
+  // `weighted` is the calibrated, shrunk group score, so filtering on it asks
+  // "would the group actually pick this", not "did somebody once type a 9".
+  // Unclaimed seed identities count as voters — their imported ratings are real
+  // scores, so a game they rated is not missing anyone's opinion.
+  const voters = state.members.length;
+  const rows = state.games.filter((g) => {
+    if (status && g.status !== status) return false;
+    if (q && !g.name.toLowerCase().includes(q) && !(g.genre || '').toLowerCase().includes(q)) return false;
+    if (minScore && !(g.weighted >= minScore)) return false;
+    if (played === 'yes' && !(g.hours > 0)) return false;
+    if (played === 'no' && g.hours > 0) return false;
+    if (mine === 'unrated' && g.votes[state.me.steamId] != null) return false;
+    if (mine === 'rated' && g.votes[state.me.steamId] == null) return false;
+    if (mine === 'incomplete' && g.n >= voters) return false;
+    return true;
+  });
 
   rows.sort({
     weighted: (a, b) => (b.weighted ?? -1) - (a.weighted ?? -1),
@@ -638,6 +682,35 @@ async function renderMembers() {
   let d;
   try { d = await gapi('/members'); } catch (e) { return toast(e.message); }
   const isOwner = d.group.role === 'owner';
+
+  /* ── coverage leaderboard ──────────────────────────────────────────────── */
+  const total = state.games.length;
+  const ranked = d.members
+    .map((m) => ({ ...m, pct: total ? Math.round((m.ratings / total) * 100) : 0 }))
+    .sort((a, b) => b.pct - a.pct || a.short_name.localeCompare(b.short_name));
+
+  $('#coverage-bars').innerHTML = ranked.map((m) => `
+    <div class="bar-row">
+      <div class="bar-label">${esc(m.short_name)} <span class="bar-sub">${m.ratings}/${total}</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${m.pct}%;background:${colorOf(m.steam_id)}"></div>
+      </div>
+      <div class="c-num">${m.pct}%</div>
+    </div>`).join('');
+
+  // Name the gap rather than just drawing it — "Dave is 47 behind" is actionable
+  // in a way that four bars of different lengths is not.
+  const note = $('#coverage-note');
+  if (ranked.length < 2 || !total) {
+    note.textContent = '';
+  } else {
+    const lead = ranked[0];
+    const last = ranked[ranked.length - 1];
+    const gap = lead.ratings - last.ratings;
+    note.textContent = gap
+      ? `${last.short_name} is ${gap} rating${gap === 1 ? '' : 's'} behind ${lead.short_name}.`
+      : 'Everyone is level. The ranking is as trustworthy as it gets.';
+  }
 
   $('#member-list').innerHTML = d.members.map((m) => `
     <div class="person">

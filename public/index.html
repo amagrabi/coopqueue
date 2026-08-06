@@ -143,6 +143,17 @@
 
     <!-- ══════════════ RATE ══════════════ -->
     <section class="view" data-view="queue">
+      <!-- Rating coverage is the app's real problem: a ranking built from a
+           quarter of the votes is noise. Keep the number in front of the person
+           who can fix it, on the screen where they can fix it. -->
+      <div id="my-coverage" class="my-coverage" hidden>
+        <div class="my-coverage-head">
+          <strong id="my-cov-left"></strong>
+          <span id="my-cov-pct"></span>
+        </div>
+        <div class="bar-track"><div id="my-cov-fill" class="bar-fill"></div></div>
+      </div>
+
       <div id="queue-empty" class="empty" hidden>
         <h2>Queue clear</h2>
         <p>You've rated or skipped everything in this group. Add a game, or go argue on the Play next tab.</p>
@@ -226,6 +237,28 @@
             <option value="hours">Most hours</option>
             <option value="votes">Fewest votes</option>
           </select>
+          <select id="lib-mine" class="input">
+            <option value="">Anyone's votes</option>
+            <option value="unrated">I haven't rated</option>
+            <option value="rated">I have rated</option>
+            <option value="incomplete">Missing someone's vote</option>
+          </select>
+          <!-- Thresholds stop at 8+ on purpose. These filter the *calibrated,
+               shrunk* group score, which is pulled toward the group mean and so
+               compresses the top end: with real data the best game scores 8.8
+               even though raw votes reach 10. A 9+ option would always come back
+               empty and read as broken. -->
+          <select id="lib-score" class="input">
+            <option value="">Any score</option>
+            <option value="8">8+</option>
+            <option value="7">7+</option>
+            <option value="6">6+</option>
+          </select>
+          <select id="lib-played" class="input">
+            <option value="">Played or not</option>
+            <option value="yes">Hours logged</option>
+            <option value="no">Never played</option>
+          </select>
         </div>
       </div>
       <div class="table-wrap">
@@ -273,6 +306,15 @@
     <!-- ══════════════ GROUP ══════════════ -->
     <section class="view" data-view="members">
       <div class="view-head"><h2>Group</h2></div>
+
+      <section class="panel">
+        <h3 class="panel-title">Rating coverage</h3>
+        <p class="panel-sub">How much of the library each person has actually scored. Everything on the
+          Play next tab is only as trustworthy as the thinnest bar here.</p>
+        <div id="coverage-bars" class="bars"></div>
+        <p id="coverage-note" class="panel-sub" style="margin-bottom:0"></p>
+      </section>
+
       <div class="grid-2">
         <section class="panel">
           <h3 class="panel-title">Members</h3>
