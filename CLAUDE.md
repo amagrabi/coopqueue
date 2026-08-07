@@ -624,7 +624,9 @@ memory, so "I didn't play it" is not an answer to anything.
 **`unfinished` means "we tried to finish it and never did"** — not `dropped` (gave up)
 and not `sampled` (barely started). It counts as *played*, so it lands in the "how
 good was it?" queue and in the played-game stats: `PLAYED_STATUS` in `app.js` and
-`PLAYED` in `stats.js` both list it, and they must agree.
+`PLAYED` in `stats.js` both list it, and they must agree. In the Library its status
+chip deliberately shares the red treatment with `dropped`: both are negative
+outcomes, even though the stored meanings remain distinct.
 
 **Adding it needed a table rebuild, and the obvious way to do that destroys every
 rating.** `status` carries a CHECK constraint, SQLite cannot ALTER one, so the column

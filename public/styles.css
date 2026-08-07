@@ -724,7 +724,7 @@ td.miss { color: #4a4a47; }
    colouring it would just add noise. */
 .status-playing  { background: rgba(57,135,229,.14);  border-color: rgba(57,135,229,.45);  color: #a8cbf5; }
 .status-finished { background: rgba(12,163,12,.14);   border-color: rgba(12,163,12,.45);   color: #8fe08f; }
-.status-unfinished { background: rgba(201,133,0,.14); border-color: rgba(201,133,0,.45); color: #e8bf72; }
+.status-unfinished,
 .status-dropped  { background: rgba(208,59,59,.13);   border-color: rgba(208,59,59,.42);   color: #f0a3a3; }
 .status-sampled  { background: rgba(250,178,25,.12);  border-color: rgba(250,178,25,.40);  color: #f2d79a; }
 
