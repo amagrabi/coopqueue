@@ -17,7 +17,9 @@ const state = {
   queue: [],
   qIndex: 0,
   rateMode: 'played',   // 'played' | 'want' — see renderQueue
+  playNight: null,      // server-ranked session shortlist, or null for group ranking
   view: 'queue',
+  cache: {},
 };
 
 /* Fixed categorical slots, assigned by position in the member list. Colour
@@ -68,7 +70,9 @@ async function api(path, options = {}) {
   return data;
 }
 /** Group-scoped call. Every data endpoint lives under /api/g/<slug>/. */
-const gapi = (path, options) => api(`/api/g/${encodeURIComponent(state.group.slug)}${path}`, options);
+const gapiFor = (slug, path, options) => api(`/api/g/${encodeURIComponent(slug)}${path}`, options);
+const gapi = (path, options) => gapiFor(state.group.slug, path, options);
+const invalidateViewCache = () => { state.cache = {}; };
 
 let toastTimer;
 function toast(msg) {
@@ -104,6 +108,22 @@ const compact = (n) =>
  * (and their buffers) pile up as you rate.
  */
 let hls = null;
+let hlsLoad = null;
+let trailerSeq = 0;
+
+/** hls.js is roughly 530 KB, so only fetch it when an HLS trailer is shown. */
+function loadHls() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (hlsLoad) return hlsLoad;
+  hlsLoad = new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = '/vendor/hls.min.js?v=1.6.17';
+    script.onload = () => resolve(window.Hls || null);
+    script.onerror = () => resolve(null);
+    document.head.append(script);
+  });
+  return hlsLoad;
+}
 
 function detachTrailer(video) {
   if (hls) { hls.destroy(); hls = null; }
@@ -139,7 +159,7 @@ function playTrailer(video) {
 }
 
 /** Attach `url` to `video`; false means this browser cannot play it at all. */
-function attachTrailer(video, url) {
+async function attachTrailer(video, url, current = () => true) {
   detachTrailer(video);
   if (!/\.m3u8(\?|$)/i.test(url)) {           // a progressive file needs no help
     video.src = url;
@@ -151,10 +171,15 @@ function attachTrailer(video, url) {
   // wherever MSE exists. iOS Safari is the mirror image: no MSE for hls.js to
   // use, but genuine native HLS. Trusting canPlayType first silently produces a
   // video that never starts in exactly the browsers this group uses.
-  if (window.Hls?.isSupported()) {
+  // Browsers with MediaSource may be able to use hls.js. Load it on demand,
+  // then re-check the card: a group switch during the download must not attach
+  // the old group's trailer to the new card.
+  const Hls = window.MediaSource ? await loadHls() : null;
+  if (!current()) return false;
+  if (Hls?.isSupported()) {
     // A rating card is a glance, not a sitting — a short buffer keeps the queue
     // snappy and avoids pulling megabytes for a game about to be skipped.
-    hls = new window.Hls({ maxBufferLength: 12, maxMaxBufferLength: 30 });
+    hls = new Hls({ maxBufferLength: 12, maxMaxBufferLength: 30 });
     hls.loadSource(url);
     hls.attachMedia(video);
     return true;
@@ -179,6 +204,7 @@ async function boot() {
     const messages = {
       cancelled: 'Sign-in was cancelled.',
       steam_rejected: 'Steam could not verify that login. Try again.',
+      steam_unavailable: 'Steam did not answer in time. Try signing in again.',
       no_steamid: 'Steam did not return an ID. Try again.',
       not_allowed: `This instance is invite-only and that account is not on the list. Your Steam ID is ${params.get('id') || 'unknown'}.`,
     };
@@ -276,8 +302,10 @@ async function openFromHash() {
   if (state.group?.slug !== slug) {
     state.group = { slug };
     state.qIndex = 0;
-    await loadGroup();
+    const loaded = await loadGroup(slug);
+    if (!loaded || loaded === 'claim') return;
   }
+  if (state.group?.slug !== slug) return;
   setView(route?.view || 'queue');
 }
 
@@ -288,33 +316,64 @@ window.addEventListener('hashchange', () => {
   else if (route.view !== state.view) setView(route.view);
 });
 
-async function loadGroup() {
-  const [lib, q, claim] = await Promise.all([gapi('/games'), gapi('/skip'), gapi('/claim')]);
+let groupLoadSeq = 0;
+
+async function loadGroup(expectedSlug = state.group?.slug) {
+  if (!expectedSlug) return false;
+  const seq = ++groupLoadSeq;
+  const [lib, q, claim] = await Promise.all([
+    gapiFor(expectedSlug, '/games'),
+    gapiFor(expectedSlug, '/skip'),
+    gapiFor(expectedSlug, '/claim'),
+  ]);
+  // A slow response from the group we just left must never overwrite the group
+  // the person is now looking at. This also drops an earlier reload superseded by
+  // a newer mutation in the same group.
+  if (seq !== groupLoadSeq || state.group?.slug !== expectedSlug) return false;
   state.games = lib.games;
   state.members = lib.members;
   state.group = lib.group;
   state.model = lib.model;
   state.queue = q.queue;
+  state.playNight = null;
+  invalidateViewCache();
+  browseSeq++;
+  browse.page = 0;
+  browse.items = [];
+  browse.hasMore = false;
 
   // Offer the imported identity before showing the app, once per group.
-  if (claim.canClaim && claim.unclaimed.length) return showClaim(claim.unclaimed);
+  if (claim.canClaim && claim.unclaimed.length) {
+    showClaim(claim.unclaimed);
+    return 'claim';
+  }
 
   renderChrome();
   show('app');
+  return 'app';
+}
+
+async function reloadGroupView(slug, view = state.view) {
+  if (state.group?.slug !== slug) return false;
+  const loaded = await loadGroup(slug);
+  if (loaded !== 'app' || state.group?.slug !== slug) return false;
+  setView(view);
+  return true;
 }
 
 function showClaim(unclaimed) {
   show('claim');
   $('#claim-options').innerHTML = unclaimed
-    .map((u) => `<button class="claim-opt" data-seed="${esc(u.seedId)}"><b>${esc(u.name)}</b><span>claim these ratings</span></button>`)
+    .map((u) => `<button class="claim-opt" data-seed="${esc(u.seedId)}" data-name="${esc(u.name)}" data-ratings="${u.ratings}"><b>${esc(u.name)}</b><span>claim ${u.ratings} rating${u.ratings === 1 ? '' : 's'}</span></button>`)
     .join('');
   $$('#claim-options .claim-opt').forEach((btn) =>
     btn.addEventListener('click', async () => {
+      if (!confirm(`Claim ${btn.dataset.ratings} rating${btn.dataset.ratings === '1' ? '' : 's'} from ${btn.dataset.name}? This cannot be undone.`)) return;
       btn.disabled = true;
+      const slug = state.group.slug;
       try {
-        const r = await gapi('/claim', { method: 'POST', body: { seedId: btn.dataset.seed } });
-        await loadGroup();
-        setView('queue');
+        const r = await gapiFor(slug, '/claim', { method: 'POST', body: { seedId: btn.dataset.seed } });
+        if (!await reloadGroupView(slug, 'queue')) return;
         toast(`Welcome back, ${r.shortName}`);
       } catch (e) { toast(e.message); btn.disabled = false; }
     })
@@ -382,6 +441,7 @@ function setView(view) {
      follows you. detach, not just pause — otherwise hls.js carries on pulling
      segments for a card nobody is looking at. */
   if (state.view === 'queue' && view !== 'queue') {
+    trailerSeq++;
     const v = $('#rate-video');
     if (v) { v.pause(); detachTrailer(v); }
   }
@@ -392,7 +452,14 @@ function setView(view) {
   state.view = view;
   const want = `#/g/${state.group.slug}/${view}`;
   if (location.hash !== want) history.replaceState(null, '', want);
-  $$('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
+  $$('.tab').forEach((t) => {
+    const current = t.dataset.view === view;
+    if (current) t.setAttribute('aria-current', 'page');
+    else t.removeAttribute('aria-current');
+    if (current && matchMedia('(max-width: 720px)').matches) {
+      t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  });
   $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
   ({ queue: renderQueue, next: renderNext, library: renderLibrary,
      browse: () => renderBrowse(true), stats: renderStats, members: renderMembers }[view])();
@@ -411,9 +478,22 @@ function wireOnce() {
     const menu = $('#group-menu');
     menu.hidden = !menu.hidden;
     $('#group-btn').setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) menu.querySelector('.is-current, .group-item')?.focus();
   });
   document.addEventListener('click', closeGroupMenu);
   $('#group-menu').addEventListener('click', (e) => e.stopPropagation());
+  $('#group-menu').addEventListener('keydown', (e) => {
+    const items = $$('.group-item', e.currentTarget);
+    const at = items.indexOf(document.activeElement);
+    if (e.key === 'Escape') {
+      closeGroupMenu();
+      $('#group-btn').focus();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      items[(at + step + items.length) % items.length]?.focus();
+    } else return;
+    e.preventDefault();
+  });
 
   $('#score-range').addEventListener('input', (e) => { $('#score-out').textContent = fmt(e.target.value, 1); });
   $('#btn-save').addEventListener('click', saveRating);
@@ -447,7 +527,17 @@ function wireOnce() {
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
-  $('#hide-ea').addEventListener('change', renderNext);
+  $('#hide-ea').addEventListener('change', () => {
+    // A session result includes this setting server-side. Drop it when the input
+    // changes instead of leaving a list on screen that no longer matches its controls.
+    state.playNight = null;
+    renderNext();
+  });
+  $('#pn-build').addEventListener('click', buildPlayNight);
+  $('#pn-reset').addEventListener('click', () => {
+    state.playNight = null;
+    renderNext();
+  });
 
   let browseTimer;
   $('#browse-search').addEventListener('input', () => {
@@ -546,6 +636,59 @@ const activeGames = () => state.games.filter(isActive);
 const PLAYED_STATUS = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
 const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
 
+async function renderQueueMedia(g) {
+  const token = ++trailerSeq;
+  const slug = state.group.slug;
+  const video = $('#rate-video');
+  const image = $('#rate-image');
+  const media = $('.rate-media');
+  const note = $('#rate-notrailer');
+  const current = () => token === trailerSeq
+    && state.group?.slug === slug
+    && currentCard()?.id === g.id
+    && state.view === 'queue';
+
+  video.pause();
+  detachTrailer(video);
+  video.hidden = true;
+  if (g.header_image) {
+    image.src = g.header_image;
+    image.hidden = false;
+    note.hidden = true;
+    media.classList.remove('is-blank');
+  } else {
+    image.hidden = true;
+    note.hidden = false;
+    note.textContent = g.trailer_url ? 'Loading trailer…'
+      : 'Not linked to Steam yet — open it from the Library and paste a store link for art and a trailer';
+    media.classList.toggle('is-blank', !g.trailer_url);
+  }
+
+  if (!g.trailer_url) {
+    if (g.header_image) {
+      note.hidden = false;
+      note.textContent = 'No trailer on Steam';
+    }
+    return;
+  }
+
+  const supported = await attachTrailer(video, g.trailer_url, current);
+  if (!current()) return;
+  if (supported) {
+    video.poster = g.header_image || '';
+    video.hidden = false;
+    image.hidden = true;
+    note.hidden = true;
+    media.classList.remove('is-blank');
+    playTrailer(video);
+  } else {
+    video.hidden = true;
+    note.hidden = false;
+    note.textContent = 'Trailer will not play in this browser';
+    media.classList.toggle('is-blank', !g.header_image);
+  }
+}
+
 /**
  * The three lists behind the Rate tab.
  *
@@ -593,7 +736,7 @@ function renderQueue() {
   $('#rate-modes .seg[data-mode="skipped"]').hidden = !byMode.skipped.length;
   $$('#rate-modes .seg').forEach((b) => {
     const on = b.dataset.mode === state.rateMode;
-    b.setAttribute('aria-selected', String(on));
+    b.setAttribute('aria-pressed', String(on));
     b.classList.toggle('is-on', on);
     b.disabled = !byMode[b.dataset.mode].length;
   });
@@ -615,7 +758,13 @@ function renderQueue() {
   $('#queue-empty').hidden = !empty;
   $('#queue-card').hidden = empty;
   renderQueueList(queue);
-  if (empty) return;
+  if (empty) {
+    trailerSeq++;
+    const video = $('#rate-video');
+    video.pause();
+    detachTrailer(video);
+    return;
+  }
 
   if (state.qIndex >= queue.length) state.qIndex = 0;
   const g = gameById(queue[state.qIndex]);
@@ -630,31 +779,7 @@ function renderQueue() {
     ? 'how good was it?'
     : 'how much do you want to play this?';
 
-  const video = $('#rate-video');
-  const image = $('#rate-image');
-  const media = $('.rate-media');
-  const note  = $('#rate-notrailer');
-  video.pause();
-  if (g.trailer_url && attachTrailer(video, g.trailer_url)) {
-    video.poster = g.header_image || '';
-    video.hidden = false; image.hidden = true; note.hidden = true;
-    media.classList.remove('is-blank');
-    playTrailer(video);
-  } else if (g.header_image) {
-    detachTrailer(video); video.hidden = true;
-    image.src = g.header_image; image.hidden = false;
-    note.hidden = false;
-    note.textContent = g.trailer_url
-      ? 'Trailer will not play in this browser'
-      : 'No trailer on Steam';
-    media.classList.remove('is-blank');
-  } else {
-    // Not linked to Steam yet — a slim prompt beats a viewport-sized black box.
-    detachTrailer(video); video.hidden = true; image.hidden = true;
-    note.hidden = false;
-    note.textContent = 'Not linked to Steam yet — open it from the Library and paste a store link for art and a trailer';
-    media.classList.add('is-blank');
-  }
+  void renderQueueMedia(g);
 
   const store = $('#btn-store');
   if (g.steam_appid) {
@@ -728,6 +853,8 @@ function metaChips(g) {
     chips.push('<span class="chip chip-warn" title="Still in Early Access on Steam — '
              + 'the game is unfinished, so it may be worth waiting">Early access</span>');
   }
+  const ownership = ownershipChip(g);
+  if (ownership) chips.push(ownership);
   if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
   /* Who put this on the list. Only when we can name them — most of an imported
      library has no attribution, and "Added by Someone" is worse than silence. */
@@ -739,16 +866,34 @@ function metaChips(g) {
   return chips.join('');
 }
 
+function ownershipChip(g) {
+  if (!g.steam_appid || !g.ownership) return '';
+  const states = state.members.map((member) => g.ownership[member.steam_id]);
+  const owned = states.filter((value) => value === true).length;
+  const missing = states.filter((value) => value === false).length;
+  const unknown = states.length - owned - missing;
+  if (!owned && !missing) {
+    return '<span class="chip" title="Sync Steam libraries from Group to check ownership">ownership unknown</span>';
+  }
+  if (!missing && !unknown) return '<span class="chip chip-good">everyone owns it</span>';
+  const detail = [missing ? `${missing} do not own` : '', unknown ? `${unknown} unknown` : '']
+    .filter(Boolean).join(' · ');
+  return `<span class="chip${missing ? ' chip-warn' : ''}" title="${esc(detail)}">${owned}/${states.length} own</span>`;
+}
+
 /** The game on screen. qIndex indexes the ACTIVE MODE's queue, not state.queue. */
 const currentCard = () => gameById(queuesByMode()[state.rateMode]?.[state.qIndex]);
 
 async function saveRating() {
   const g = currentCard();
   if (!g) return;
+  const slug = state.group.slug;
   const score = Number($('#score-range').value);
   $('#btn-save').disabled = true;
   try {
-    await gapi('/rate', { method: 'POST', body: { gameId: g.id, score } });
+    await gapiFor(slug, '/rate', { method: 'POST', body: { gameId: g.id, score } });
+    if (state.group?.slug !== slug) return;
+    invalidateViewCache();
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     g.votes[state.me.steamId] = score;
@@ -761,7 +906,11 @@ async function saveRating() {
     renderMyCoverage();   // the bar should move on every save, that is the point
     toast(`${g.name}: ${fmt(score, 1)}`);
     renderQueue();
-    gapi('/games').then((lib) => { state.games = lib.games; state.model = lib.model; });
+    void gapiFor(slug, '/games').then((lib) => {
+      if (state.group?.slug !== slug) return;
+      state.games = lib.games;
+      state.model = lib.model;
+    }).catch(() => { /* the optimistic score is already saved; the next reload reconciles */ });
   } catch (e) { toast(e.message); }
   finally { $('#btn-save').disabled = false; }
 }
@@ -811,8 +960,11 @@ function renderQueueList(queue) {
 async function unskipGame() {
   const g = currentCard();
   if (!g) return;
+  const slug = state.group.slug;
   try {
-    await gapi('/skip', { method: 'DELETE', body: { gameId: g.id } });
+    await gapiFor(slug, '/skip', { method: 'DELETE', body: { gameId: g.id } });
+    if (state.group?.slug !== slug) return;
+    invalidateViewCache();
     g.mySkip = null;
     if (!state.queue.includes(g.id)) state.queue.push(g.id);
     $('#queue-count').textContent = state.queue.length || '';
@@ -825,8 +977,11 @@ async function unskipGame() {
 async function skipGame(notPlayed = false) {
   const g = currentCard();
   if (!g) return;
+  const slug = state.group.slug;
   try {
-    await gapi('/skip', { method: 'POST', body: { gameId: g.id, notPlayed } });
+    await gapiFor(slug, '/skip', { method: 'POST', body: { gameId: g.id, notPlayed } });
+    if (state.group?.slug !== slug) return;
+    invalidateViewCache();
     if (notPlayed && !(g.notPlayed || []).includes(state.me.steamId)) {
       g.notPlayed = [...(g.notPlayed || []), state.me.steamId];
     }
@@ -842,10 +997,42 @@ async function skipGame(notPlayed = false) {
 
 /* ══════════════════════════════ PLAY NEXT ═════════════════════════════ */
 function renderNext() {
+  renderPlayNightControls();
   const need = state.group.maxPlayers;
+  const session = state.playNight;
+  $('#pn-reset').hidden = !session;
+
+  if (session) {
+    const names = session.attendees.map(nameOf);
+    $('#next-sub').textContent = `${names.join(', ')} · ${session.minutes} minutes. `
+      + 'Scores use only tonight’s attendees; every result has a verified player cap and session length.';
+    const ranked = session.games.map((result) => ({ game: gameById(result.id), result }))
+      .filter(({ game }) => game);
+    $('#next-list').innerHTML = ranked.map(({ game, result }, i) => `
+      <li class="rank-row" data-id="${game.id}">
+        <div class="rank-num">${i + 1}</div>
+        <div class="rank-main">
+          <div class="rank-name">${esc(game.name)}</div>
+          <div class="rank-meta">${metaChips(game)}
+            <span class="chip chip-good">fits a ${result.minSessionMinutes}-minute session</span>
+            ${result.votes === 1 ? '<span class="chip chip-warn">only 1 attendee rated it</span>' : ''}
+          </div>
+        </div>
+        <div class="rank-score"><b>${fmt(result.score, 1)}</b><span>${result.votes} attendee vote${result.votes === 1 ? '' : 's'}</span></div>
+      </li>`).join('') || `<p class="view-sub">Nothing clears every hard gate yet. ${
+        session.excluded.sessionLengthUnknown
+          ? 'Add a typical minimum session in game details, or loosen tonight’s inputs.'
+          : 'Try changing the crew, time, or ownership requirement.'}</p>`;
+    $('#unviable-block').innerHTML = '';
+    $$('#next-list .rank-row').forEach((row) =>
+      row.addEventListener('click', () => openDetail(Number(row.dataset.id))));
+    return;
+  }
+
   $('#next-sub').textContent =
     `Backlog games ranked by the group's average score. ` +
-    `toward the middle when only one person has voted. Anything that can't fit ${need} players is flagged.`;
+    `Read each score alongside its vote count; one vote is thin evidence. ` +
+    `Anything that can't fit ${need} players is flagged.`;
 
   /* Early access is filtered here rather than merely flagged: Play next answers
      "what should we start", and starting something unfinished is usually the wrong
@@ -881,6 +1068,58 @@ function renderNext() {
 
   $$('#next-list .rank-row, #unviable-block .unviable-row')
     .forEach((r) => r.addEventListener('click', () => openDetail(Number(r.dataset.id))));
+}
+
+function renderPlayNightControls() {
+  const box = $('#pn-attendees');
+  const signature = state.members.map((member) => member.steam_id).join('|');
+  if (box.dataset.members === signature) return;
+  box.dataset.members = signature;
+  box.innerHTML = state.members.map((member) => `
+    <label class="attendee">
+      <input type="checkbox" value="${esc(member.steam_id)}" checked>
+      <i class="dot" style="background:${colorOf(member.steam_id)}"></i>
+      <span>${esc(member.short_name)}</span>
+    </label>`).join('');
+}
+
+async function buildPlayNight() {
+  const attendees = $$('#pn-attendees input:checked').map((input) => input.value);
+  const minutes = Number($('#pn-minutes').value);
+  const button = $('#pn-build');
+  const status = $('#pn-status');
+  const slug = state.group.slug;
+  button.disabled = true;
+  status.textContent = 'Checking caps, time and tonight’s ratings…';
+  try {
+    const result = await gapiFor(slug, '/play-night', {
+      method: 'POST',
+      body: {
+        attendees,
+        minutes,
+        requireOwnership: $('#pn-owned').checked,
+        excludeEarlyAccess: $('#hide-ea').checked,
+      },
+    });
+    if (state.group?.slug !== slug) return;
+    state.playNight = result;
+    const reasons = [
+      [result.excluded.tooLong, 'too long'],
+      [result.excluded.sessionLengthUnknown, 'missing session length'],
+      [result.excluded.tooFewPlayers, 'too few players'],
+      [result.excluded.playerCountUnknown, 'unverified player cap'],
+      [result.excluded.notOwnedByEveryone, 'not owned by everyone'],
+      [result.excluded.ownershipUnknown, 'ownership unknown'],
+      [result.excluded.noAttendeeRatings, 'no attendee ratings'],
+      [result.excluded.earlyAccess, 'early access'],
+    ].filter(([count]) => count).map(([count, label]) => `${count} ${label}`);
+    status.textContent = `${result.games.length} fit${reasons.length ? ` · filtered: ${reasons.join(', ')}` : ''}`;
+    renderNext();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /* ══════════════════════════════ LIBRARY ═══════════════════════════════ */
@@ -933,23 +1172,23 @@ let libSort = null;   // { key, dir } — null means the dropdown is in charge
 
 const LIB_COLUMNS = () => [
   { key: 'name',     label: 'Game',     cls: 'c-name', type: 'text', title: 'Game title' },
-  { key: 'genre',    label: 'Genre',    cls: '',       type: 'text' },
-  { key: 'status',   label: 'Status',   cls: '',       type: 'text' },
-  { key: 'players',  label: 'Players',  cls: 'c-num',  type: 'num',
+  { key: 'genre',    label: 'Genre',    cls: 'c-genre', type: 'text' },
+  { key: 'status',   label: 'Status',   cls: 'c-status', type: 'text' },
+  { key: 'players',  label: 'Players',  cls: 'c-num c-players', type: 'num',
     title: 'Max simultaneous online co-op players' },
   ...state.members.map((m) => ({
     key: `p:${m.steam_id}`, label: m.short_name, cls: 'c-p', type: 'num',
     color: colorOf(m.steam_id), title: `${m.short_name}'s own score` })),
-  { key: 'raw',      label: 'Avg',      cls: 'c-num',  type: 'num',
+  { key: 'raw',      label: 'Avg',      cls: 'c-num c-avg', type: 'num',
     title: 'The group\'s score: the plain mean of what people gave it. '
          + 'Read it next to Votes — a 9.0 from one person is not a 9.0 from four.' },
-  { key: 'n',        label: 'Votes',    cls: 'c-num',  type: 'num',
+  { key: 'n',        label: 'Votes',    cls: 'c-num c-votes', type: 'num',
     title: 'How many of you have scored this. A high average from one person is '
          + 'thin evidence; this is the column that tells you so.' },
   { key: 'started',  label: 'Started',  cls: 'c-date', type: 'text',
     title: 'When you first played it. Steam publishes no first-played date, so this '
          + 'is typed by hand in the game\'s details.' },
-  { key: 'hours',    label: 'Hrs',      cls: 'c-num',  type: 'num',
+  { key: 'hours',    label: 'Hrs',      cls: 'c-num c-hours', type: 'num',
     title: 'Hours logged for this game, entered by hand' },
 ];
 
@@ -965,14 +1204,19 @@ const libValue = (g, key) => {
 function renderLibHead() {
   $('#lib-head').innerHTML = LIB_COLUMNS().map((c) => {
     const active = libSort?.key === c.key;
-    const arrow = active ? (libSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
-    return `<th class="${c.cls} th-sort${active ? ' is-sorted' : ''}" data-sort="${esc(c.key)}"
+    const arrow = active ? (libSort.dir === 'asc' ? '▲' : '▼') : '';
+    const ariaSort = active ? (libSort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+    return `<th class="${c.cls} th-sort${active ? ' is-sorted' : ''}" aria-sort="${ariaSort}"
       ${c.color ? `style="color:${c.color}"` : ''}
-      ${c.title ? `title="${esc(c.title)}"` : ''}>${esc(c.label)}${arrow}</th>`;
+      ${c.title ? `title="${esc(c.title)}"` : ''}>
+        <button type="button" class="th-sort-btn" data-sort="${esc(c.key)}">
+          ${esc(c.label)}<span aria-hidden="true">${arrow}</span>
+        </button>
+      </th>`;
   }).join('');
 
-  $$('#lib-head .th-sort').forEach((th) => th.addEventListener('click', () => {
-    const key = th.dataset.sort;
+  $$('#lib-head .th-sort-btn').forEach((button) => button.addEventListener('click', () => {
+    const key = button.dataset.sort;
     const col = LIB_COLUMNS().find((c) => c.key === key);
     libSort = libSort?.key === key
       ? { key, dir: libSort.dir === 'asc' ? 'desc' : 'asc' }
@@ -1080,26 +1324,29 @@ function renderLibrary() {
   $('#lib-table tbody').innerHTML = rows.map((g) => `
     <tr data-id="${g.id}"${g.archived_at ? ' class="is-archived"' : ''}>
       <td class="c-name cell-strong">
+        <button type="button" class="lib-open" aria-label="Open details for ${esc(g.name)}">
         <span class="lib-game">${g.header_image
           ? `<img class="lib-art" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
-        g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span></td>
-      <td>${esc(g.genre || '—')}</td>
-      <td>${g.archived_at
+        g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span>
+        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : STATUS_LABEL[g.status]} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
+        </button></td>
+      <td class="c-genre">${esc(g.genre || '—')}</td>
+      <td class="c-status">${g.archived_at
         ? '<span class="status-tag status-archived">Archived</span>'
         : `<span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span>`}</td>
-      <td class="c-num">${g.max_players ?? '?'}</td>
+      <td class="c-num c-players">${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
         return v == null ? '<td class="c-p miss">·</td>' : `<td class="c-p">${fmt(v, 1)}</td>`;
       }).join('')}
-      <td class="c-num cell-strong">${fmt(g.raw, 1)}</td>
-      <td class="c-num">${g.n || '–'}</td>
+      <td class="c-num c-avg cell-strong">${fmt(g.raw, 1)}</td>
+      <td class="c-num c-votes">${g.n || '–'}</td>
       <td class="c-date">${g.started
         ? `<span title="Started ${esc(g.started)}">${esc(shortDate(g.started))}</span>`
         : '–'}</td>
-      <td class="c-num">${(() => {
+      <td class="c-num c-hours">${(() => {
         const h = hoursOf(g);
         if (!h.value) return '–';
         return h.manual
@@ -1110,12 +1357,29 @@ function renderLibrary() {
 
   $$('#lib-table tbody tr').forEach((tr) =>
     tr.addEventListener('click', () => openDetail(Number(tr.dataset.id))));
+  $$('#lib-table .lib-open').forEach((button) => button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDetail(Number(button.closest('tr').dataset.id));
+  }));
 }
 
 /* ══════════════════════════════ STATS ═════════════════════════════════ */
+let statsSeq = 0;
+
 async function renderStats() {
+  const slug = state.group.slug;
+  const seq = ++statsSeq;
   let s;
-  try { s = await gapi('/stats'); } catch (e) { return toast(e.message); }
+  try {
+    s = state.cache.stats?.slug === slug
+      ? state.cache.stats.data
+      : await gapiFor(slug, '/stats');
+  } catch (e) {
+    if (seq === statsSeq && state.group?.slug === slug && state.view === 'stats') toast(e.message);
+    return;
+  }
+  if (seq !== statsSeq || state.group?.slug !== slug || state.view !== 'stats') return;
+  state.cache.stats = { slug, data: s };
 
   $('#stat-tiles').innerHTML = `
     ${tile(s.totals.games, 'games tracked')}
@@ -1224,9 +1488,22 @@ function barChart(items, max, tone = () => '', decimals = 2) {
 }
 
 /* ══════════════════════════════ GROUP ═════════════════════════════════ */
+let membersSeq = 0;
+
 async function renderMembers() {
+  const slug = state.group.slug;
+  const seq = ++membersSeq;
   let d;
-  try { d = await gapi('/members'); } catch (e) { return toast(e.message); }
+  try {
+    d = state.cache.members?.slug === slug
+      ? state.cache.members.data
+      : await gapiFor(slug, '/members');
+  } catch (e) {
+    if (seq === membersSeq && state.group?.slug === slug && state.view === 'members') toast(e.message);
+    return;
+  }
+  if (seq !== membersSeq || state.group?.slug !== slug || state.view !== 'members') return;
+  state.cache.members = { slug, data: d };
   const isOwner = d.group.role === 'owner';
 
   /* ── coverage leaderboard ──────────────────────────────────────────────── */
@@ -1248,8 +1525,8 @@ async function renderMembers() {
       <div class="c-num">${m.pct}%</div>
     </div>`).join('');
 
-  // Name the gap rather than just drawing it — "Dave is 47 behind" is actionable
-  // in a way that four bars of different lengths is not.
+  // Name the percentage-point gap rather than comparing raw rating counts: each
+  // person can have a different denominator after marking games they did not play.
   const note = $('#coverage-note');
   // active.length, not `total` — that was a group-wide count before denominators
   // went per person, and referencing it after the rename threw here, killing every
@@ -1259,10 +1536,10 @@ async function renderMembers() {
   } else {
     const lead = ranked[0];
     const last = ranked[ranked.length - 1];
-    const gap = lead.ratings - last.ratings;
+    const gap = lead.pct - last.pct;
     note.textContent = gap
-      ? `${last.short_name} is ${gap} rating${gap === 1 ? '' : 's'} behind ${lead.short_name}.`
-      : 'Everyone is level. The ranking is as trustworthy as it gets.';
+      ? `${last.short_name} is ${gap} percentage point${gap === 1 ? '' : 's'} behind ${lead.short_name}.`
+      : 'Everyone has the same rating coverage.';
   }
 
   $('#member-list').innerHTML = d.members.map((m) => `
@@ -1281,13 +1558,15 @@ async function renderMembers() {
     </div>`).join('');
 
   $$('#member-list [data-remove]').forEach((b) => b.addEventListener('click', async () => {
+    const slug = state.group.slug;
     const self = b.dataset.remove === state.me.steamId;
     if (!confirm(self ? 'Leave this group? Your ratings here are deleted.'
                       : 'Remove this member and all their ratings?')) return;
     try {
-      await gapi('/members', { method: 'DELETE', body: { steamId: b.dataset.remove } });
+      await gapiFor(slug, '/members', { method: 'DELETE', body: { steamId: b.dataset.remove } });
+      if (state.group?.slug !== slug) return;
       if (self) { state.groups = (await api('/api/me')).groups; state.group = null; location.hash = ''; return boot(); }
-      await loadGroup(); setView('members'); toast('Removed');
+      if (await reloadGroupView(slug, 'members')) toast('Removed');
     } catch (e) { toast(e.message); }
   }));
 
@@ -1313,8 +1592,14 @@ async function renderMembers() {
     <div class="danger">
       <strong>Delete this group</strong>
       <p class="field-help">Removes the group and everything in it — every game, every rating,
-        every member. There is no undo and no export. Archiving a single game is on its row in
-        the Library; this is for the whole group.</p>
+        every comment and every member. There is no undo. Download a portable backup first;
+        archiving a single game is on its row in the Library.</p>
+      <div class="export-links" aria-label="Download group backup">
+        <a class="btn btn-sm" href="/api/g/${encodeURIComponent(slug)}/export?format=json">Download JSON backup</a>
+        <span>CSV:</span>
+        ${['games', 'ratings', 'comments', 'members'].map((table) =>
+          `<a href="/api/g/${encodeURIComponent(slug)}/export?format=csv&table=${table}">${table}</a>`).join(' · ')}
+      </div>
       <label class="field">
         <span>Type <code>${esc(d.group.name)}</code> to confirm</span>
         <input class="input" id="s-del-name" autocomplete="off" placeholder="${esc(d.group.name)}">
@@ -1336,6 +1621,7 @@ async function renderMembers() {
         + 'blind while the rest see the numbers achieves nothing.'}</p>`;
 
   if (isOwner) $('#s-delete').addEventListener('click', async () => {
+    const slug = state.group.slug;
     const typed = $('#s-del-name').value.trim();
     if (typed !== d.group.name) {
       $('#s-del-status').textContent = 'Type the group name exactly to confirm.';
@@ -1344,7 +1630,8 @@ async function renderMembers() {
     if (!confirm(`Delete "${d.group.name}" and every rating in it? This cannot be undone.`)) return;
     $('#s-delete').disabled = true;
     try {
-      const r = await gapi('/group', { method: 'DELETE', body: { confirmName: typed } });
+      const r = await gapiFor(slug, '/group', { method: 'DELETE', body: { confirmName: typed } });
+      if (state.group?.slug !== slug) return;
       toast(`Deleted ${d.group.name} — ${r.deleted.games} games, ${r.deleted.ratings} ratings`);
       state.groups = (await api('/api/me')).groups;
       state.group = null;
@@ -1356,25 +1643,28 @@ async function renderMembers() {
     }
   });
 
-  renderPlaytime();
+  void renderPlaytime();
   $('#pt-sync').addEventListener('click', syncPlaytime);
 
   if (isOwner) $('#s-blind').addEventListener('change', async (e) => {
+    const slug = state.group.slug;
     try {
-      await gapi('/members', { method: 'PATCH', body: { blindRating: e.target.checked } });
-      await loadGroup();
+      await gapiFor(slug, '/members', { method: 'PATCH', body: { blindRating: e.target.checked } });
+      if (!await reloadGroupView(slug, state.view)) return;
       toast(e.target.checked ? 'Everyone now rates blind' : 'Ratings visible to everyone again');
       if (state.view === 'queue') renderQueue();
     } catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
   });
 
   $('#s-save').addEventListener('click', async () => {
+    const slug = state.group.slug;
     const patch = { myName: $('#s-myname').value };
     if (isOwner) { patch.name = $('#s-name').value; patch.maxPlayers = Number($('#s-size').value); }
     try {
-      await gapi('/members', { method: 'PATCH', body: patch });
+      await gapiFor(slug, '/members', { method: 'PATCH', body: patch });
+      if (state.group?.slug !== slug) return;
       state.groups = (await api('/api/me')).groups;
-      await loadGroup(); setView('members'); toast('Saved');
+      if (await reloadGroupView(slug, 'members')) toast('Saved');
     } catch (e) { toast(e.message); }
   });
 
@@ -1397,7 +1687,11 @@ async function renderMembers() {
     catch { $('#invite-link').select(); toast('Press Ctrl+C to copy'); }
   });
   const setInvite = async (mode) => {
-    try { await gapi('/members', { method: 'PATCH', body: { invite: mode } }); await loadGroup(); setView('members'); }
+    const slug = state.group.slug;
+    try {
+      await gapiFor(slug, '/members', { method: 'PATCH', body: { invite: mode } });
+      await reloadGroupView(slug, 'members');
+    }
     catch (e) { toast(e.message); }
   };
   $('#invite-rotate')?.addEventListener('click', () => setInvite('rotate'));
@@ -1406,7 +1700,10 @@ async function renderMembers() {
 }
 
 /* ══════════════════════════════ ADD GAME ══════════════════════════════ */
+let steamSearchSeq = 0;
+
 function openAdd() {
+  steamSearchSeq++;
   $('#add-manual').open = false;
   ['#man-name', '#man-genre', '#man-players'].forEach((sel) => { $(sel).value = ''; });
   $('#man-status').textContent = '';
@@ -1418,10 +1715,12 @@ function openAdd() {
 }
 
 async function runSearch(term) {
+  const seq = ++steamSearchSeq;
   if (!term || term.trim().length < 2) { $('#add-results').innerHTML = ''; return; }
   $('#add-status').textContent = 'Searching Steam…';
   try {
     const { results } = await api(`/api/steam/search?q=${encodeURIComponent(term.trim())}`);
+    if (seq !== steamSearchSeq || !$('#add-dialog').open) return;
     if (!results.length) { $('#add-status').textContent = 'No matches on Steam.'; $('#add-results').innerHTML = ''; return; }
     $('#add-status').textContent = '';
     // Whether it is already on the list is the first thing you want to know here;
@@ -1440,17 +1739,19 @@ async function runSearch(term) {
     }).join('');
     $$('#add-results .add-hit:not([disabled])').forEach((b) =>
       b.addEventListener('click', () => addGame(b.dataset.appid, b)));
-  } catch (e) { $('#add-status').textContent = e.message; }
+  } catch (e) {
+    if (seq === steamSearchSeq && $('#add-dialog').open) $('#add-status').textContent = e.message;
+  }
 }
 
 async function addGame(appid, btn) {
+  const slug = state.group.slug;
   btn.disabled = true;
   $('#add-status').textContent = 'Adding…';
   try {
-    const r = await gapi('/games', { method: 'POST', body: { input: appid } });
-    await loadGroup();
+    const r = await gapiFor(slug, '/games', { method: 'POST', body: { input: appid } });
+    if (!await reloadGroupView(slug, 'queue')) return;
     $('#add-dialog').close();
-    setView('queue');
     toast(`Added ${r.name}. Set its player count so we know if we can all play.`);
   } catch (e) { $('#add-status').textContent = e.message; btn.disabled = false; }
 }
@@ -1460,10 +1761,11 @@ async function addManual() {
   const name = $('#man-name').value.trim();
   if (name.length < 2) { $('#man-status').textContent = 'Give the game a name.'; return; }
   const btn = $('#man-add');
+  const slug = state.group.slug;
   btn.disabled = true;
   $('#man-status').textContent = 'Adding…';
   try {
-    const r = await gapi('/games', {
+    const r = await gapiFor(slug, '/games', {
       method: 'POST',
       body: {
         manual: true,
@@ -1472,9 +1774,8 @@ async function addManual() {
         maxPlayers: Number($('#man-players').value) || null,
       },
     });
-    await loadGroup();
+    if (!await reloadGroupView(slug, 'queue')) return;
     $('#add-dialog').close();
-    setView('queue');
     toast(`Added ${r.name} by hand. No trailer — set a player count from the Library if it needs one.`);
   } catch (e) {
     $('#man-status').textContent = e.message;
@@ -1482,10 +1783,19 @@ async function addManual() {
 }
 
 /** Who the playtime sync can and cannot read. */
+let playtimeSeq = 0;
+
 async function renderPlaytime() {
+  const slug = state.group.slug;
+  const seq = ++playtimeSeq;
   const box = $('#pt-members');
   try {
-    const { members } = await gapi('/playtime');
+    const result = state.cache.playtime?.slug === slug
+      ? state.cache.playtime.data
+      : await gapiFor(slug, '/playtime');
+    if (seq !== playtimeSeq || state.group?.slug !== slug || state.view !== 'members') return;
+    state.cache.playtime = { slug, data: result };
+    const { members } = result;
     box.innerHTML = members.map((m) => {
       // Three genuinely different states, and conflating them is what makes a
       // privacy warning feel like nagging: a placeholder has no account to read,
@@ -1516,17 +1826,20 @@ async function renderPlaytime() {
         + '<span class="pt-fix">Estimates still work from whoever we can read.</span>'
       : '';
   } catch (e) {
-    box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+    if (seq === playtimeSeq && state.group?.slug === slug && state.view === 'members') {
+      box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+    }
   }
 }
 
 async function syncPlaytime() {
+  const slug = state.group.slug;
   const btn = $('#pt-sync');
   btn.disabled = true;
   $('#pt-status').textContent = 'Asking Steam…';
   try {
-    const r = await gapi('/playtime', { method: 'POST' });
-    await loadGroup();
+    const r = await gapiFor(slug, '/playtime', { method: 'POST' });
+    if (!await reloadGroupView(slug, 'members')) return;
     await renderPlaytime();
     const ok = r.members.filter((m) => m.ok).length;
     toast(`Synced ${ok}/${r.members.length} — ${r.gamesEstimated} games got an estimate`);
@@ -1550,6 +1863,7 @@ const browse = { page: 0, items: [], hasMore: false };
 let browseSeq = 0;
 
 async function renderBrowse(reset) {
+  const slug = state.group.slug;
   if (reset) { browse.page = 0; browse.items = []; browse.hasMore = false; }
 
   const q = $('#browse-search').value.trim();
@@ -1571,13 +1885,17 @@ async function renderBrowse(reset) {
        has to come from below the tenancy boundary; /api/coop is deliberately
        group-blind and stays that way. Same card shape from both — they share
        CATALOGUE_COLS — so only the URL differs here. */
-    d = sort === 'fit' ? await gapi(`/recommend?${params}`) : await api(`/api/coop?${params}`);
+    d = sort === 'fit'
+      ? await gapiFor(slug, `/recommend?${params}`)
+      : await api(`/api/coop?${params}`);
   }
   catch (e) {
-    if (seq === browseSeq) $('#browse-status').textContent = e.message;
+    if (seq === browseSeq && state.group?.slug === slug && state.view === 'browse') {
+      $('#browse-status').textContent = e.message;
+    }
     return;
   }
-  if (seq !== browseSeq) return;   // superseded by a later search; drop this answer
+  if (seq !== browseSeq || state.group?.slug !== slug || state.view !== 'browse') return;
 
   const got = d.games || [];   // never let a malformed page turn into a hard crash
   browse.items = browse.page ? browse.items.concat(got) : got;
@@ -1674,6 +1992,7 @@ async function renderBrowse(reset) {
 
 /** Add a catalogue game to this group's library, carrying any verified player cap. */
 async function addFromCatalogue(btn) {
+  const slug = state.group.slug;
   const appid = Number(btn.dataset.add);
   const entry = browse.items.find((g) => g.appid === appid);
   btn.disabled = true;
@@ -1681,12 +2000,11 @@ async function addFromCatalogue(btn) {
   try {
     // Passing maxPlayers through means an added game arrives with a real cap
     // where one is known, so the viability check works without further input.
-    const r = await gapi('/games', {
+    const r = await gapiFor(slug, '/games', {
       method: 'POST',
       body: { input: String(appid), maxPlayers: entry?.max_players ?? null },
     });
-    await loadGroup();
-    btn.outerHTML = '<span class="chip chip-good">in your library</span>';
+    if (!await reloadGroupView(slug, 'browse')) return;
     toast(entry?.max_players
       ? `Added ${r.name} — it's in everyone's rating queue now.`
       : `Added ${r.name}. Set its player count so we know if we can all play.`);
@@ -1698,9 +2016,14 @@ async function addFromCatalogue(btn) {
 }
 
 /* ══════════════════════════════ DETAIL ════════════════════════════════ */
+let detailGameId = null;
+
 function openDetail(id) {
   const g = gameById(id);
   if (!g) return;
+  const slug = state.group.slug;
+  const returnView = state.view;
+  detailGameId = id;
   $('#detail-title').textContent = g.name;
 
   $('#detail-body').innerHTML = `
@@ -1719,6 +2042,21 @@ function openDetail(id) {
           </div>`;
         }).join('')}
       </div>
+
+      ${g.steam_appid && g.ownership ? `
+        <section class="ownership-detail">
+          <h4>Steam ownership</h4>
+          <div class="ownership-people">
+            ${state.members.map((member) => {
+              const owned = g.ownership[member.steam_id];
+              return `<span class="ownership-person ${owned === true ? 'is-owned' : owned === false ? 'is-missing' : ''}">
+                <i class="dot" style="background:${colorOf(member.steam_id)}"></i>
+                ${esc(member.short_name)} · ${owned === true ? 'owns it' : owned === false ? 'not in latest library sync' : 'unknown'}
+              </span>`;
+            }).join('')}
+          </div>
+          <p>Based on the latest public Steam library sync. Unknown stays unknown when a library is private or stale.</p>
+        </section>` : ''}
 
       <div class="detail-row2">
         <div class="detail-field">
@@ -1742,6 +2080,12 @@ function openDetail(id) {
           <label for="d-hours">Hours played</label>
           <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
         </div>
+      </div>
+      <div class="detail-field">
+        <label for="d-session">Shortest worthwhile session (minutes)</label>
+        <input id="d-session" class="input" type="number" step="15" min="15" max="720"
+               value="${g.min_session_minutes ?? ''}" placeholder="unknown">
+        <p class="field-help">A human estimate for Play Night — not total playtime or campaign length.</p>
       </div>
       <div class="detail-row2">
         <div class="detail-field">
@@ -1782,6 +2126,12 @@ function openDetail(id) {
           </div>
         </div>`}
 
+      ${g.steam_appid ? `
+        <section class="trophy" id="d-achievements">
+          <h4>🏆 Trophy relay</h4>
+          <p class="panel-sub" style="margin:0">Loading achievement progress…</p>
+        </section>` : ''}
+
       <section class="thread">
         <h4 class="thread-title">Comments</h4>
         <div id="d-comments" class="thread-list">
@@ -1807,16 +2157,19 @@ function openDetail(id) {
 
   $('#d-save').addEventListener('click', async () => {
     try {
-      await gapi(`/games/${id}`, { method: 'PATCH', body: {
+      await gapiFor(slug, `/games/${id}`, { method: 'PATCH', body: {
         status: $('#d-status').value,
         max_players: $('#d-players').value === '' ? null : Number($('#d-players').value),
         genre: $('#d-genre').value.trim() || null,
         hours: $('#d-hours').value === '' ? null : Number($('#d-hours').value),
+        min_session_minutes: $('#d-session').value === '' ? null : Number($('#d-session').value),
         added_by: $('#d-addedby').value || null,
         started: $('#d-started').value || null,
         finished: $('#d-finished').value || null,
       }});
-      await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Saved');
+      if (!await reloadGroupView(slug, returnView)) return;
+      $('#detail-dialog').close();
+      toast('Saved');
     } catch (e) { toast(e.message); }
   });
 
@@ -1825,8 +2178,10 @@ function openDetail(id) {
     const appid = Number(raw.match(/app\/(\d+)/)?.[1] || raw);
     if (!Number.isInteger(appid) || !appid) return toast('paste a Steam store link or a numeric appid');
     try {
-      await gapi(`/games/${id}`, { method: 'PUT', body: { appid } });
-      await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Linked to Steam');
+      await gapiFor(slug, `/games/${id}`, { method: 'PUT', body: { appid } });
+      if (!await reloadGroupView(slug, returnView)) return;
+      $('#detail-dialog').close();
+      toast('Linked to Steam');
     } catch (e) { toast(e.message); }
   });
 
@@ -1837,8 +2192,9 @@ function openDetail(id) {
   if (g.archived_at) {
     $('#d-restore').addEventListener('click', async () => {
       try {
-        await gapi(`/games/${id}`, { method: 'PATCH', body: { archived: false } });
-        await loadGroup(); $('#detail-dialog').close(); setView(state.view);
+        await gapiFor(slug, `/games/${id}`, { method: 'PATCH', body: { archived: false } });
+        if (!await reloadGroupView(slug, returnView)) return;
+        $('#detail-dialog').close();
         toast(`${g.name} is back, with every rating it had`);
       } catch (e) { toast(e.message); }
     });
@@ -1850,8 +2206,9 @@ function openDetail(id) {
         + `${kept}, and it drops out of the rating queue and Play next. `
         + `You can restore it any time from Library → Archived.`)) return;
       try {
-        const r = await gapi(`/games/${id}`, { method: 'DELETE' });
-        await loadGroup(); $('#detail-dialog').close(); setView(state.view);
+        const r = await gapiFor(slug, `/games/${id}`, { method: 'DELETE' });
+        if (!await reloadGroupView(slug, returnView)) return;
+        $('#detail-dialog').close();
         toast(r.keptRatings
           ? `Archived ${r.name} — ${r.keptRatings} ratings kept`
           : `Archived ${r.name}`);
@@ -1859,21 +2216,89 @@ function openDetail(id) {
     });
   }
 
-  loadComments(id);
-  $('#d-comment-add').addEventListener('click', () => postComment(id));
+  void loadComments(id, slug);
+  if (g.steam_appid) void loadAchievements(id, slug);
+  $('#d-comment-add').addEventListener('click', () => postComment(id, slug));
   // Cmd/Ctrl+Enter posts, so a keyboard-driven queue stays keyboard-driven.
   $('#d-comment').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postComment(id); }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postComment(id, slug); }
   });
 
   $('#detail-dialog').showModal();
 }
 
+async function loadAchievements(gameId, slug = state.group.slug) {
+  const box = $('#d-achievements');
+  if (!box) return;
+  try {
+    const view = await gapiFor(slug, `/achievements?gameId=${gameId}`);
+    if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
+    renderAchievements(gameId, slug, view);
+  } catch (error) {
+    if (detailGameId === gameId && box) {
+      box.innerHTML = `<h4>🏆 Trophy relay</h4><p class="panel-sub" style="margin:0">${esc(error.message)}</p>`;
+    }
+  }
+}
+
+function renderAchievements(gameId, slug, view) {
+  const box = $('#d-achievements');
+  if (!box) return;
+  const relay = view.relay || { unlocked: 0, total: 0, synced: 0, eligible: 0, nearSweep: [], latest: [] };
+  const pct = relay.total ? Math.round((relay.unlocked / relay.total) * 100) : 0;
+  const syncedMembers = (view.members || []).filter((member) => member.total != null);
+  box.innerHTML = `
+    <div class="trophy-head">
+      <div>
+        <h4>🏆 Trophy relay</h4>
+        <p>${relay.total
+          ? `${relay.unlocked}/${relay.total} different achievements unlocked somewhere in the group`
+          : syncedMembers.length ? 'Steam reports no achievements for this game.'
+            : 'No one has handed off the trophy baton yet.'}</p>
+      </div>
+      ${relay.total ? `<strong>${pct}%</strong>` : ''}
+    </div>
+    ${relay.total ? `<div class="trophy-track"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}
+    <div class="trophy-people">
+      ${(view.members || []).map((member) => `
+        <div class="trophy-person">
+          <span><i class="dot" style="background:${colorOf(member.steamId)}"></i>${esc(member.name)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${member.total ? (member.achieved / member.total) * 100 : 0}%;background:${colorOf(member.steamId)}"></div></div>
+          <b>${member.total == null ? (member.account ? 'not synced' : 'no account') : `${member.achieved}/${member.total}`}</b>
+        </div>`).join('')}
+    </div>
+    ${relay.unanimous != null ? `<p class="trophy-note">✨ ${relay.unanimous} unlocked by everyone.</p>` : ''}
+    ${(relay.nearSweep || []).length ? `<div class="trophy-calls"><strong>One baton short</strong>${relay.nearSweep.map((item) =>
+      `<span>${esc(item.name)} — waiting on ${esc(item.missing)}</span>`).join('')}</div>` : ''}
+    ${(relay.latest || []).length ? `<div class="trophy-calls"><strong>Fresh trophies</strong>${relay.latest.map((item) =>
+      `<span>${esc(item.member)} unlocked ${esc(item.name)} · ${when(item.unlocktime)}</span>`).join('')}</div>` : ''}
+    <div class="trophy-actions">
+      <button class="btn btn-sm" id="d-ach-sync">Sync my progress</button>
+      <span id="d-ach-status">${relay.synced}/${relay.eligible} accounts synced for this game</span>
+    </div>`;
+
+  $('#d-ach-sync').addEventListener('click', async () => {
+    const button = $('#d-ach-sync');
+    const status = $('#d-ach-status');
+    button.disabled = true;
+    status.textContent = 'Asking Steam…';
+    try {
+      const updated = await gapiFor(slug, '/achievements', { method: 'POST', body: { gameId } });
+      if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
+      renderAchievements(gameId, slug, updated);
+    } catch (error) {
+      status.textContent = error.message;
+      button.disabled = false;
+    }
+  });
+}
+
 /** Fetched per game rather than bundled into the library payload — see the route. */
-async function loadComments(gameId) {
+async function loadComments(gameId, slug = state.group.slug) {
   const box = $('#d-comments');
   try {
-    const { comments } = await gapi(`/comments?gameId=${gameId}`);
+    const { comments } = await gapiFor(slug, `/comments?gameId=${gameId}`);
+    if (state.group?.slug !== slug || !$('#detail-dialog').open) return;
     box.innerHTML = comments.length
       ? comments.map((c) => `
         <article class="comment">
@@ -1891,26 +2316,29 @@ async function loadComments(gameId) {
     $$('#d-comments [data-del-comment]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('Delete this comment?')) return;
       try {
-        await gapi('/comments', { method: 'DELETE', body: { id: Number(b.dataset.delComment) } });
-        loadComments(gameId);
+        await gapiFor(slug, '/comments', { method: 'DELETE', body: { id: Number(b.dataset.delComment) } });
+        void loadComments(gameId, slug);
       } catch (e) { toast(e.message); }
     }));
   } catch (e) {
-    box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+    if (state.group?.slug === slug && $('#detail-dialog').open) {
+      box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
+    }
   }
 }
 
-async function postComment(gameId) {
+async function postComment(gameId, slug = state.group.slug) {
   const el = $('#d-comment');
   const text = el.value.trim();
   if (!text) { $('#d-comment-status').textContent = 'Write something first.'; return; }
   const btn = $('#d-comment-add');
   btn.disabled = true;
   try {
-    await gapi('/comments', { method: 'POST', body: { gameId, body: text } });
+    await gapiFor(slug, '/comments', { method: 'POST', body: { gameId, body: text } });
+    if (state.group?.slug !== slug || !$('#detail-dialog').open) return;
     el.value = '';
     $('#d-comment-status').textContent = '';
-    await loadComments(gameId);
+    await loadComments(gameId, slug);
   } catch (e) {
     $('#d-comment-status').textContent = e.message;
   } finally { btn.disabled = false; }

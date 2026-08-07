@@ -1,12 +1,15 @@
 -- CoopQueue — Cloudflare D1 schema (multi-tenant)
--- Apply with:  npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
+-- Fresh installs and tests only. Never apply this file to an existing remote
+-- database: the statements immediately below deliberately destroy every table.
 --
 -- Tenancy model: everything a group owns hangs off groups.id. A person is one
 -- row in users (keyed by their SteamID64) and can belong to any number of
 -- groups; their display name and role are per-group, held on memberships.
 
 DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS achievement_progress;
 DROP TABLE IF EXISTS playtime;
+DROP TABLE IF EXISTS group_library_sync;
 DROP TABLE IF EXISTS playtime_sync;
 DROP TABLE IF EXISTS seed_assignments;
 DROP TABLE IF EXISTS skips;
@@ -18,6 +21,7 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS steam_apps;
 DROP TABLE IF EXISTS coop_apps;
 DROP TABLE IF EXISTS crawl_state;
+DROP TABLE IF EXISTS rate_limits;
 
 -- ── people ──────────────────────────────────────────────────────────────────
 -- steam_id is a SteamID64, or 'seed:<group>:<name>' for a placeholder member
@@ -138,6 +142,10 @@ CREATE TABLE games (
                       -- neither 'dropped' (gave up) nor 'sampled' (barely started).
                       CHECK (status IN ('backlog','playing','finished','unfinished','dropped','sampled')),
   max_players       INTEGER,                  -- max simultaneous ONLINE co-op players
+  -- Shortest session that is still worth starting, set by this group. Steam's
+  -- lifetime hours cannot answer "does this fit tonight?" and must never be used
+  -- as a substitute. Mirrors migrations/021-session-and-achievements.sql.
+  min_session_minutes INTEGER,
   coop_note         TEXT,                     -- 'Remote Play Together', 'needs a mod', …
   header_image      TEXT,
   trailer_url       TEXT,
@@ -201,6 +209,35 @@ CREATE TABLE playtime_sync (
   synced_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
+-- A global playtime sync is not proof that a missing row belongs to THIS group's
+-- library: the sync stores only games in the group from which it was launched.
+-- This group-scoped watermark is therefore the only thing allowed to turn an
+-- absent playtime row into "not owned". Existing data stays unknown until the
+-- group is synced once, which is safer than a false negative.
+CREATE TABLE group_library_sync (
+  group_id  INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  steam_id  TEXT    NOT NULL,
+  games     INTEGER,
+  played    INTEGER,
+  synced_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (group_id, steam_id)
+);
+
+-- Achievement progress is global for the same reason playtime is: a Steam
+-- account's progress in an app does not change between groups. Members sync one
+-- game at a time from its detail panel, keeping Steam traffic bounded and making
+-- profile privacy failures attributable rather than silently incomplete.
+CREATE TABLE achievement_progress (
+  steam_id   TEXT    NOT NULL,
+  appid      INTEGER NOT NULL,
+  achieved   INTEGER NOT NULL,
+  total      INTEGER NOT NULL,
+  unlocked   TEXT    NOT NULL,                -- JSON [{key,name,unlocktime}]
+  fetched_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (steam_id, appid)
+);
+CREATE INDEX idx_achievement_app ON achievement_progress(appid);
+
 -- One comment thread per game. group_id is denormalised on purpose: invariant 2
 -- wants every statement below the tenancy boundary to filter on group_id, and a
 -- column beats a join somebody will forget. Mirrors migrations/010-comments.sql.
@@ -240,6 +277,14 @@ CREATE TABLE skips (
   not_played INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
+);
+
+-- Per-account abuse protection for writes and Steam-backed lookups. One row per
+-- account/category is reused every window, so this table never needs a cleanup job.
+CREATE TABLE rate_limits (
+  bucket       TEXT PRIMARY KEY,
+  window_start INTEGER NOT NULL,
+  hits         INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX idx_games_group     ON games(group_id, status);

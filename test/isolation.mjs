@@ -46,7 +46,7 @@ const DB = makeDB(sqlite);
 const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
-       commentsRoute] = await Promise.all([
+       commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -56,7 +56,14 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/members.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/group.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/comments.js')),
+  import(path.join(SITE, 'functions/_middleware.js')),
+  import(path.join(SITE, 'functions/api/me.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/export.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/play-night.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/achievements.js')),
 ]);
+const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
+const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
 
 const user = (id) => sqlite.prepare('SELECT * FROM users WHERE steam_id=?').get(id);
 const ctxFor = async (steamId, slug) => {
@@ -227,7 +234,8 @@ const getCoop = (qs = '') =>
 sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, max_players, max_players_src) VALUES
   (777001,'Verified Four',1,4,'manual'),
   (777002,'Unverified Cap',2,NULL,NULL),
-  (777003,'Verified Two',3,2,'manual')`);
+  (777003,'Verified Two',3,2,'manual'),
+  (777004,'100% Orange Juice',4,4,'manual')`);
 // A fresh steam_apps row so pooling does not reach out to Steam during tests.
 sqlite.exec(`INSERT INTO steam_apps (appid, name, genre, fetched_at)
              VALUES (777001,'Verified Four','Action',unixepoch())`);
@@ -252,6 +260,15 @@ await check('a fit filter never offers a game whose player count is unverified',
   if (!hasUnverified) return 'fixture missing: unverified game absent from unfiltered list';
   if (fits.games.some((g) => g.max_players == null)) return 'CLAIMED AN UNVERIFIED GAME FITS';
   return fits.games.every((g) => g.max_players >= 4) || 'returned a game below the headcount';
+});
+
+await check('catalogue search treats % and _ as text, not SQL wildcards', async () => {
+  const percent = await (await getCoop('q=%25')).json();
+  const underscore = await (await getCoop('q=_')).json();
+  return (percent.games.some((g) => g.appid === 777004)
+      && percent.games.every((g) => g.name.includes('%'))
+      && underscore.games.length === 0)
+    || `percent=${percent.games.map((g) => g.name).join(',')} underscore=${underscore.games.length}`;
 });
 
 await check('two groups can pool the same game independently', async () => {
@@ -303,6 +320,16 @@ await check('a hand-added game needs a real name', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const r = await gamesRoute.onRequestPost({ request: req({ manual: true, name: ' ' }), env, data });
   return r.status === 400 || `expected 400, got ${r.status}`;
+});
+
+await check('manual game fields reject fractional caps and oversized text', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const fractional = await gamesRoute.onRequestPost({
+    request: req({ manual: true, name: 'Fractional cap', maxPlayers: 2.5 }), env, data });
+  const oversized = await gamesRoute.onRequestPost({
+    request: req({ manual: true, name: 'Huge genre', genre: 'x'.repeat(81) }), env, data });
+  return (fractional.status === 400 && oversized.status === 400)
+    || `fractional ${fractional.status}, oversized ${oversized.status}`;
 });
 
 await check('adding by hand cannot reach another group', async () => {
@@ -368,6 +395,18 @@ await check('someone with no assignment is left to the claim screen', async () =
   const body = await (await claimRoute.onRequestGet({ env, data })).json();
   return (body.canClaim && body.unclaimed.length > 0)
     || `canClaim=${body.canClaim} unclaimed=${body.unclaimed.length}`;
+});
+
+await check('claim choices report how many ratings will move', async () => {
+  const { data } = await ctxFor(NOBODY, 'g4m1ng');
+  const body = await (await claimRoute.onRequestGet({ env, data })).json();
+  const wrong = body.unclaimed.find((s) => {
+    const expected = sqlite.prepare(
+      `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
+        WHERE g.group_id=1 AND r.steam_id=?`).get(s.seedId).n;
+    return s.ratings !== expected;
+  });
+  return !wrong || `${wrong.name} reports ${wrong.ratings}`;
 });
 
 await check('auto-claim refuses to merge an existing rating history', async () => {
@@ -575,6 +614,165 @@ await check('comments go with the game when the group is deleted', async () => {
   return left === 0 || `${left} comments survived the group deletion`;
 });
 
+console.log('\nExports, ownership & play night');
+
+sqlite.exec(`INSERT INTO games
+  (id, group_id, name, steam_appid, status, max_players, min_session_minutes, enriched_at, created_at)
+  VALUES
+  (8200,1,'Tonight Shortlist',982000,'backlog',4,60,100,100),
+  (8201,1,'Tonight Too Long',982001,'backlog',4,180,100,100),
+  (8202,1,'Tonight Duration Unknown',982002,'backlog',4,NULL,500,100),
+  (8203,1,'Tonight Cap Unknown',982003,'backlog',NULL,60,100,100)`);
+sqlite.exec(`INSERT OR REPLACE INTO ratings (game_id, steam_id, score) VALUES
+  (8200,'${ALICE}',8),(8200,'${MALLORY}',9),(8200,'${LEO_REAL}',10),
+  (8201,'${ALICE}',10),(8201,'${MALLORY}',10),
+  (8202,'${ALICE}',9),(8203,'${ALICE}',9)`);
+sqlite.exec(`INSERT OR REPLACE INTO playtime_sync (steam_id, games, played, synced_at) VALUES
+  ('${ALICE}',100,50,2000),('${MALLORY}',100,50,1000)`);
+sqlite.exec(`INSERT OR REPLACE INTO group_library_sync (group_id, steam_id, games, played, synced_at) VALUES
+  (1,'${ALICE}',100,50,100),(1,'${MALLORY}',100,50,1000)`);
+sqlite.exec(`INSERT OR REPLACE INTO playtime (steam_id, appid, minutes, fetched_at) VALUES
+  ('${ALICE}',982000,0,100),('${MALLORY}',982000,0,100)`);
+
+await check('ownership is true, false, or unknown — never guessed from stale data', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const library = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const owned = library.games.find((game) => game.id === 8200).ownership;
+  const stale = library.games.find((game) => game.id === 8202).ownership;
+  return (owned[ALICE] === true && owned[MALLORY] === true && stale[ALICE] === null
+      && stale[MALLORY] === false)
+    || `owned=${JSON.stringify(owned)} stale=${JSON.stringify(stale)}`;
+});
+
+await check('Play Night uses only attendees ratings and hard session-fit gates', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await playNightRoute.onRequestPost({
+    request: req({ attendees: [ALICE, MALLORY], minutes: 90, requireOwnership: true }), env, data,
+  });
+  const result = await r.json();
+  const short = result.games.find((game) => game.id === 8200);
+  if (!short) return `short game missing: ${JSON.stringify(result.excluded)}`;
+  if (short.score !== 8.5 || short.votes !== 2) return `attendee score ${short.score}/${short.votes}`;
+  if (result.games.some((game) => [8201, 8202, 8203].includes(game.id))) return 'a non-fitting fixture leaked in';
+  return (result.excluded.tooLong > 0 && result.excluded.sessionLengthUnknown > 0
+      && result.excluded.playerCountUnknown > 0) || JSON.stringify(result.excluded);
+});
+
+await check('Play Night rejects an attendee outside the group', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await playNightRoute.onRequestPost({
+    request: req({ attendees: [ALICE, '76561198000000999'], minutes: 90 }), env, data,
+  });
+  return r.status === 400 || `got ${r.status}`;
+});
+
+await check('session length accepts a real range and rejects invented values', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const badPatch = await gameIdRoute.onRequestPatch({
+    params: { id: '8200' }, request: req({ min_session_minutes: 7 }), env, data,
+  });
+  const goodPatch = await gameIdRoute.onRequestPatch({
+    params: { id: '8200' }, request: req({ min_session_minutes: 75 }), env, data,
+  });
+  const value = sqlite.prepare('SELECT min_session_minutes FROM games WHERE id=8200').get().min_session_minutes;
+  sqlite.exec('UPDATE games SET min_session_minutes=60 WHERE id=8200');
+  return (badPatch.status === 400 && goodPatch.status === 200 && value === 75)
+    || `bad ${badPatch.status}, good ${goodPatch.status}, value ${value}`;
+});
+
+await check('only an owner can export group data', async () => {
+  const { data } = await ctxFor(MALLORY, 'g4m1ng');
+  const r = await exportRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/export?format=json'), env, data,
+  });
+  return r.status === 403 || `got ${r.status}`;
+});
+
+await check('JSON export is complete and never crosses the group boundary', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await exportRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/export?format=json'), env, data,
+  });
+  const backup = await r.json();
+  if (!r.headers.get('content-disposition')?.includes('.json')) return 'missing attachment filename';
+  if (!backup.games.some((game) => game.id === 8200)) return 'own game missing';
+  if (backup.games.some((game) => game.group_id !== 1)) return 'foreign game exported';
+  if (backup.comments.some((comment) => comment.group_id !== 1)) return 'foreign comment exported';
+  return (Array.isArray(backup.ratings) && Array.isArray(backup.members) && backup.version === 1)
+    || 'missing a relation';
+});
+
+await check('CSV export is one valid relation and neutralises spreadsheet formulas', async () => {
+  sqlite.exec(`INSERT INTO comments (group_id, game_id, steam_id, body)
+               VALUES (1,8200,'${ALICE}','=HYPERLINK(""https://bad"",""click"")')`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await exportRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/export?format=csv&table=comments'), env, data,
+  });
+  const csv = await r.text();
+  return (r.headers.get('content-type')?.startsWith('text/csv') && csv.includes("'=HYPERLINK"))
+    || `type ${r.headers.get('content-type')}, body ${csv.slice(-120)}`;
+});
+
+await check('achievement relay reads cached progress only for this group game', async () => {
+  sqlite.exec(`INSERT OR REPLACE INTO achievement_progress
+    (steam_id, appid, achieved, total, unlocked, fetched_at) VALUES
+    ('${ALICE}',982000,1,2,'[{"key":"first","name":"First Night","unlocktime":123}]',100)`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await achievementsRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/achievements?gameId=8200'), env, data,
+  });
+  const view = await r.json();
+  const mine = view.members.find((member) => member.steamId === ALICE);
+  return (r.status === 200 && view.supported && mine.achieved === 1 && view.relay.unlocked === 1)
+    || `status ${r.status}, ${JSON.stringify(view)}`;
+});
+
+await check('achievement sync fetches and stores only the signed-in member', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = env.STEAM_API_KEY;
+  env.STEAM_API_KEY = 'test-key';
+  globalThis.fetch = async (url) => {
+    if (!String(url).includes('/ISteamUserStats/GetPlayerAchievements/')) {
+      throw new Error(`unexpected fetch ${url}`);
+    }
+    return new Response(JSON.stringify({
+      playerstats: {
+        success: true,
+        gameName: 'Tonight Shortlist',
+        achievements: [
+          { apiname: 'first', name: 'First Night', achieved: 1, unlocktime: 456 },
+          { apiname: 'later', name: 'Another Night', achieved: 0, unlocktime: 0 },
+        ],
+      },
+    }), { headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const { data } = await ctxFor(ALICE, 'g4m1ng');
+    const r = await achievementsRoute.onRequestPost({
+      request: req({ gameId: 8200 }), env, data,
+    });
+    const row = sqlite.prepare(
+      'SELECT achieved, total, unlocked FROM achievement_progress WHERE steam_id=? AND appid=?'
+    ).get(ALICE, 982000);
+    const unlocked = JSON.parse(row?.unlocked || '[]');
+    return (r.status === 200 && row?.achieved === 1 && row?.total === 2
+        && unlocked.length === 1 && unlocked[0].key === 'first')
+      || `status ${r.status}, row ${JSON.stringify(row)}`;
+  } finally {
+    env.STEAM_API_KEY = originalKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await check('achievement progress cannot be read through a foreign game id', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await achievementsRoute.onRequestGet({
+    request: getReq('https://x/api/g/g4m1ng/achievements?gameId=5000'), env, data,
+  });
+  return r.status === 404 || `got ${r.status}`;
+});
+
 console.log('\nArchiving');
 
 await check('removing a game archives it and keeps every rating', async () => {
@@ -616,6 +814,31 @@ await check('an archived game leaves the stats', async () => {
     `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
       WHERE g.group_id=1 AND g.archived_at IS NULL`).get().n;
   return rated === expected || `people counts total ${rated}, expected ${expected}`;
+});
+
+await check('the group switcher does not count archived games', async () => {
+  const body = await (await groupsRoute.onRequestGet({ env, data: { user: user(ALICE) } })).json();
+  const group = body.groups.find((g) => g.slug === 'g4m1ng');
+  const expectedGames = sqlite.prepare(
+    'SELECT COUNT(*) AS n FROM games WHERE group_id=1 AND archived_at IS NULL').get().n;
+  const expectedUnrated = sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM games g
+      WHERE g.group_id=1 AND g.archived_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM ratings r WHERE r.game_id=g.id AND r.steam_id=?)
+        AND NOT EXISTS (SELECT 1 FROM skips s WHERE s.game_id=g.id AND s.steam_id=?)`
+  ).get(ALICE, ALICE).n;
+  return (group?.games === expectedGames && group?.unrated === expectedUnrated)
+    || `games ${group?.games}/${expectedGames}, unrated ${group?.unrated}/${expectedUnrated}`;
+});
+
+await check('member coverage does not count ratings on archived games', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const body = await (await membersRoute.onRequestGet({ env, data })).json();
+  const mine = body.members.find((m) => m.steam_id === ALICE);
+  const expected = sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM ratings r JOIN games g ON g.id=r.game_id
+      WHERE r.steam_id=? AND g.group_id=1 AND g.archived_at IS NULL`).get(ALICE).n;
+  return mine?.ratings === expected || `reported ${mine?.ratings}, expected ${expected}`;
 });
 
 await check('restoring brings the game and its ratings back', async () => {
@@ -734,6 +957,14 @@ await check('start and end dates can be set by hand', async () => {
   const row = sqlite.prepare('SELECT started, finished FROM games WHERE id=?').get(g.id);
   return (r.status === 200 && row.started === '2025-03-14' && row.finished === '2025-06-02')
     || `status ${r.status}, got ${JSON.stringify(row)}`;
+});
+
+await check('impossible calendar dates are refused', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ started: '2025-02-29' }), env, data });
+  return r.status === 400 || `expected 400, got ${r.status}`;
 });
 
 await check('a typed end date always beats the Steam estimate', async () => {
@@ -1333,6 +1564,60 @@ await check('the co-op filter is on by default and can be turned off', async () 
   const has = (d) => (d.games || []).some((g) => g.appid === 9101);
   sqlite.exec('DELETE FROM coop_apps WHERE appid=9101');
   return (!has(on) && has(off)) || `default showed it: ${has(on)}; coopOnly=0 hid it: ${!has(off)}`;
+});
+
+console.log('\nHTTP boundaries');
+
+await check('JSON request bodies are capped before handlers can buffer them', async () => {
+  const request = new Request('https://x/api/groups', {
+    method: 'POST', body: JSON.stringify({ text: 'x'.repeat(33 * 1024) }),
+  });
+  try {
+    await readBody(request);
+    return 'oversized body was accepted';
+  } catch (e) {
+    return (e.status === 413) || `threw ${e.name} with status ${e.status}`;
+  }
+});
+
+await check('malformed JSON is rejected instead of becoming an empty object', async () => {
+  try {
+    await readBody(new Request('https://x/api/groups', { method: 'POST', body: '{nope' }));
+    return 'malformed body was accepted';
+  } catch (e) {
+    return (e.status === 400) || `threw ${e.name} with status ${e.status}`;
+  }
+});
+
+await check('authenticated writes are rate-limited per account', async () => {
+  sqlite.exec('DELETE FROM rate_limits');
+  const cookie = await makeSessionCookie(ALICE, env.SESSION_SECRET);
+  let last;
+  for (let i = 0; i < 61; i++) {
+    last = await rootRoute.onRequest({
+      request: new Request('https://x/api/groups/join', {
+        method: 'POST', headers: { cookie },
+      }),
+      env,
+      data: {},
+      next: async () => new Response(null, { status: 204 }),
+    });
+  }
+  sqlite.exec('DELETE FROM rate_limits');
+  return (last.status === 429 && Number(last.headers.get('retry-after')) > 0)
+    || `last status ${last.status}, retry-after ${last.headers.get('retry-after')}`;
+});
+
+await check('presence updates are scheduled off the /api/me response path', async () => {
+  let pending;
+  const response = await meRoute.onRequestGet({
+    env,
+    data: { user: user(ALICE) },
+    waitUntil: (promise) => { pending = promise; },
+  });
+  if (response.status !== 200 || !pending?.then) return 'response or waitUntil promise missing';
+  await pending;
+  return true;
 });
 
 console.log('\nScoring & viability');

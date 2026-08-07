@@ -3,7 +3,7 @@ import { searchStore, getAppDetails, parseAppId } from '../../../lib/steam.js';
 
 /** Type-ahead for the add-a-game box. Also resolves a pasted store URL directly. */
 export async function onRequestGet({ request, env }) {
-  const q = new URL(request.url).searchParams.get('q')?.trim();
+  const q = new URL(request.url).searchParams.get('q')?.trim().slice(0, 200);
   if (!q || q.length < 2) return json({ results: [] });
 
   const appid = parseAppId(q);

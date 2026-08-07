@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 119 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 139 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -93,6 +93,8 @@ npm run db:migrate -- --file=./migrations/001-coop-apps.sql   # apply one migrat
 npm run crawl:coop -- --pages 8 --out migrations/002-coop-seed.sql
 node scripts/seed-player-caps.mjs --from migrations/002-coop-seed.sql \
                                  --out migrations/003-player-caps.sql
+TWITCH_CLIENT_ID=... TWITCH_CLIENT_SECRET=... npm run measure:caps -- \
+  --from migrations/002-coop-seed.sql --out igdb-cap-coverage.json
 
 node scripts/validate-palette.mjs      # re-check player-colour separation (invariant 4)
 
@@ -107,8 +109,9 @@ cd crawler && npx wrangler tail        # watch cron runs live
 ```
 
 **`schema.sql` can never be applied to a live database** — it opens with
-`DROP TABLE`, so running `db:init` against production wipes every group and
-rating. Anything that has to reach an existing database goes in `migrations/` as
+`DROP TABLE`, so applying it remotely to an existing database wipes every group and
+rating. The old remote `db:init` shortcut was removed to make that mistake harder.
+Anything that has to reach an existing database goes in `migrations/` as
 an additive, idempotent file applied with `db:migrate`. New tables must be added
 to *both* `schema.sql` (for fresh installs and both test suites, which build from
 it) and a migration (for production) — they are kept in sync by hand.
@@ -137,6 +140,12 @@ never a raw fetch.** It is cache-first against the shared `steam_apps` table.
 Steam's store endpoints throttle at roughly 200 requests / 5 min *per IP*, and
 Workers egress from a shared pool — this cache is the only reason the site can
 have more than a handful of groups.
+
+Root middleware enforces per-account fixed-window limits: 30 Steam searches per
+minute, 20 Steam-backed writes per five minutes, and 60 other writes per minute.
+Migration 020 creates the compact `rate_limits` table these checks require. JSON
+request bodies are capped at 32 KB and outbound Steam calls time out after 10
+seconds; keep both bounds when adding routes.
 
 **4. Colours come from the validated palette in `styles.css`, and the ORDER they
 are handed out in matters as much as the values.** The eight `--series-*` values
@@ -367,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-119/119 assertions pass. `npm run test:ui` does **not** run on macOS: it
+139/139 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -435,9 +444,10 @@ than from memory. Extending it is a one-line edit per game. Ambiguous games
 `max_players` and the nuance in `coop_note`; genuinely unclear ones are left out.
 
 Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/add
-UI (**done**) → crawl cron (**done**, hourly) → Steam playtime (**done**) /
-achievements → recent-releases button (**done** — the crawler's second discovery
-pass) → comments (**done**). Note the Steam stats step depends on every member
+UI (**done**) → crawl cron (**done**, hourly) → Steam playtime/ownership (**done**) →
+per-game achievement relay (**done**) → Play Night + exports (**done**) →
+recent-releases button (**done** — the crawler's second discovery pass) → comments
+(**done**). Note the Steam stats step depends on every member
 setting Steam privacy → *Game details* to Public, **and** unticking the separate
 "always keep my total playtime private"; `GetOwnedGames` returns an empty list for
 the first and a full list of zeroes for the second.
@@ -448,7 +458,8 @@ the first and a full list of zeroes for the second.
   `wrangler deploy` ship code only. The row counts were identical either side of
   deleting an entire Pages project.
 - **The one real danger is `schema.sql`**, which opens with `DROP TABLE`.
-  `npm run db:init` against production wipes everything. Use `migrations/`.
+  Applying it to an existing remote database wipes everything. The old remote
+  `db:init` shortcut is deliberately gone; use `migrations/`.
 - **D1 Time Travel** gives point-in-time restore for the last 30 days, on the
   free plan, with nothing to configure:
   `wrangler d1 time-travel info g4m1ng` prints the current bookmark, and
@@ -459,29 +470,24 @@ the first and a full list of zeroes for the second.
 
 ## Next up, roughly in value order
 
-1. **Rate-limit writes.** Cloudflare Rate Limiting rules are free. Right now the
-   only protection is soft caps (20 owned groups/person, 64 members/group, 2000
-   games/group) enforced in application code.
-2. **Scheduled D1 backups.** A cron trigger running `d1 export`. Free tier has no
+1. **Scheduled D1 backups.** A cron trigger running `d1 export`. Free tier has no
    automatic backups; losing the database means losing everything.
-3. **Verified player caps, at scale.** Only **55 of 337** catalogue rows have one,
+2. **Verified player caps, at scale.** Only **55 of 337** catalogue rows have one,
    so most cards read "player count unverified" and the "only ones we can all play"
    filter excludes them — correctly, per invariant 6, but it makes the filter look
    broken. Steam genuinely does not publish a co-op player cap anywhere
    machine-readable: `categories` is the closest thing and it is a yes/no, which is
    why the crawler deliberately never writes `max_players`. **IGDB** is the
-   candidate: its `multiplayer_modes.onlinecoopmax` is exactly this number, and the
-   API is free with Twitch developer credentials (client id + secret, which the
-   owner has to create — nobody has verified its coverage against this catalogue
-   yet). Failing that, `scripts/seed-player-caps.mjs` is a hand-curated list and
-   extending it is one line per game.
-4. **Achievement sync.** `ISteamUserStats/GetPlayerAchievements`, keyed on the
-   SteamID64s already stored. Playtime sync is done (see Group hours); this would
-   add a "who already owns this" badge and completion figures.
-5. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
+   candidate: its `multiplayer_modes.onlinecoopmax` is exactly this number. The
+   measurement-only `scripts/measure-igdb-caps.mjs` maps the Steam catalogue,
+   rejects multiple matches and conflicting platform caps, and writes a JSON
+   coverage report without touching D1. It needs confidential Twitch credentials;
+   none are configured locally, so no real coverage result exists yet. Even a
+   `usable-candidate` is input to human verification, never an automatic write.
+3. **A weekly nudge** (Discord webhook) listing games with fewer votes than the
    group has members. Rating coverage is the app's core problem — in the original
    spreadsheet it ranged from 89% to 27% per person.
-6. **Public read-only group pages.** Also the cheapest growth loop the site has.
+4. **Public read-only group pages.** Also the cheapest growth loop the site has.
 
 ## Group hours
 
@@ -511,6 +517,41 @@ column that actually decides, and the Group tab names the specific setting to fi
 All three code paths — status, sync and recompute — resolve a placeholder
 membership through `seed_assignments`, so a group that imported its history gets
 real estimates before its friends have signed in.
+
+Ownership uses the same `playtime` rows but is deliberately three-state. A row is
+positive proof of ownership, including zero-minute games. Absence only becomes
+"not owned" when `group_library_sync` proves that this exact group was synced after
+the game was linked; private, missing and stale libraries remain unknown. The old
+`playtime_sync` watermark is account-global and cannot prove this because each run
+stores only the launching group's games. Reusing it across groups creates false
+negatives, which is why migration 021 adds the group-scoped watermark and existing
+groups need one fresh sync before negative ownership appears.
+
+## Play Night
+
+`POST /api/g/:slug/play-night` accepts 2–64 membership Steam IDs, 30–720 available
+minutes, and an optional require-ownership flag. It hard-excludes unknown or too-low
+verified player caps, unknown or too-long `games.min_session_minutes`, and (when
+requested) any false/unknown ownership. That session length is a human estimate;
+neither lifetime hours nor campaign length is a valid substitute. Ranking is the
+plain mean of the selected attendees' ratings only, with vote count as visible thin
+evidence. No session state is persisted.
+
+## Exports and achievements
+
+Only an owner can read `/api/g/:slug/export`. JSON is the lossless, versioned bundle
+of group, games, ratings, comments and members; CSV is one relation per download.
+CSV text beginning with a spreadsheet formula character is prefixed with an
+apostrophe, while JSON keeps the exact source text. Response serialization streams
+each row so a large group does not allocate a second group-sized output string.
+
+Achievements are also bounded on purpose. A game detail POST syncs only the signed-
+in member for that one Steam app through `GetPlayerAchievements`; it never launches
+a members × games crawl. `achievement_progress` is global by SteamID64/appid, while
+the GET view is group-scoped through the requested game. The Trophy relay shows the
+union unlocked, per-person progress, fresh unlocks and (only when every resolvable
+account has synced) achievements one member short or unanimous. Steam privacy and
+games with no achievements are explicit states, not zero progress.
 
 ## Comments
 

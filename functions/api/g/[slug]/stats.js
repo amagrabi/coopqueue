@@ -40,9 +40,17 @@ export async function onRequestGet({ env, data }) {
   const glob = globalStats(ratings);
 
   const byGame = new Map();
+  const byUser = new Map();
+  const gameTotals = new Map();
   for (const r of ratings) {
     if (!byGame.has(r.game_id)) byGame.set(r.game_id, []);
     byGame.get(r.game_id).push(r);
+    if (!byUser.has(r.steam_id)) byUser.set(r.steam_id, []);
+    byUser.get(r.steam_id).push(r);
+    const total = gameTotals.get(r.game_id) || { sum: 0, n: 0 };
+    total.sum += r.score;
+    total.n++;
+    gameTotals.set(r.game_id, total);
   }
 
   const scored = games.map((g) => ({ ...g, ...scoreGame(byGame.get(g.id) || []) }));
@@ -60,7 +68,7 @@ export async function onRequestGet({ env, data }) {
 
   const people = members.map((u) => {
     const c = cal.get(u.steam_id);
-    const mine = ratings.filter((r) => r.steam_id === u.steam_id);
+    const mine = byUser.get(u.steam_id) || [];
     const denom = games.length - (satOut.get(u.steam_id) || 0);
     return {
       steamId: u.steam_id, name: u.short_name, avatar: u.avatar, count: mine.length,
@@ -108,9 +116,9 @@ export async function onRequestGet({ env, data }) {
     for (const g of games) {
       const mine = scoreOf.get(`${g.id}:${u.steam_id}`);
       if (mine == null) continue;
-      const others = (byGame.get(g.id) || []).filter((v) => v.steam_id !== u.steam_id);
-      if (others.length < 2) continue;
-      const avg = others.reduce((a, v) => a + v.score, 0) / others.length;
+      const total = gameTotals.get(g.id);
+      if (!total || total.n < 3) continue;
+      const avg = (total.sum - mine) / (total.n - 1);
       n++; sum += Math.abs(mine - avg);
     }
     return { steamId: u.steam_id, name: u.short_name, n, gap: n ? r2(sum / n) : null };
@@ -127,9 +135,9 @@ export async function onRequestGet({ env, data }) {
       if (!g.genre) continue;
       const mine = scoreOf.get(`${g.id}:${u.steam_id}`);
       if (mine == null) continue;
-      const others = (byGame.get(g.id) || []).filter((v) => v.steam_id !== u.steam_id);
-      if (!others.length) continue;
-      const avg = others.reduce((a, v) => a + v.score, 0) / others.length;
+      const total = gameTotals.get(g.id);
+      if (!total || total.n < 2) continue;
+      const avg = (total.sum - mine) / (total.n - 1);
       if (!byGenre.has(g.genre)) byGenre.set(g.genre, []);
       byGenre.get(g.genre).push(mine - avg);
     }

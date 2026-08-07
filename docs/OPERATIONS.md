@@ -33,7 +33,7 @@ Set on the **production** environment only:
 | Name | Required | Effect if missing |
 |---|---|---|
 | `SESSION_SECRET` | yes | every request 500s — nobody can sign in |
-| `STEAM_API_KEY` | no | people show as `Player 1234`, no avatars |
+| `STEAM_API_KEY` | no | no profiles, library/playtime sync, ownership negatives or achievement sync |
 | `ALLOWED_STEAM_IDS` | no | unset means anyone may sign in and create groups |
 
 ```bash
@@ -53,7 +53,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 119 assertions — ALWAYS before a deploy
+npm test          # 139 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -102,9 +102,10 @@ cd crawler && npx wrangler tail        # watch cron runs live
 ## Changing the database
 
 **`schema.sql` must never be applied to a live database.** It opens with
-`DROP TABLE`, so `npm run db:init` against production wipes every group, game and
-rating. It exists for fresh installs and for the two test suites, which build from
-it.
+`DROP TABLE`, so a raw remote execution wipes every group, game and rating. The old
+`db:init` shortcut was removed because it made that mistake too easy. The file exists
+for fresh installs and for the two test suites, which build from it; the guarded
+`npm run setup` only applies it when the remote database has no schema yet.
 
 Anything that has to reach the live database goes in `migrations/` as an **additive,
 idempotent** file:
@@ -127,6 +128,18 @@ silently deleted every rating.
 Migrations are **not tracked** — there is no applied-migrations table. They are
 applied by hand with an explicit `--file`, so renaming or renumbering a file is
 safe, and re-running one has to be harmless by construction.
+
+Migration `020-rate-limits.sql` must be applied before deploying code that imports
+the root request limiter. It creates one compact row per account and limit category;
+without it, authenticated API requests fail closed with a logged 500 instead of
+silently running without protection.
+
+Migration `021-session-and-achievements.sql` must likewise be applied before this
+feature set is deployed. It adds the human-entered Play Night session length, the
+achievement cache, and the group-specific library-sync watermark used to prove a
+negative ownership result. Until a group runs **Sync playtime from Steam** once
+after this migration, owned rows can still show positive but every absence remains
+unknown; that is the deliberate safe upgrade path.
 
 ### Useful queries
 
@@ -179,6 +192,11 @@ sqlite3 restored.db "PRAGMA foreign_keys=OFF;" ".read backup.sql" "PRAGMA foreig
 A backup you have never restored is a guess. Rehearse it after any migration that
 recreates a table.
 
+The owner-facing JSON/CSV export beside **Delete group** is a portable copy of that
+one group's games, ratings, comments and members. It is useful before deletion, but
+it is not a database backup: only D1 Time Travel or `npm run db:backup` can restore
+the whole instance and its shared Steam/catalogue caches.
+
 ---
 
 ## Catalogue maintenance
@@ -192,6 +210,25 @@ store page) plus two for discovery.
 Popularity is `review_count` from `appreviews`, never Steam's `sort_by=Reviews_DESC`
 — that sorts by review *score* and will rank a 534-review DLC above Stardew
 Valley's million.
+
+### Measuring IGDB player-cap coverage
+
+Do not turn IGDB values into caps until coverage and conflicts have been measured.
+Create a confidential Twitch developer app, keep its secret local, then run:
+
+```bash
+TWITCH_CLIENT_ID=... TWITCH_CLIENT_SECRET=... npm run measure:caps -- \
+  --from migrations/002-coop-seed.sql --out igdb-cap-coverage.json
+```
+
+The script respects IGDB's four-request-per-second limit, resolves Steam through
+the current `external_game_sources` endpoint, paginates complete result sets, and
+reports no match, multiple game matches, missing multiplayer rows, conflicting
+caps and unambiguous candidates. It also compares those candidates with
+`migrations/003-player-caps.sql`, reporting agreement and conflicts with existing
+hand-verified values. It never writes D1 or a migration. Review every candidate
+against the human-verified meaning (maximum simultaneous **online co-op** players)
+before adding it to `scripts/seed-player-caps.mjs` or generating a migration.
 
 ### Tags and the co-op flag
 

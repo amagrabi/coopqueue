@@ -1,12 +1,19 @@
 import { json } from '../../lib/http.js';
 import { myGroups } from '../../lib/groups.js';
 
-export async function onRequestGet({ env, data }) {
+export async function onRequestGet(context) {
+  const { env, data } = context;
   const groups = await myGroups(env.DB, data.user.steam_id);
-  // Cheap presence tracking; also tells you whether an invite ever got used.
-  await env.DB.prepare('UPDATE users SET last_seen_at = unixepoch() WHERE steam_id = ?')
-    .bind(data.user.steam_id)
-    .run();
+  // Presence is useful, but it is not part of this response. Sample it hourly and
+  // keep the D1 write off the page-load path; Pages binds waitUntil to `context`.
+  context.waitUntil(env.DB.prepare(
+    `UPDATE users SET last_seen_at = unixepoch()
+      WHERE steam_id = ? AND (last_seen_at IS NULL OR last_seen_at < unixepoch() - 3600)`
+  ).bind(data.user.steam_id).run().catch((error) => {
+    console.error(JSON.stringify({
+      event: 'presence_update_failed', error: error instanceof Error ? error.message : String(error),
+    }));
+  }));
 
   return json({
     user: {

@@ -6,7 +6,8 @@ export async function onRequestGet({ env, data }) {
     `SELECT m.steam_id, m.short_name, m.role, m.is_seed, u.avatar, u.display_name,
             (SELECT COUNT(*) FROM ratings r
                JOIN games gg ON gg.id = r.game_id
-              WHERE r.steam_id = m.steam_id AND gg.group_id = m.group_id) AS ratings
+              WHERE r.steam_id = m.steam_id AND gg.group_id = m.group_id
+                AND gg.archived_at IS NULL) AS ratings
        FROM memberships m
        JOIN users u ON u.steam_id = m.steam_id
       WHERE m.group_id = ?

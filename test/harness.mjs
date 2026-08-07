@@ -183,6 +183,14 @@ db.exec(`INSERT INTO seed_assignments (group_id, steam_id, seed_steam_id)
          VALUES (1,'${LEO_ACCOUNT}','seed:1:leo')`);
 db.exec(`INSERT INTO playtime_sync (steam_id, games, played, synced_at) VALUES
   ('${ME}',122,98,unixepoch()), ('${LEO_ACCOUNT}',455,0,unixepoch())`);
+db.exec(`INSERT INTO group_library_sync (group_id, steam_id, games, played, synced_at) VALUES
+  (1,'${ME}',122,98,unixepoch()), (1,'${LEO_ACCOUNT}',455,0,unixepoch())`);
+// Enough human-entered session estimates to make Play Night demonstrable. Unknown
+// rows remain too, so its explanation is visible rather than every game pretending
+// to fit a two-hour slot.
+db.exec(`UPDATE games SET min_session_minutes=90
+          WHERE id IN (SELECT id FROM games WHERE group_id=1 AND status='backlog'
+                        AND max_players IS NOT NULL LIMIT 8)`);
 
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
@@ -234,6 +242,18 @@ function libraryFor(gid, need) {
     `SELECT m.steam_id, m.short_name, m.is_seed, u.avatar, u.display_name
        FROM memberships m JOIN users u ON u.steam_id=m.steam_id
       WHERE m.group_id=? ORDER BY m.short_name COLLATE NOCASE`, gid);
+  const ownershipMembers = q(
+    `SELECT m.steam_id, m.is_seed, COALESCE(a.steam_id,m.steam_id) AS account,
+            s.games AS synced_games, s.synced_at
+       FROM memberships m
+       LEFT JOIN seed_assignments a ON a.group_id=m.group_id AND a.seed_steam_id=m.steam_id
+       LEFT JOIN group_library_sync s
+              ON s.group_id=m.group_id AND s.steam_id=COALESCE(a.steam_id,m.steam_id)
+      WHERE m.group_id=?`, gid);
+  const owned = new Set(q(
+    `SELECT p.steam_id, p.appid FROM playtime p
+       JOIN games g ON g.steam_appid=p.appid AND g.group_id=?`, gid)
+    .map((row) => `${row.steam_id}:${row.appid}`));
   const cal = calibrate(ratings), glob = globalStats(ratings);
   const byGame = new Map();
   for (const r of ratings) { if (!byGame.has(r.game_id)) byGame.set(r.game_id, []); byGame.get(r.game_id).push(r); }
@@ -251,9 +271,17 @@ function libraryFor(gid, need) {
     ratings, cal, glob, members, byGame,
     games: games.map((g) => {
       const votes = byGame.get(g.id) || [];
+      const ownership = Object.fromEntries(ownershipMembers.map((member) => {
+        if (!g.steam_appid) return [member.steam_id, null];
+        if (owned.has(`${member.account}:${g.steam_appid}`)) return [member.steam_id, true];
+        const unresolved = !!member.is_seed && member.account === member.steam_id;
+        const fresh = !unresolved && member.synced_games > 0
+          && member.synced_at >= (g.enriched_at ?? g.created_at);
+        return [member.steam_id, fresh ? false : null];
+      }));
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
                comments: [], ...scoreGame(votes), notPlayed: satOut.get(g.id) || [],
-               mySkip: mySkips.get(g.id) || null, viability: viability(g, need) };
+               mySkip: mySkips.get(g.id) || null, ownership, viability: viability(g, need) };
     }),
   };
 }
@@ -346,7 +374,8 @@ const server = http.createServer(async (req, res) => {
                         FROM memberships m
                         LEFT JOIN seed_assignments a
                                ON a.group_id=m.group_id AND a.seed_steam_id=m.steam_id
-                        LEFT JOIN playtime_sync s ON s.steam_id=COALESCE(a.steam_id, m.steam_id)
+                        LEFT JOIN group_library_sync s
+                               ON s.group_id=m.group_id AND s.steam_id=COALESCE(a.steam_id, m.steam_id)
                        WHERE m.group_id=? ORDER BY m.short_name COLLATE NOCASE`, gid);
       return send(res, 200, {
         members: rows.map((m) => ({
@@ -362,6 +391,60 @@ const server = http.createServer(async (req, res) => {
     }
     if (sub === '/playtime' && req.method === 'POST') {
       return send(res, 200, { ok: true, members: [], gamesEstimated: 0 });
+    }
+    if (sub === '/play-night' && req.method === 'POST') {
+      const b = await readBody(req);
+      const attendees = Array.isArray(b.attendees) ? [...new Set(b.attendees.map(String))] : [];
+      const memberIds = new Set(q('SELECT steam_id FROM memberships WHERE group_id=?', gid).map((m) => m.steam_id));
+      if (attendees.length < 2 || attendees.some((id) => !memberIds.has(id))) {
+        return send(res, 400, { error: 'select at least two members of this group' });
+      }
+      const minutes = Number(b.minutes);
+      if (!Number.isInteger(minutes) || minutes < 30 || minutes > 720) {
+        return send(res, 400, { error: 'available time must be 30–720 minutes' });
+      }
+      const L = libraryFor(gid, attendees.length);
+      const excluded = { earlyAccess: 0, playerCountUnknown: 0, tooFewPlayers: 0,
+        sessionLengthUnknown: 0, tooLong: 0, noAttendeeRatings: 0,
+        ownershipUnknown: 0, notOwnedByEveryone: 0 };
+      const games = [];
+      for (const g of L.games.filter((game) => !game.archived_at && game.status === 'backlog')) {
+        if (b.excludeEarlyAccess !== false && g.early_access) { excluded.earlyAccess++; continue; }
+        const fit = viability(g, attendees.length);
+        if (fit.ok == null) { excluded.playerCountUnknown++; continue; }
+        if (fit.ok === false) { excluded.tooFewPlayers++; continue; }
+        if (g.min_session_minutes == null) { excluded.sessionLengthUnknown++; continue; }
+        if (g.min_session_minutes > minutes) { excluded.tooLong++; continue; }
+        const votes = attendees.map((id) => g.votes[id]).filter((score) => score != null);
+        if (!votes.length) { excluded.noAttendeeRatings++; continue; }
+        if (b.requireOwnership) {
+          const own = attendees.map((id) => g.ownership[id]);
+          if (own.some((value) => value == null)) { excluded.ownershipUnknown++; continue; }
+          if (own.some((value) => value === false)) { excluded.notOwnedByEveryone++; continue; }
+        }
+        games.push({ id: g.id, score: votes.reduce((a, n) => a + n, 0) / votes.length,
+          votes: votes.length, minSessionMinutes: g.min_session_minutes, ownership: g.ownership });
+      }
+      games.sort((a, b2) => b2.score - a.score || b2.votes - a.votes);
+      return send(res, 200, { games, attendees, minutes, requireOwnership: !!b.requireOwnership, excluded });
+    }
+
+    if (sub.startsWith('/achievements')) {
+      const id = req.method === 'GET'
+        ? Number(url.searchParams.get('gameId')) : Number((await readBody(req)).gameId);
+      const game = one('SELECT id, steam_appid FROM games WHERE id=? AND group_id=?', id, gid);
+      if (!game) return send(res, 404, { error: 'no such game' });
+      if (req.method === 'POST') return send(res, 409, { error: 'Steam sync is disabled in the local harness' });
+      const members = q(`SELECT m.steam_id, m.short_name, m.is_seed,
+                                COALESCE(a.steam_id,m.steam_id) AS account
+                           FROM memberships m LEFT JOIN seed_assignments a
+                             ON a.group_id=m.group_id AND a.seed_steam_id=m.steam_id
+                          WHERE m.group_id=? ORDER BY m.short_name`, gid)
+        .map((m) => ({ steamId: m.steam_id, name: m.short_name,
+          account: !(m.is_seed && m.account === m.steam_id), achieved: null, total: null, fetchedAt: null }));
+      const eligible = members.filter((m) => m.account).length;
+      return send(res, 200, { supported: false, members,
+        relay: { unlocked: 0, total: 0, synced: 0, eligible, unanimous: null, nearSweep: [], latest: [] } });
     }
 
     // Taste ranking. Shares lib/recommend.js with the real route, so the Browse
@@ -468,7 +551,7 @@ const server = http.createServer(async (req, res) => {
         }
         db.prepare('UPDATE games SET added_by=? WHERE id=? AND group_id=?').run(who, id, gid);
       }
-      for (const k of ['status', 'genre', 'hours', 'max_players', 'name']) {
+      for (const k of ['status', 'genre', 'hours', 'max_players', 'min_session_minutes', 'name']) {
         if (!(k in b)) continue;
         db.prepare(`UPDATE games SET ${k}=? WHERE id=? AND group_id=?`)
           .run(b[k] === '' ? null : b[k], id, gid);

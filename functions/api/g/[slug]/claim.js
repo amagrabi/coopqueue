@@ -41,11 +41,20 @@ export async function onRequestGet({ env, data }) {
   ).bind(data.group.group_id, data.user.steam_id).first();
 
   const seeds = await env.DB.prepare(
-    'SELECT steam_id, short_name FROM memberships WHERE group_id = ? AND is_seed = 1 ORDER BY short_name'
+    `SELECT m.steam_id, m.short_name,
+            (SELECT COUNT(*) FROM ratings r JOIN games g ON g.id = r.game_id
+              WHERE r.steam_id = m.steam_id AND g.group_id = m.group_id) AS ratings
+       FROM memberships m
+      WHERE m.group_id = ? AND m.is_seed = 1
+      ORDER BY m.short_name`
   ).bind(data.group.group_id).all();
 
   return json({
     canClaim: (mine?.n ?? 0) === 0,
-    unclaimed: (seeds.results || []).map((s) => ({ seedId: s.steam_id, name: s.short_name })),
+    unclaimed: (seeds.results || []).map((s) => ({
+      seedId: s.steam_id,
+      name: s.short_name,
+      ratings: s.ratings || 0,
+    })),
   });
 }

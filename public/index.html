@@ -54,22 +54,22 @@
 
   <div class="feature-grid">
     <div class="feature">
-      <h3>A rating queue people actually finish</h3>
+      <h2>A rating queue people actually finish</h2>
       <p>One game at a time with the Steam trailer embedded, driven entirely from the keyboard.
-         Forty unrated games takes about three minutes.</p>
+         Rating forty games takes about three minutes.</p>
     </div>
     <div class="feature">
-      <h3>Suggestions from your own ratings</h3>
+      <h2>Suggestions from your own ratings</h2>
       <p>Once the group has rated a few games, the catalogue reorders around what you liked —
          and tells you which tags it based that on, so you can disagree with it.</p>
     </div>
     <div class="feature">
-      <h3>Player-count reality check</h3>
+      <h2>Player-count reality check</h2>
       <p>Set how many of you there are and anything that can't fit the group gets flagged before
          you buy it, with couch-only titles marked separately rather than binned.</p>
     </div>
     <div class="feature">
-      <h3>The arguments, quantified</h3>
+      <h2>The arguments, quantified</h2>
       <p>Per-person taste profiles, genre track records, and a chart of the games you disagreed
          about most violently.</p>
     </div>
@@ -85,7 +85,7 @@
 
     <div class="onboard-split">
       <form class="onboard-card" id="create-form">
-        <h3>Start a group</h3>
+        <h2>Start a group</h2>
         <label class="field">
           <span>Group name</span>
           <input class="input" id="create-name" placeholder="Wednesday Night Crew" maxlength="60" required>
@@ -99,12 +99,12 @@
       </form>
 
       <form class="onboard-card" id="join-form">
-        <h3>Join a group</h3>
+        <h2>Join a group</h2>
         <label class="field">
           <span>Invite code</span>
           <input class="input" id="join-code" placeholder="K7QMX2PLNR" maxlength="24" autocapitalize="characters">
         </label>
-        <p class="field-help">Whoever set your group up can copy the invite link from the Members panel.</p>
+        <p class="field-help">Whoever set your group up can copy the invite link from the Group tab.</p>
         <button class="btn" type="submit">Join</button>
       </form>
     </div>
@@ -139,13 +139,13 @@
       <div class="group-menu" id="group-menu" role="menu" hidden></div>
     </div>
 
-    <nav class="tabs" role="tablist">
-      <button class="tab" data-view="queue"   role="tab">Rate <span class="pill" id="queue-count"></span></button>
-      <button class="tab" data-view="next"    role="tab">Play next</button>
-      <button class="tab" data-view="library" role="tab">Library</button>
-      <button class="tab" data-view="browse"  role="tab">Find games</button>
-      <button class="tab" data-view="stats"   role="tab">Stats</button>
-      <button class="tab" data-view="members" role="tab">Group</button>
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab" data-view="queue">Rate <span class="pill" id="queue-count"></span></button>
+      <button class="tab" data-view="next">Play next</button>
+      <button class="tab" data-view="library">Library</button>
+      <button class="tab" data-view="browse">Find games</button>
+      <button class="tab" data-view="stats">Stats</button>
+      <button class="tab" data-view="members">Group</button>
     </nav>
 
     <div class="topbar-right">
@@ -178,22 +178,22 @@
            thing on the screen. Played comes first: it is the smaller set and the
            more perishable, since memory fades. -->
       <div id="rate-modes" class="rate-modes" hidden>
-        <div class="segmented" role="tablist">
-          <button class="seg" data-mode="played" role="tab">
+        <div class="segmented" role="group" aria-label="Rating queue">
+          <button class="seg" data-mode="played">
             Played <span class="pill" id="mode-played-n"></span>
           </button>
-          <button class="seg" data-mode="want" role="tab">
+          <button class="seg" data-mode="want">
             Want to play <span class="pill" id="mode-want-n"></span>
           </button>
           <!-- Changing your mind is a normal thing to do, and the queue only ever
                offers games you have NOT rated, so there was no way back to one. -->
-          <button class="seg" data-mode="rated" role="tab">
+          <button class="seg" data-mode="rated">
             Already rated <span class="pill" id="mode-rated-n"></span>
           </button>
           <!-- Skipping used to be a one-way door: the queue excludes what you
                skipped and "Already rated" has no score to list, so the game became
                unreachable. Hidden unless you actually have skips. -->
-          <button class="seg" data-mode="skipped" role="tab" hidden>
+          <button class="seg" data-mode="skipped" hidden>
             Skipped <span class="pill" id="mode-skipped-n"></span>
           </button>
         </div>
@@ -274,6 +274,33 @@
           <span>Hide early access games</span>
         </label>
       </div>
+      <section class="play-night" aria-labelledby="play-night-title">
+        <div class="play-night-head">
+          <div>
+            <h3 id="play-night-title">Play Night</h3>
+            <p>Who is here, and how much time do you actually have?</p>
+          </div>
+          <div class="play-night-actions">
+            <button class="btn btn-primary" id="pn-build">Build tonight's shortlist</button>
+            <button class="btn btn-ghost" id="pn-reset" hidden>Back to group ranking</button>
+          </div>
+        </div>
+        <div class="play-night-controls">
+          <fieldset>
+            <legend>Tonight's crew</legend>
+            <div id="pn-attendees" class="attendee-list"></div>
+          </fieldset>
+          <label class="detail-field" for="pn-minutes">
+            <span>Available minutes</span>
+            <input class="input" id="pn-minutes" type="number" min="30" max="720" step="15" value="120">
+          </label>
+          <label class="toggle pn-own">
+            <input type="checkbox" id="pn-owned">
+            <span>Everyone selected must own it</span>
+          </label>
+        </div>
+        <p id="pn-status" class="play-night-status" aria-live="polite"></p>
+      </section>
       <ol id="next-list" class="rank-list"></ol>
       <div id="unviable-block" class="unviable-block"></div>
     </section>
@@ -283,8 +310,8 @@
       <div class="view-head">
         <h2>Library</h2>
         <div class="filters">
-          <input id="lib-search" class="input" type="search" placeholder="Search…" autocomplete="off">
-          <select id="lib-status" class="input">
+          <input id="lib-search" class="input" type="search" placeholder="Search…" autocomplete="off" aria-label="Search library">
+          <select id="lib-status" class="input" aria-label="Filter library by status">
             <option value="">Any status</option>
             <option value="backlog">Backlog</option>
             <option value="playing">Playing</option>
@@ -293,7 +320,7 @@
             <option value="dropped">Dropped</option>
             <option value="sampled">Sampled</option>
           </select>
-          <select id="lib-sort" class="input">
+          <select id="lib-sort" class="input" aria-label="Sort library">
             <option value="started">Recently started</option>
             <option value="best">Best first</option>
             <option value="name">A–Z</option>
@@ -301,7 +328,7 @@
             <option value="hours">Hours</option>
             <option value="votes">Fewest votes</option>
           </select>
-          <select id="lib-mine" class="input">
+          <select id="lib-mine" class="input" aria-label="Filter library by rating coverage">
             <option value="">Anyone's votes</option>
             <option value="unrated">I haven't rated</option>
             <option value="rated">I have rated</option>
@@ -312,19 +339,19 @@
                capped at 8+ while the score was calibrated and shrunk toward the group
                mean, which compressed the top end enough that 9+ always came back
                empty and read as broken. -->
-          <select id="lib-score" class="input">
+          <select id="lib-score" class="input" aria-label="Filter library by score">
             <option value="">Any score</option>
             <option value="9">9+</option>
             <option value="8">8+</option>
             <option value="7">7+</option>
             <option value="6">6+</option>
           </select>
-          <select id="lib-played" class="input">
+          <select id="lib-played" class="input" aria-label="Filter library by playtime">
             <option value="">Played?</option>
             <option value="yes">Has hours</option>
             <option value="no">Never played</option>
           </select>
-          <select id="lib-archived" class="input">
+          <select id="lib-archived" class="input" aria-label="Show active or archived games">
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="all">Both</option>
@@ -349,13 +376,13 @@
       <div class="view-head">
         <div>
           <h2>Find new games</h2>
-          <p class="view-sub">The most-played online co-op games on Steam. Add the ones this group
+          <p class="view-sub">Popular online co-op games on Steam. Add the ones this group
             might actually play — only games in your library appear in anyone's rating queue, which
             is what stops a big catalogue from burying the votes that matter.</p>
         </div>
         <div class="filters">
-          <input id="browse-search" class="input" type="search" placeholder="Search the catalogue…" autocomplete="off">
-          <select id="browse-sort" class="input">
+          <input id="browse-search" class="input" type="search" placeholder="Search the catalogue…" autocomplete="off" aria-label="Search game catalogue">
+          <select id="browse-sort" class="input" aria-label="Sort game catalogue">
             <option value="fit">Recommended for us</option>
             <option value="rank">Most popular</option>
             <option value="name">A–Z</option>
@@ -527,14 +554,12 @@
   <div class="dialog-body" id="detail-body"></div>
 </dialog>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
 <!-- Steam serves trailers only as segmented HLS now, which nothing but Safari
      plays in a bare <video>. Vendored rather than pulled from a CDN so the site
-     stays a self-contained static bundle. Loaded before app.js but not deferred,
-     so window.Hls is defined by the time the first rating card renders; the
-     queue degrades to the header image if it is missing. -->
-<script src="/vendor/hls.min.js"></script>
+     stays a self-contained static bundle. app.js loads it only when a rating card
+     actually needs an HLS trailer; the rest of the app does not pay that cost. -->
 <script src="/app.js" type="module"></script>
 </body>
 </html>

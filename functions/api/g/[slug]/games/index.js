@@ -1,6 +1,21 @@
 import { json, bad, body } from '../../../../../lib/http.js';
 import { globalStats, scoreGame, viability } from '../../../../../lib/score.js';
 import { getAppDetails, parseAppId, searchStore } from '../../../../../lib/steam.js';
+import { ownershipForGames } from '../../../../../lib/ownership.js';
+
+const STATUSES = new Set(['backlog', 'playing', 'finished', 'unfinished', 'dropped', 'sampled']);
+
+function cleanGameInput(status, maxPlayers, genre) {
+  const cleanStatus = status || 'backlog';
+  if (!STATUSES.has(cleanStatus)) return { error: 'invalid game status' };
+  const players = maxPlayers == null || maxPlayers === '' ? null : Number(maxPlayers);
+  if (players !== null && (!Number.isInteger(players) || players < 0 || players > 64)) {
+    return { error: 'max players must be a whole number from 0 to 64' };
+  }
+  const cleanGenre = genre == null ? null : String(genre).trim();
+  if (cleanGenre && cleanGenre.length > 80) return { error: 'genre must be under 80 characters' };
+  return { status: cleanStatus, maxPlayers: players, genre: cleanGenre || null };
+}
 
 /**
  * The whole group library with scores already computed. At a few hundred games
@@ -31,8 +46,14 @@ export async function onRequestGet({ env, data }) {
         WHERE g.group_id = ?`
     ).bind(gid).all(),
     env.DB.prepare(
-      `SELECT m.steam_id, m.short_name, m.is_seed, u.avatar, u.display_name
+      `SELECT m.steam_id, m.short_name, m.is_seed, u.avatar, u.display_name,
+              COALESCE(a.steam_id, m.steam_id) AS account,
+              s.games AS synced_games, s.synced_at
          FROM memberships m JOIN users u ON u.steam_id = m.steam_id
+         LEFT JOIN seed_assignments a
+                ON a.group_id = m.group_id AND a.seed_steam_id = m.steam_id
+         LEFT JOIN group_library_sync s
+                ON s.group_id = m.group_id AND s.steam_id = COALESCE(a.steam_id, m.steam_id)
         WHERE m.group_id = ?
         ORDER BY m.short_name COLLATE NOCASE`
     ).bind(gid).all(),
@@ -73,7 +94,10 @@ export async function onRequestGet({ env, data }) {
   }
 
   const need = data.group.max_players;
-  const games = (gamesRes.results || []).map((g) => {
+  const gameRows = gamesRes.results || [];
+  const memberRows = membersRes.results || [];
+  const ownership = await ownershipForGames(env.DB, gid, gameRows, memberRows);
+  const games = gameRows.map((g) => {
     const votes = byGame.get(g.id) || [];
     return {
       ...g,
@@ -82,13 +106,16 @@ export async function onRequestGet({ env, data }) {
       ...scoreGame(votes),
       notPlayed: satOut.get(g.id) || [],
       mySkip: mine.get(g.id) || null,
+      ownership: ownership.byGame.get(g.id) || {},
       viability: viability(g, need),
     };
   });
 
   return json({
     games,
-    members: membersRes.results || [],
+    // Account and sync watermarks are inputs to the three-state ownership
+    // inference, not frontend data. Steam IDs already identify the members.
+    members: memberRows.map(({ account, synced_games, synced_at, ...member }) => member),
     group: {
       slug: data.group.slug, name: data.group.name, maxPlayers: need, role: data.group.role,
       blindRating: !!data.group.blind_rating,
@@ -101,6 +128,8 @@ export async function onRequestGet({ env, data }) {
 export async function onRequestPost({ request, env, data }) {
   const { input, maxPlayers, status, manual, name, genre } = await body(request);
   const gid = data.group.group_id;
+  const cleanInput = cleanGameInput(status, maxPlayers, genre);
+  if (cleanInput.error) return bad(cleanInput.error);
 
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM games WHERE group_id = ?').bind(gid).first();
   if ((count?.n ?? 0) >= 2000) return bad('this group has hit the 2000-game limit', 429);
@@ -127,14 +156,14 @@ export async function onRequestPost({ request, env, data }) {
     const res = await env.DB.prepare(
       `INSERT INTO games (group_id, name, genre, status, max_players, added_by, enriched_at)
        VALUES (?,?,?,?,?,?,unixepoch())`
-    ).bind(gid, clean, genre?.trim() || null, status || 'backlog',
-           Number.isFinite(Number(maxPlayers)) && Number(maxPlayers) > 0 ? Number(maxPlayers) : null,
+    ).bind(gid, clean, cleanInput.genre, cleanInput.status, cleanInput.maxPlayers,
            data.user.steam_id).run();
 
     return json({ ok: true, id: res.meta.last_row_id, name: clean, manual: true }, 201);
   }
 
   if (!input || !String(input).trim()) return bad('give me a Steam link, an appid, or a game name');
+  if (String(input).length > 500) return bad('that Steam search is too long');
 
   let appid = parseAppId(input);
   if (!appid) {
@@ -156,8 +185,8 @@ export async function onRequestPost({ request, env, data }) {
                         added_by, enriched_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,unixepoch())`
   ).bind(
-    gid, meta.name, appid, meta.genre, status || 'backlog',
-    maxPlayers ?? null, meta.header_image, meta.trailer_url,
+    gid, meta.name, appid, meta.genre, cleanInput.status,
+    cleanInput.maxPlayers, meta.header_image, meta.trailer_url,
     meta.short_description, meta.price, meta.release_date, meta.metacritic,
     data.user.steam_id
   ).run();

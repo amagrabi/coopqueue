@@ -1,8 +1,18 @@
 import { json, bad, body } from '../../../../../lib/http.js';
 import { getAppDetails } from '../../../../../lib/steam.js';
 
-const EDITABLE = ['name', 'genre', 'status', 'max_players', 'coop_note', 'hours', 'started', 'finished', 'notes'];
+const EDITABLE = [
+  'name', 'genre', 'status', 'max_players', 'min_session_minutes',
+  'coop_note', 'hours', 'started', 'finished', 'notes',
+];
 const STATUSES = ['backlog', 'playing', 'finished', 'unfinished', 'dropped', 'sampled'];
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const validDay = (value) => {
+  const day = String(value);
+  if (!ISO_DAY.test(day)) return false;
+  const parsed = new Date(`${day}T00:00:00Z`);
+  return !Number.isNaN(+parsed) && parsed.toISOString().slice(0, 10) === day;
+};
 
 /** Game ids are global and guessable, so every statement filters on group_id too. */
 export async function onRequestPatch({ params, request, env, data }) {
@@ -40,10 +50,32 @@ export async function onRequestPatch({ params, request, env, data }) {
   for (const k of EDITABLE) {
     if (!(k in patch)) continue;
     if (k === 'status' && !STATUSES.includes(patch[k])) return bad(`status must be one of ${STATUSES.join(', ')}`);
-    if (k === 'max_players' && patch[k] !== null && !(Number(patch[k]) >= 0)) return bad('max_players must be >= 0');
-    if (k === 'name' && !String(patch[k] ?? '').trim()) return bad('name cannot be empty');
+    if (k === 'max_players' && patch[k] !== null
+        && (!Number.isInteger(Number(patch[k])) || Number(patch[k]) < 0 || Number(patch[k]) > 64)) {
+      return bad('max_players must be a whole number from 0 to 64');
+    }
+    if (k === 'min_session_minutes' && patch[k] !== null
+        && (!Number.isInteger(Number(patch[k])) || Number(patch[k]) < 15 || Number(patch[k]) > 720)) {
+      return bad('min_session_minutes must be a whole number from 15 to 720');
+    }
+    if (k === 'hours' && patch[k] !== null
+        && (!Number.isFinite(Number(patch[k])) || Number(patch[k]) < 0 || Number(patch[k]) > 100000)) {
+      return bad('hours must be a number from 0 to 100000');
+    }
+    if (k === 'name') {
+      const name = String(patch[k] ?? '').trim();
+      if (!name) return bad('name cannot be empty');
+      if (name.length > 120) return bad('name must be under 120 characters');
+      patch[k] = name;
+    }
+    if (k === 'genre' && patch[k] != null && String(patch[k]).length > 80) return bad('genre must be under 80 characters');
+    if (k === 'coop_note' && patch[k] != null && String(patch[k]).length > 500) return bad('co-op note must be under 500 characters');
+    if (k === 'notes' && patch[k] != null && String(patch[k]).length > 5000) return bad('notes must be under 5000 characters');
+    if ((k === 'started' || k === 'finished') && patch[k] != null && patch[k] !== ''
+        && !validDay(patch[k])) return bad(`${k} must be a real ISO date`);
     sets.push(`${k} = ?`);
-    vals.push(patch[k] === '' ? null : patch[k]);
+    vals.push(patch[k] === '' ? null : ['max_players', 'min_session_minutes', 'hours'].includes(k) && patch[k] !== null
+      ? Number(patch[k]) : patch[k]);
   }
   if (!sets.length) return bad('nothing to update');
 
@@ -114,6 +146,7 @@ export async function onRequestPut({ params, request, env, data }) {
   ).bind(meta.appid, meta.header_image, meta.trailer_url, meta.short_description,
          meta.price, meta.release_date, meta.metacritic, meta.genre, id, gid).run();
 
-  const row = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(id).first();
+  const row = await env.DB.prepare('SELECT * FROM games WHERE id = ? AND group_id = ?')
+    .bind(id, gid).first();
   return json({ ok: true, game: row });
 }

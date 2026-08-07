@@ -23,8 +23,8 @@ export async function onRequestGet({ request, env }) {
   const p = new URL(request.url).searchParams;
   const q = (p.get('q') || '').trim().slice(0, 80);
   const sort = p.get('sort') || 'rank';
-  const page = Math.min(MAX_PAGE, Math.max(0, Number(p.get('page')) || 0));
-  const minPlayers = Math.max(0, Number(p.get('minPlayers')) || 0);
+  const page = Math.min(MAX_PAGE, Math.max(0, Math.floor(Number(p.get('page')) || 0)));
+  const minPlayers = Math.min(64, Math.max(0, Math.floor(Number(p.get('minPlayers')) || 0)));
   // Default ON. Every row here arrived through Steam's co-op category, but that
   // category is applied loosely enough to include Counter-Strike and Apex Legends,
   // so the flag from parseTags — which excludes PvP genres rather than requiring a
@@ -34,8 +34,8 @@ export async function onRequestGet({ request, env }) {
   const where = [];
   const args = [];
   if (q) {
-    where.push('name LIKE ?');
-    args.push(`%${q.replace(/[%_]/g, (c) => `\\${c}`)}%`);
+    where.push("name LIKE ? ESCAPE '\\'");
+    args.push(`%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
   }
   // A player-count filter can only ever match games somebody verified. Unknown
   // caps are excluded rather than assumed to fit — guessing here is exactly what
@@ -61,12 +61,12 @@ export async function onRequestGet({ request, env }) {
 
   const COLS = CATALOGUE_COLS;
 
-  const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM coop_apps ${filter}`)
-    .bind(...args).first();
-
-  const rows = await env.DB.prepare(
-    `SELECT ${COLS} FROM coop_apps ${filter} ORDER BY ${order} LIMIT ? OFFSET ?`
-  ).bind(...args, PAGE + 1, page * PAGE).all();
+  const [total, rows] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM coop_apps ${filter}`).bind(...args).first(),
+    env.DB.prepare(
+      `SELECT ${COLS} FROM coop_apps ${filter} ORDER BY ${order} LIMIT ? OFFSET ?`
+    ).bind(...args, PAGE + 1, page * PAGE).all(),
+  ]);
 
   const found = rows.results || [];
   return json({

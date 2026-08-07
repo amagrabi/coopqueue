@@ -29,7 +29,11 @@ and the more perishable, since memory fades. Keyboard-driven: `1`–`9` (`0` = 1
 Forty unrated games takes about three minutes.
 
 **Play next.** The backlog ranked, with anything that can't fit your group
-pushed into a separate block rather than silently sorted to the bottom.
+pushed into a separate block rather than silently sorted to the bottom. **Play
+Night** narrows that further to the people who are actually present and the time
+available tonight. It only calls a game a fit when both its online player cap and
+human-entered minimum worthwhile session are known; its score uses only those
+attendees' ratings.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
@@ -54,8 +58,16 @@ not hidden in a stats page.
 **Stats.** Per-person baselines, genre track record, and a dot plot of your
 biggest arguments.
 
-**Group.** Members, invite links you can rotate or disable, and the headcount
-that drives the viability check.
+**Steam ownership and trophies.** A three-state ownership badge uses the public
+libraries already synced from the Group tab: owned, absent from a sufficiently
+recent sync, or unknown. Private and stale data are never relabelled "not owned".
+Each game's detail panel also has a **Trophy relay**: members sync their own Steam
+achievement progress one game at a time, then the group sees its combined progress,
+fresh unlocks and achievements that are one person short of a clean sweep.
+
+**Group.** Members, invite links you can rotate or disable, the headcount that
+drives the viability check, and owner-only JSON or per-table CSV exports before a
+group is permanently deleted.
 
 ### The scoring model
 
@@ -111,9 +123,9 @@ on the Group tab, and send it to the other three. They click it, sign in with
 Steam, and land straight in the group with the claim prompt waiting.
 
 Using Steam rather than email has one more payoff. Because a SteamID64 is a real
-Steam account, the v2 features come almost free: actual playtime per person,
-achievement completion, and "who already owns this" all come from Steam's public
-Web API keyed on the ID you already have.
+Steam account, playtime, ownership and achievement completion come from Steam's
+public Web API keyed on the ID already stored. They still respect Steam privacy:
+hidden or stale data is shown as unknown, never guessed.
 
 If you want the instance private while you try it out, set `ALLOWED_STEAM_IDS`
 and only those Steam accounts can sign in at all. Leave it unset to let anyone
@@ -138,11 +150,12 @@ your live URL at the end.
 
 The script is safe to re-run — every step checks for existing state first, so if
 something fails you can fix it and run it again without duplicating anything.
-It will never wipe existing data without asking.
+It never applies the destructive fresh-install schema when tables already exist.
 
 You need a free Cloudflare account (no card) and, optionally, a free Steam Web
-API key from <https://steamcommunity.com/dev/apikey>. The key is used only for
-display names and avatars; skip it and people show up as `Player 1234`.
+API key from <https://steamcommunity.com/dev/apikey>. The key is used for display
+names and avatars, manual library/playtime sync and per-game achievement sync.
+Without it the tracker and ratings still work, but those Steam-backed features do not.
 
 ### Deploying from GitHub instead
 
@@ -162,6 +175,7 @@ stay in the dashboard.
 npx wrangler login
 npx wrangler pages project create coopqueue --production-branch main
 npx wrangler d1 create g4m1ng            # paste the id into wrangler.toml
+# Only against the brand-new, empty database created on the line above:
 npx wrangler d1 execute g4m1ng --remote --file=./schema.sql
 npx wrangler d1 execute g4m1ng --remote --file=./seed.sql      # optional
 openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name coopqueue
@@ -215,7 +229,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 22 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 139 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -243,11 +257,15 @@ functions/
       _middleware.js             THE TENANCY BOUNDARY — membership or 404
       games/index.js             GET the group library with scores · POST add
       games/[id].js              PATCH · DELETE · PUT to link a Steam appid
+      play-night.js              session-specific shortlist
+      export.js                  owner-only JSON and CSV downloads
+      achievements.js            cached per-game Trophy relay
       rate.js  skip.js  stats.js  claim.js  members.js  enrich.js
 lib/
   auth.js      HMAC-signed cookie sessions, optional signup allowlist
   groups.js    slugs, invite codes, membership lookup
-  score.js     calibration + shrinkage + viability
+  score.js     plain-mean scoring + viability
+  ownership.js three-state Steam-library ownership
   steam.js     Steam Web API and store endpoints, cache-first
   http.js      JSON responses, body parsing, score clamping
 public/        index.html · app.js · styles.css — no build step
@@ -283,7 +301,11 @@ user-supplied strings are escaped before reaching the DOM. Invite codes are
 disabled by the owner at any time.
 
 Soft caps exist so one account can't exhaust the free tier: 20 owned groups per
-person, 64 members per group, 2000 games per group.
+person, 64 members per group, 2000 games per group. The root middleware also
+limits Steam searches to 30/minute, Steam-backed writes to 20/5 minutes, and other
+writes to 60/minute per signed-in account. JSON bodies are capped at 32 KB, Steam
+calls time out after 10 seconds, and static responses carry a restrictive CSP and
+the standard browser hardening headers.
 
 ---
 
@@ -313,10 +335,10 @@ Steam requests. Search can't be cached (unbounded query space) and is the thing
 that would break first under load. If it does, the fix is a debounce on the
 client plus a KV-backed cache of the last N search terms.
 
-Two things to know before opening it up: D1's free tier has **no automatic
-backups** (run `wrangler d1 export` on a cron — also free), and there is
-currently **no rate limiting** on writes beyond the soft caps. Cloudflare's
-Rate Limiting rules are free and would be the first thing to add.
+One thing to know before opening it up: D1's free tier has **no automatic
+backups** (run `wrangler d1 export` on a cron — also free). The application now
+rate-limits Steam search, Steam-backed writes, and ordinary writes per signed-in
+account; the existing group, member, and game caps remain the longer-term guardrails.
 
 ---
 
@@ -333,19 +355,17 @@ Rate Limiting rules are free and would be the first thing to add.
 
 ## What's next
 
-Steam playtime sync, comments, archiving and the recommender are **done**. Still
-open, roughly in value order:
+Steam playtime/ownership sync, Play Night, group exports, per-game achievement
+progress, comments, archiving and the recommender are **done**. Still open,
+roughly in value order:
 
-- **Rate-limit writes.** Cloudflare Rate Limiting rules are free; right now the
-  only protection is soft caps enforced in application code.
 - **Scheduled D1 backups** via a cron trigger running `d1 export`. The free tier
   has no automatic backups, and Time Travel only reaches back 30 days.
 - **Verified player caps at scale.** Only 55 of 337 catalogue rows have one, so
-  most cards read "player count unverified". Steam publishes no machine-readable
-  co-op cap; IGDB's `multiplayer_modes.onlinecoopmax` is exactly the field, and
-  the API is free with Twitch developer credentials.
-- **Achievement sync** — `ISteamUserStats/GetPlayerAchievements`, plus a "who
-  already owns this" badge, so you stop buying a game two people already have.
+  most cards read "player count unverified". `npm run measure:caps` measures Steam
+  app matching and `multiplayer_modes.onlinecoopmax` coverage in IGDB without
+  writing a single cap. It still needs confidential Twitch developer credentials
+  and a real coverage run before any candidate is manually verified and migrated.
 - **A weekly nudge** (Discord webhook) listing games with fewer votes than the
   group has members. Rating coverage is the app's core problem — in the original
   spreadsheet it ranged from 89% to 27% per person.

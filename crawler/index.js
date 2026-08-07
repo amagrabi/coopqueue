@@ -12,7 +12,7 @@
  *    one invocation physically cannot do it. BATCH is sized to stay under the cap
  *    with room to spare.
  *  - Steam's store endpoints throttle at roughly 200 requests / 5 min per IP, and
- *    Workers egress from a shared pool. A small batch every 15 minutes sits far
+ *    Workers egress from a shared pool. A small batch every hour sits far
  *    below that, where a burst would risk poisoning the shared address.
  *
  * So the catalogue converges instead of being rebuilt: each run refreshes the
@@ -55,16 +55,21 @@ const json = (data, status = 200) =>
     status, headers: { 'content-type': 'application/json' },
   });
 
+const fetchWithTimeout = (url, options = {}) => fetch(url, {
+  ...options,
+  signal: AbortSignal.timeout(10_000),
+}).catch(() => null);
+
 async function getJson(url) {
-  const r = await fetch(url, { headers: UA });
-  if (!r.ok) return null;
+  const r = await fetchWithTimeout(url, { headers: UA });
+  if (!r?.ok) return null;
   return r.json().catch(() => null);
 }
 
 /** Store-page HTML, for the tags that exist nowhere in Steam's JSON APIs. */
 async function getStoreHtml(url) {
-  const r = await fetch(url, { headers: STORE_HEADERS, redirect: 'follow' });
-  if (!r.ok) return null;
+  const r = await fetchWithTimeout(url, { headers: STORE_HEADERS, redirect: 'follow' });
+  if (!r?.ok) return null;
   return r.text().catch(() => null);
 }
 

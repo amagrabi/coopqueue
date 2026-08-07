@@ -22,7 +22,7 @@ Live at <https://coopqueue.pages.dev>.
 ## Before you finish
 
 ```bash
-npm test                 # 119 assertions — MUST pass before any deploy
+npm test                 # 139 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -49,7 +49,8 @@ These are the ones that cause real damage. `CLAUDE.md` has the full list of seve
 invariants plus the evidence.
 
 1. **`schema.sql` must never touch a live database.** It opens with `DROP TABLE`.
-   `npm run db:init` against production wipes everything. Changes to a live database
+   Applying it to an existing remote database wipes everything; the old remote
+   `db:init` shortcut was removed. Changes to a live database
    go in `migrations/` as additive, idempotent files. New columns go in **both**
    `schema.sql` and a migration.
 
@@ -115,13 +116,13 @@ its numbers in `CLAUDE.md`.
 ```
 functions/api/          Pages Functions (the API)
   g/[slug]/             everything group-scoped — behind _middleware.js
-lib/                    shared pure modules: auth, steam, score, coop, recommend, groups
+lib/                    shared pure modules: auth, steam, score, coop, recommend, groups, ownership
 public/                 the entire frontend: index.html, app.js, styles.css, brand/
   vendor/hls.min.js     the one vendored dependency
 crawler/                the hourly cron Worker (Pages Functions cannot carry crons)
 migrations/             additive, idempotent, applied by hand
-scripts/                setup, crawl, backfill-tags, reclassify-coop, validate-palette
-test/isolation.mjs      94 assertions against the REAL route handlers
+scripts/                setup, crawl, IGDB measurement, tags, palette validation
+test/isolation.mjs      139 assertions against the REAL route handlers
 test/harness.mjs        local server; reimplements routes over real lib/ + schema
 schema.sql              fresh installs and tests ONLY — never production
 ```

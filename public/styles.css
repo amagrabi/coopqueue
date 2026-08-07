@@ -141,7 +141,7 @@ kbd {
   display: inline-flex; align-items: center; gap: 7px;
 }
 .tab:hover { background: var(--surface-2); color: var(--text-primary); }
-.tab[aria-selected="true"] { background: var(--surface-2); color: var(--text-primary); }
+.tab[aria-current="page"] { background: var(--surface-2); color: var(--text-primary); }
 .pill {
   font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
   background: var(--series-1); color: #fff; min-width: 20px; text-align: center;
@@ -265,6 +265,34 @@ kbd {
 .kbd-hint { font-size: 12px; color: var(--text-muted); margin: 14px 0 0; }
 
 /* ───────────────────────────── play next ──────────────────────────────── */
+.play-night {
+  margin: 0 0 20px; padding: 18px 20px; border-radius: var(--radius);
+  border: 1px solid rgba(57,135,229,.35);
+  background: linear-gradient(135deg, rgba(57,135,229,.10), rgba(181,91,207,.05));
+}
+.play-night-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.play-night-head h3 { font-size: 16px; }
+.play-night-head p, .play-night-status { margin: 3px 0 0; color: var(--text-muted); font-size: 12.5px; }
+.play-night-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.play-night-controls {
+  display: grid; grid-template-columns: minmax(260px,1fr) 150px auto;
+  gap: 18px; align-items: end; margin-top: 16px;
+}
+.play-night-controls fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.play-night-controls legend, .play-night-controls .detail-field > span {
+  display: block; margin-bottom: 7px; font-size: 11.5px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted);
+}
+.attendee-list { display: flex; gap: 7px; flex-wrap: wrap; }
+.attendee {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1);
+  color: var(--text-secondary); font-size: 13px; cursor: pointer;
+}
+.attendee:has(input:checked) { border-color: rgba(57,135,229,.55); color: var(--text-primary); }
+.attendee input { margin: 0; }
+.pn-own { padding-bottom: 8px; }
+.play-night-status { min-height: 18px; margin-top: 12px; }
 .rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rank-row {
   display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: center;
@@ -404,9 +432,8 @@ td.miss { color: #4a4a47; }
   margin: 10px 0 0; padding: 10px 12px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
 }
-/* A tag and its score are one unit. Without this, "Third-Person Shooter -0.34"
-   breaks across two lines mid-chip, borders and all. */
-.browse-why .chip { white-space: nowrap; }
+/* Long Steam tags must stay inside the explanation on narrow screens. */
+.browse-why .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
 
 /* Secondary text inside a bar label, e.g. the raw 25/114 behind a percentage. */
 .bar-sub { color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -473,6 +500,37 @@ td.miss { color: #4a4a47; }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--border); }
 .detail-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+.ownership-detail { padding: 13px 15px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.ownership-detail h4, .trophy h4 { margin: 0; font-size: 14px; }
+.ownership-detail p { margin: 8px 0 0; color: var(--text-muted); font-size: 11.5px; }
+.ownership-people { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+.ownership-person {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 12px;
+}
+.ownership-person.is-owned { color: #8fe08f; border-color: rgba(12,163,12,.35); }
+.ownership-person.is-missing { color: #f2d79a; border-color: rgba(250,178,25,.35); }
+
+.trophy {
+  padding: 16px; border: 1px solid rgba(250,178,25,.28); border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(250,178,25,.07), rgba(181,91,207,.05));
+}
+.trophy-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.trophy-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.trophy-head > strong { font-size: 24px; color: #f2d79a; }
+.trophy-track { height: 8px; margin: 12px 0; overflow: hidden; border-radius: 999px; background: var(--gridline); }
+.trophy-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#fab219,#b55bcf); }
+.trophy-people { display: grid; gap: 7px; margin-top: 12px; }
+.trophy-person { display: grid; grid-template-columns: 110px 1fr 74px; gap: 9px; align-items: center; font-size: 12px; }
+.trophy-person > span { display: inline-flex; gap: 6px; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.trophy-person .bar-track { height: 8px; }
+.trophy-person b { color: var(--text-secondary); font-weight: 500; text-align: right; }
+.trophy-note { margin: 11px 0 0; font-size: 12px; color: #f2d79a; }
+.trophy-calls { display: grid; gap: 2px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+.trophy-calls strong { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.trophy-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 13px; }
+.trophy-actions span { color: var(--text-muted); font-size: 11.5px; }
+
 .toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
@@ -483,7 +541,11 @@ td.miss { color: #4a4a47; }
 
 @media (max-width: 720px) {
   .topbar { gap: 10px; padding: 10px 14px; }
-  .tabs { order: 3; width: 100%; overflow-x: auto; }
+  .tabs {
+    order: 3; width: 100%; overflow-x: auto; scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+  .tab { flex: none; scroll-snap-align: center; }
   .topbar-right { gap: 8px; }
   .who span { display: none; }
   .main { padding: 18px 14px 60px; }
@@ -493,6 +555,13 @@ td.miss { color: #4a4a47; }
   .dot-row { grid-template-columns: 110px 1fr 30px; }
   .dot-axis { margin-left: 122px; margin-right: 42px; }
   .detail-row2 { grid-template-columns: 1fr; }
+  .play-night-controls { grid-template-columns: 1fr; gap: 13px; align-items: start; }
+  .pn-own { padding-bottom: 0; }
+  .rank-row { grid-template-columns: 30px minmax(0,1fr); gap: 10px; }
+  .rank-score { grid-column: 2; text-align: left; display: flex; gap: 7px; align-items: baseline; }
+  .rank-score span { display: inline; }
+  .trophy-person { grid-template-columns: 90px 1fr; }
+  .trophy-person b { grid-column: 2; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
@@ -521,7 +590,7 @@ td.miss { color: #4a4a47; }
   gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
 }
 .feature { background: var(--surface-1); padding: 24px 22px; }
-.feature h3 { font-size: 15px; margin-bottom: 8px; }
+.feature h2 { font-size: 15px; margin-bottom: 8px; }
 .feature p { color: var(--text-secondary); font-size: 13.5px; line-height: 1.55; margin: 0; }
 .landing-foot { margin-top: 40px; color: var(--text-muted); font-size: 12.5px; text-align: center; }
 
@@ -531,7 +600,7 @@ td.miss { color: #4a4a47; }
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 20px; display: grid; gap: 12px; align-content: start;
 }
-.onboard-card h3 { font-size: 15px; }
+.onboard-card h2 { font-size: 15px; }
 .field { display: grid; gap: 5px; }
 .field > span {
   font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
@@ -588,8 +657,13 @@ td.miss { color: #4a4a47; }
 .settings-rule { border: 0; border-top: 1px solid var(--border); margin: 20px 0 14px; }
 
 /* ── library: sortable headers, status colour, thumbnails ───────────────── */
-.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
-.th-sort:hover { color: var(--text-primary); }
+.th-sort { user-select: none; white-space: nowrap; }
+.th-sort-btn {
+  border: 0; padding: 4px 0; background: transparent; color: inherit;
+  font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
+}
+.th-sort-btn span { display: inline-block; min-width: 1em; margin-left: 3px; }
+.th-sort-btn:hover, .th-sort-btn:focus-visible { color: var(--text-primary); }
 .th-sort.is-sorted { color: var(--text-primary); }
 
 /* Status at a glance. Hues reuse the validated semantic tokens rather than new
@@ -604,6 +678,12 @@ td.miss { color: #4a4a47; }
 /* Steam header art is a 460x215 banner, so the thumbnail keeps that ratio — a
    square crop cuts the logo off on most games and reads as a smudge. */
 .lib-game { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.lib-open {
+  display: grid; gap: 4px; width: 100%; padding: 0; border: 0;
+  background: transparent; color: inherit; font: inherit; font-weight: inherit;
+  text-align: left; cursor: pointer;
+}
+.lib-mobile-meta { display: none; color: var(--text-muted); font-size: 11.5px; font-weight: 400; }
 .lib-art {
   flex: 0 0 auto; width: 46px; height: 21px; border-radius: 3px;
   object-fit: cover; background: var(--surface-2); display: block;
@@ -643,6 +723,8 @@ td.miss { color: #4a4a47; }
   padding: 14px 16px; background: rgba(208,59,59,.06);
 }
 .danger > strong { color: #f0a3a3; font-size: 14px; }
+.export-links { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0 16px; font-size: 12.5px; color: var(--text-muted); }
+.export-links a:not(.btn) { color: #a8cbf5; }
 .btn-danger { background: var(--critical); border-color: transparent; color: #fff; }
 .btn-danger:hover { background: #e05252; }
 /* Archived rows stay legible but visibly not part of the active library. */
@@ -688,3 +770,12 @@ tr.is-archived td { opacity: .55; }
 .est { color: var(--text-muted); border-bottom: 1px dotted var(--baseline); cursor: help; }
 .pt-fix { display: block; margin-top: 3px; }
 
+@media (max-width: 720px) {
+  /* The desktop table is too wide to scan on a phone. Keep one tappable summary
+     column and put the decision-making fields directly under the title. */
+  .table-wrap { overflow-x: visible; }
+  #lib-table th:not(.c-name), #lib-table td:not(.c-name) { display: none; }
+  #lib-table .c-name { width: 100%; min-width: 0; padding: 12px; }
+  #lib-table .lib-mobile-meta { display: block; }
+  #lib-table .lib-game { flex-wrap: wrap; }
+}

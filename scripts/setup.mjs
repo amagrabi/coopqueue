@@ -145,13 +145,8 @@ async function main() {
   const hasSchema = /"name"\s*:\s*"groups"/.test(tables);
 
   if (hasSchema) {
-    warn('Tables already exist.');
-    if (await yes('Wipe and recreate them? This deletes every group and rating.')) {
-      wrangler(['d1', 'execute', DB_NAME, '--remote', '--yes', '--file', './schema.sql']);
-      ok('Schema recreated');
-    } else {
-      note('Left the existing data alone.');
-    }
+    ok('Tables already exist; left every row untouched');
+    note('Apply additive files from migrations/ for schema changes.');
   } else {
     wrangler(['d1', 'execute', DB_NAME, '--remote', '--yes', '--file', './schema.sql']);
     ok('Schema applied');
@@ -178,7 +173,7 @@ async function main() {
 
   console.log('');
   note('A Steam Web API key is free and instant: https://steamcommunity.com/dev/apikey');
-  note('It is only used for display names and avatars — you can skip it.');
+  note('It enables profiles, Steam-library ownership, playtime, and achievement sync; you can skip it.');
   const steamKey = await ask('Steam API key (blank to skip):');
   if (steamKey) {
     wrangler(['pages', 'secret', 'put', 'STEAM_API_KEY', '--project-name', PROJECT], { input: steamKey + '\n' });

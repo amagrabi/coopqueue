@@ -18,7 +18,9 @@ export async function onRequestGet({ request, env }) {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: params,
-  });
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+  if (!verify?.ok) return redirect('/?error=steam_unavailable');
   const text = await verify.text();
   if (!/is_valid\s*:\s*true/i.test(text)) return redirect('/?error=steam_rejected');
 

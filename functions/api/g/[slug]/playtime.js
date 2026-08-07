@@ -39,7 +39,8 @@ export async function onRequestGet({ env, data }) {
        FROM memberships m
        LEFT JOIN seed_assignments a
               ON a.group_id = m.group_id AND a.seed_steam_id = m.steam_id
-       LEFT JOIN playtime_sync s ON s.steam_id = COALESCE(a.steam_id, m.steam_id)
+       LEFT JOIN group_library_sync s
+              ON s.group_id = m.group_id AND s.steam_id = COALESCE(a.steam_id, m.steam_id)
       WHERE m.group_id = ? ORDER BY m.short_name COLLATE NOCASE`
   ).bind(gid).all();
 
@@ -81,6 +82,11 @@ export async function onRequestPost({ env, data }) {
       WHERE a.group_id = ?1`
   ).bind(gid).all();
 
+  const groupApps = await env.DB.prepare(
+    'SELECT steam_appid FROM games WHERE group_id = ? AND steam_appid IS NOT NULL'
+  ).bind(gid).all();
+  const wanted = new Set((groupApps.results || []).map((g) => g.steam_appid));
+
   const report = [];
   for (const m of members.results || []) {
     const owned = await ownedGames(env.STEAM_API_KEY, m.steam_id);
@@ -89,11 +95,11 @@ export async function onRequestPost({ env, data }) {
       continue;
     }
 
-    // Only games this group actually has are stored. A member's full library can
-    // run to hundreds of titles and none of the rest can affect any estimate here.
-    const mine = await env.DB.prepare(
-      'SELECT steam_appid FROM games WHERE group_id = ? AND steam_appid IS NOT NULL').bind(gid).all();
-    const wanted = new Set((mine.results || []).map((g) => g.steam_appid));
+    // Only games this group actually has are stored. Archived games stay in this
+    // set: if one is restored after the sync, its existing owned row must beat the
+    // group watermark or absence could be misread as proof that it is not owned.
+    // A member's full library can run to hundreds of other titles and none of
+    // those can affect any estimate or ownership badge here.
     const keep = owned.filter((g) => wanted.has(g.appid));
 
     if (keep.length) {
@@ -116,6 +122,12 @@ export async function onRequestPost({ env, data }) {
        ON CONFLICT(steam_id) DO UPDATE SET
          games = excluded.games, played = excluded.played, synced_at = unixepoch()`
     ).bind(m.steam_id, owned.length, played).run();
+    await env.DB.prepare(
+      `INSERT INTO group_library_sync (group_id, steam_id, games, played, synced_at)
+       VALUES (?,?,?,?,unixepoch())
+       ON CONFLICT(group_id, steam_id) DO UPDATE SET
+         games = excluded.games, played = excluded.played, synced_at = unixepoch()`
+    ).bind(gid, m.steam_id, owned.length, played).run();
 
     report.push({
       name: m.short_name, steamId: m.steam_id,
@@ -159,7 +171,8 @@ export async function recomputeEstimates(env, gid) {
        FROM games g
        JOIN accounts acc
        JOIN playtime p ON p.steam_id = acc.steam_id AND p.appid = g.steam_appid
-      WHERE g.group_id = ?1 AND g.steam_appid IS NOT NULL AND p.minutes >= ?2`
+      WHERE g.group_id = ?1 AND g.archived_at IS NULL
+        AND g.steam_appid IS NOT NULL AND p.minutes >= ?2`
   ).bind(gid, PARTICIPANT_MINUTES).all();
 
   const byGame = new Map();
@@ -200,7 +213,7 @@ export async function recomputeEstimates(env, gid) {
   // Games nobody qualifying played get an explicit 0 rather than a stale number.
   stmts.push(env.DB.prepare(
     `UPDATE games SET hours_estimated = 0, hours_participants = 0, finished_estimated = NULL
-      WHERE group_id = ?1 AND steam_appid IS NOT NULL
+      WHERE group_id = ?1 AND archived_at IS NULL AND steam_appid IS NOT NULL
         AND id NOT IN (
           WITH accounts(steam_id) AS (
             SELECT steam_id FROM memberships WHERE group_id = ?1 AND is_seed = 0
@@ -212,7 +225,7 @@ export async function recomputeEstimates(env, gid) {
           SELECT g.id FROM games g
             JOIN accounts acc
             JOIN playtime p ON p.steam_id = acc.steam_id AND p.appid = g.steam_appid
-           WHERE g.group_id = ?1 AND p.minutes >= ?2)`
+           WHERE g.group_id = ?1 AND g.archived_at IS NULL AND p.minutes >= ?2)`
   ).bind(gid, PARTICIPANT_MINUTES));
 
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
