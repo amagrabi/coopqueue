@@ -578,6 +578,27 @@ the same way**: restore `npm run db:backup` output into a local SQLite file with
 `PRAGMA foreign_keys = ON`, replay the migration, and compare row counts *and* a
 checksum of the ratings before and after.
 
+## Gotchas in the client worth not rediscovering
+
+- **A valueless `data-` attribute is the empty string, which is falsy.** The group
+  switcher's "+ New group" and "Join with a code" items were checked with
+  `if (b.dataset.new || b.dataset.joincode)`, which is never true for `<button
+  data-new>` — both fell through to `location.hash = '#/g/undefined/queue'` and
+  appeared to do nothing at all. Use `'new' in b.dataset`.
+- **The group menu anchors LEFT, not right.** A `max-width: 720px` rule set
+  `left: auto; right: 0` to keep it on screen, but the switcher sits near the left
+  edge of the topbar, so a 260px menu hung ~114px off the left of a 375px phone.
+  It is `left: 0` with `max-width: calc(100vw - 64px)` — the switcher's own offset
+  plus a margin — so it cannot overflow the other way either.
+
+## Early access on Play next
+
+`#hide-ea` is **on by default**. Play next answers "what should we start", and an
+unfinished game is usually the wrong answer however much the group wants it — the
+label alone was not enough, because a high-scoring early access title still sat at
+the top of the list. It only leaves that list; the game stays in the library, stays
+rateable, and the chip still explains why.
+
 ## Skipping is not a one-way door
 
 Reported as a bug and it was one: Subnautica 2 showed on Play next with one rating,

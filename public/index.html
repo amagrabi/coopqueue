@@ -266,6 +266,13 @@
           <input type="checkbox" id="hide-unviable" checked>
           <span>Hide games we can't all play</span>
         </label>
+        <!-- On by default: an unfinished game is a bad answer to "what next", even
+             when the group wants it. It stays rateable, it just stops being
+             suggested until it ships. -->
+        <label class="toggle">
+          <input type="checkbox" id="hide-ea" checked>
+          <span>Hide early access games</span>
+        </label>
       </div>
       <ol id="next-list" class="rank-list"></ol>
       <div id="unviable-block" class="unviable-block"></div>

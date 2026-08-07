@@ -352,10 +352,15 @@ function renderGroupMenu() {
 
   $$('#group-menu .group-item').forEach((b) => b.addEventListener('click', async () => {
     closeGroupMenu();
-    if (b.dataset.new || b.dataset.joincode) {
+    /* `in`, not truthiness: these are valueless attributes, so `dataset.new` is the
+       empty string — falsy. The old check never fired and both items fell through
+       to a navigation to `#/g/undefined/queue`, which is why they did nothing. */
+    const wantsNew = 'new' in b.dataset;
+    const wantsJoin = 'joincode' in b.dataset;
+    if (wantsNew || wantsJoin) {
       state.group = null;
       showOnboard();
-      if (b.dataset.joincode) $('#join-code').focus(); else $('#create-name').focus();
+      (wantsJoin ? $('#join-code') : $('#create-name')).focus();
       return;
     }
     location.hash = `#/g/${b.dataset.slug}/queue`;
@@ -442,6 +447,7 @@ function wireOnce() {
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
+  $('#hide-ea').addEventListener('change', renderNext);
 
   let browseTimer;
   $('#browse-search').addEventListener('input', () => {
@@ -841,7 +847,13 @@ function renderNext() {
     `Backlog games ranked by the group's average score. ` +
     `toward the middle when only one person has voted. Anything that can't fit ${need} players is flagged.`;
 
-  const backlog = activeGames().filter((g) => g.status === 'backlog' && g.n > 0);
+  /* Early access is filtered here rather than merely flagged: Play next answers
+     "what should we start", and starting something unfinished is usually the wrong
+     answer however much the group wants it. Off this list, not out of the library. */
+  const hideEa = $('#hide-ea').checked;
+  const backlog = activeGames()
+    .filter((g) => g.status === 'backlog' && g.n > 0)
+    .filter((g) => !(hideEa && g.early_access));
   const hide = $('#hide-unviable').checked;
   const playable = backlog.filter((g) => g.viability.ok !== false).sort((a, b) => b.raw - a.raw);
   const blocked  = backlog.filter((g) => g.viability.ok === false).sort((a, b) => b.raw - a.raw);

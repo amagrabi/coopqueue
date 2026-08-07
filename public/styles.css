@@ -501,7 +501,14 @@ td.miss { color: #4a4a47; }
 .landing { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
 .landing-top {
   display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
   padding: 18px 0; border-bottom: 1px solid var(--border);
+}
+/* The logo grows to 54px on small screens and the sign-in button sits right next
+   to it, so they need real air between them rather than whatever space-between
+   happens to leave. */
+@media (max-width: 560px) {
+  .landing-top { gap: 20px; padding: 20px 0 18px; }
 }
 .hero { padding: 84px 0 64px; max-width: 44rem; }
 .hero h1 { font-size: clamp(32px, 5.2vw, 52px); line-height: 1.08; letter-spacing: -.03em; }
@@ -566,7 +573,15 @@ td.miss { color: #4a4a47; }
 @media (max-width: 720px) {
   .hero { padding: 48px 0 40px; }
   .group-btn { max-width: 130px; }
-  .group-menu { left: auto; right: 0; }
+  /* Anchored to the button's LEFT edge, not its right. Right-aligning it was meant
+     to keep the menu on screen, but the switcher sits near the left edge of the
+     topbar, so a 260px menu hung ~114px off the left of a 375px phone. The cap is
+     the switcher's own offset plus a margin, so it cannot overflow the other way. */
+  .group-menu {
+    left: 0; right: auto;
+    min-width: 0; width: max-content; max-width: calc(100vw - 64px);
+  }
+  .group-item-meta { white-space: normal; }
 }
 
 /* Divider between the group's settings and the viewer's own preferences. */
