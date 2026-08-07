@@ -83,8 +83,8 @@ tab ranks everyone by how much of the library they have scored. Rating coverage
 is the thing that decides whether any of the scoring means anything, so it is
 not hidden in a stats page.
 
-**Stats.** A compact full-width library-status summary, genres by games / recorded hours / average rating,
-yearly starts and finishes, time-versus-rating, per-person baselines, and a dot
+**Stats.** A compact full-width library-status summary followed by paired genre and
+rating profiles, yearly starts and finishes, time-versus-rating, and a dot
 plot of your biggest arguments. Missing hours remain unknown and every history
 chart shows its date coverage. Panels with no underlying data stay hidden.
 Personal workspaces keep the useful history, rating and playtime views while

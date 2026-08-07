@@ -371,8 +371,13 @@ td.miss { color: #4a4a47; }
 .tile-alert .tile-val { color: var(--serious); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(340px,1fr)); gap: 16px; margin-bottom: 16px; }
-.stats-grid { align-items: start; }
-.stats-grid > .panel { min-width: 0; }
+.stats-grid { align-items: stretch; }
+/* A Stats row owns its spacing. The generic panel margin otherwise combines with
+   the grid margin, while a shorter card stops early and makes that doubled gap
+   look different in each column. Stretch the pair and leave one 16px gutter. */
+.stats-grid > .panel { min-width: 0; height: 100%; margin-bottom: 0; }
+#stats-people { display: flex; flex-direction: column; }
+#stats-people .people { flex: 1; align-content: space-between; }
 .grid-2.single { grid-template-columns: 1fr; }
 .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; }
 .panel-title { font-size: 15.5px; margin-bottom: 14px; }
