@@ -629,6 +629,11 @@ cannot escape the point's own stacking layer. The custom tooltip uses `aria-labe
 without a duplicate native `title` tooltip. `lib/stats.js` owns these aggregations and
 is shared with the harness so the local UI cannot drift from the deployed route.
 
+**Who agrees with whom** treats the closest and furthest pair as a summary: their
+cards share a row when space allows, then a labelled and deliberately separated
+detail list ranks every eligible pair. On narrow phones the summary cards stack
+before that list instead of squeezing their labels into two thin columns.
+
 ## Comments
 
 One thread per game, in `comments`. It replaced the single `notes` textarea, which

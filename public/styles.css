@@ -954,6 +954,12 @@ tr.is-archived td { opacity: .55; }
 
 /* ── extra statistics ───────────────────────────────────────────────────── */
 .stat-callouts { display: grid; gap: 8px; margin-top: 14px; }
+.pair-callouts { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.pair-callouts .callout-stat { min-width: 0; padding: 11px 13px; }
+.stats-detail-label {
+  margin: 20px 0 11px; color: var(--text-muted); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+}
 .callout-stat {
   display: grid; gap: 1px; padding: 9px 12px; border-radius: var(--radius-sm);
   background: var(--surface-2); font-size: 12.5px; color: var(--text-muted);
@@ -1003,4 +1009,7 @@ tr.is-archived td { opacity: .55; }
   #lib-table .c-name { width: 100%; min-width: 0; padding: 12px; }
   #lib-table .lib-mobile-meta { display: block; }
   #lib-table .lib-game { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .pair-callouts { grid-template-columns: 1fr; }
 }
