@@ -25,11 +25,15 @@ does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
 
 <table>
   <tr>
-    <td width="50%">
+    <td width="33%">
+      <img src="public/screenshots/rate.webp" alt="Focused rating card with artwork, group scores and voting controls"><br>
+      <strong>Fast, focused voting.</strong> One game at a time, with keyboard-friendly controls.
+    </td>
+    <td width="33%">
       <img src="public/screenshots/play-next.webp" alt="Play next ranking with attendee filters, artwork, player caps and group scores"><br>
       <strong>A shortlist that fits.</strong> Choose tonight's crew and the backlog re-ranks immediately.
     </td>
-    <td width="50%">
+    <td width="33%">
       <img src="public/screenshots/stats.webp" alt="Group statistics for tracked games, playtime, ratings, genres and gaming history"><br>
       <strong>Statistics backed by real data.</strong> Empty charts simply stay out of the way.
     </td>

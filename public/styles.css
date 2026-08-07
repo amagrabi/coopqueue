@@ -749,7 +749,7 @@ td.miss { color: #4a4a47; }
 .landing-shot figcaption strong { color: var(--text-primary); }
 .landing-shot-panel figcaption { text-align: center; }
 .landing-shot-picker {
-  display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px;
+  display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px;
   margin-bottom: 18px;
 }
 .landing-shot-choice {

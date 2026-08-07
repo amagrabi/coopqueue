@@ -547,7 +547,10 @@ realistic `g4m1ng` game and rating fixture while replacing group/member display
 names with neutral identities. Linked games derive their header image from their
 real Steam appid; unlinked legacy rows retain the generic fallback. It also hides
 the signed-in member's Complete our history prompt so the reusable Library image
-stays focused on the shared data rather than one person's housekeeping. Do not capture
+stays focused on the shared data rather than one person's housekeeping. The first
+Rate card uses PEAK's static header and matching fixture copy instead of the generic
+Back 4 Blood trailer used to exercise video playback in ordinary harness sessions.
+Do not capture
 the production group directly or commit its private comments, invite code, account
 identifiers or avatars.
 

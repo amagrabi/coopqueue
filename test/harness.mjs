@@ -153,6 +153,14 @@ if (MARKETING) {
     'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3527290/31bac6b2eccf09b368f5e95ce510bae2baf3cfcd/header.jpg',
     'Peak',
   );
+  // PEAK is the first unrated played game in the marketing fixture. The generic
+  // test trailer and copy above belong to Back 4 Blood; leaving them attached
+  // makes the Rate screenshot contradict its own title. Prefer matching static
+  // art and concise fixture copy over a misleading video frame.
+  db.prepare(`UPDATE games SET trailer_url=NULL, short_description=?
+               WHERE group_id=1 AND name='Peak'`).run(
+    'Climb a mysterious mountain with friends, helping each other through a route where one mistake can send the whole expedition downhill.',
+  );
 }
 
 /* Real tag lists for catalogue rows the crawl has not tagged yet, so the taste
