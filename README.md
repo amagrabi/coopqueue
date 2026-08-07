@@ -47,8 +47,10 @@ person answer, defer or dismiss a prompt without hiding it from everyone else.
 **Find games.** The most-reviewed online co-op games on Steam, as a global
 catalogue, defaulting to a **Recommended for us** order built from your group's
 own ratings — and it names the tags it based that on, so you can disagree with
-it. A **Co-op only** filter is on by default. Add the ones your group might play
-to its **library**, and only library games ever appear in anyone's rating queue.
+it. A **Co-op only** filter is on by default. Search results and catalogue cards
+link to the official Steam page in a new tab, so you can check the details before
+adding anything. Add the ones your group might play to its **library**, and only
+library games ever appear in anyone's rating queue.
 That opt-in step is the whole point: a catalogue of thousands would otherwise
 bury the handful of votes that decide what you actually play. Games whose player cap nobody has verified say so
 rather than guessing, and the "only ones we can all play" filter leaves them out

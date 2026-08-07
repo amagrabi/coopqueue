@@ -448,7 +448,10 @@ td.miss { color: #4a4a47; }
 .browse-body .browse-ea {
   font-size: 12px; color: #f2d79a; margin: 8px 0 0; display: block; overflow: visible;
 }
-.browse-act { padding: 12px 14px; display: flex; justify-content: flex-end; align-items: center; }
+.browse-act {
+  padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap;
+  justify-content: flex-end; align-items: center;
+}
 .browse-foot { display: flex; justify-content: center; margin-top: 18px; }
 
 /* The ranking's own explanation, above the grid. */
@@ -510,12 +513,18 @@ td.miss { color: #4a4a47; }
 .add-hit {
   display: grid; grid-template-columns: 92px 1fr auto; gap: 12px; align-items: center;
   padding: 8px; border-radius: var(--radius-sm); background: var(--surface-2);
-  border: 1px solid transparent; cursor: pointer; text-align: left; font: inherit; color: inherit;
+  border: 1px solid transparent; text-align: left; font: inherit; color: inherit;
 }
 .add-hit:hover { border-color: var(--series-1); }
 .add-hit img { width: 92px; height: 43px; object-fit: cover; border-radius: 4px; background: #000; }
+.add-hit-copy { min-width: 0; }
 .add-hit b { font-size: 14px; font-weight: 600; }
 .add-hit span { font-size: 12px; color: var(--text-muted); }
+.add-hit .add-hit-store {
+  display: inline-block; margin-top: 3px; color: var(--text-secondary);
+  font-size: 12px; font-weight: 550; text-decoration: none;
+}
+.add-hit .add-hit-store:hover { color: var(--text-primary); text-decoration: underline; }
 .add-status { font-size: 13px; color: var(--text-muted); margin: 14px 0 0; min-height: 18px; }
 
 .detail-grid { display: grid; gap: 18px; }
@@ -691,6 +700,12 @@ td.miss { color: #4a4a47; }
 }
 @media (max-width: 480px) { .workspace-choice { grid-template-columns: 1fr; } }
 
+@media (max-width: 480px) {
+  .add-hit { grid-template-columns: 72px minmax(0,1fr); }
+  .add-hit img { width: 72px; height: 34px; }
+  .add-hit > :last-child { grid-column: 2; justify-self: start; }
+}
+
 /* Divider between the group's settings and the viewer's own preferences. */
 .settings-rule { border: 0; border-top: 1px solid var(--border); margin: 20px 0 14px; }
 
@@ -741,8 +756,12 @@ td.miss { color: #4a4a47; }
 .seg.is-on { background: var(--surface-2); color: var(--text-primary); }
 .seg:disabled { opacity: .4; cursor: default; }
 .rate-ask { margin: 10px 0 0; font-size: 13.5px; color: var(--text-secondary); }
-/* Already-owned search hits stay readable but clearly not actionable. */
-.add-hit.is-have { opacity: .65; cursor: default; }
+/* Already-owned search hits keep their Steam link fully actionable while the
+   library state, art and title recede. */
+.add-hit.is-have > img,
+.add-hit.is-have .add-hit-copy > b,
+.add-hit.is-have .add-hit-copy > span,
+.add-hit.is-have > .chip { opacity: .65; }
 .add-hit.is-have:hover { background: var(--surface-2); }
 
 /* ── add by hand ────────────────────────────────────────────────────────── */

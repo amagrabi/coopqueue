@@ -102,6 +102,10 @@ function toast(msg) {
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const steamStoreUrl = (appid) => {
+  const id = Number(appid);
+  return Number.isSafeInteger(id) && id > 0 ? `https://store.steampowered.com/app/${id}/` : null;
+};
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
 /** Rough relative time. Comment threads read better in "2 days ago" than dates. */
 const when = (epoch) => {
@@ -1927,18 +1931,25 @@ async function runSearch(term) {
     // finding out by getting a 409 after clicking Add is a poor substitute.
     const byAppid = new Map(state.games.filter((g) => g.steam_appid).map((g) => [g.steam_appid, g]));
     $('#add-results').innerHTML = results.map((r) => {
-      const have = byAppid.get(r.appid);
+      const appid = Number(r.appid);
+      const storeUrl = steamStoreUrl(appid);
+      if (!storeUrl) return '';
+      const have = byAppid.get(appid);
       return `
-      <button class="add-hit${have ? ' is-have' : ''}" data-appid="${r.appid}" ${have ? 'disabled' : ''}>
+      <div class="add-hit${have ? ' is-have' : ''}" data-appid="${appid}">
         <img src="${esc(r.image || '')}" alt="" loading="lazy">
-        <span><b>${esc(r.name)}</b><br><span>${esc(r.price || '')} ${esc(r.release || '')}</span></span>
+        <span class="add-hit-copy">
+          <b>${esc(r.name)}</b><br><span>${esc(r.price || '')} ${esc(r.release || '')}</span><br>
+          <a class="add-hit-store" href="${storeUrl}" target="_blank" rel="noopener"
+             aria-label="Open ${esc(r.name)} on Steam (new tab)">Steam page ↗</a>
+        </span>
         ${have
           ? `<span class="chip chip-good">already in ${esc(STATUS_LABEL[have.status] || 'your library')}</span>`
-          : '<span class="chip">Add</span>'}
-      </button>`;
+          : `<button type="button" class="btn btn-sm" data-add-appid="${appid}">Add</button>`}
+      </div>`;
     }).join('');
-    $$('#add-results .add-hit:not([disabled])').forEach((b) =>
-      b.addEventListener('click', () => addGame(b.dataset.appid, b)));
+    $$('#add-results [data-add-appid]').forEach((b) =>
+      b.addEventListener('click', () => addGame(b.dataset.addAppid, b)));
   } catch (e) {
     if (seq === steamSearchSeq && $('#add-dialog').open) $('#add-status').textContent = e.message;
   }
@@ -2159,6 +2170,7 @@ async function renderBrowse(reset) {
 
   $('#browse-grid').innerHTML = shown.map((g) => {
     const inLibrary = owned.has(g.appid);
+    const storeUrl = steamStoreUrl(g.appid);
     const cap = g.max_players
       ? `${g.max_players}p co-op`
       : '<span class="chip">player count unverified</span>';
@@ -2182,6 +2194,9 @@ async function renderBrowse(reset) {
           ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
         </div>
         <div class="browse-act">
+          ${storeUrl ? `<a class="btn btn-sm btn-ghost" href="${storeUrl}"
+             target="_blank" rel="noopener"
+             aria-label="Open ${esc(g.name)} on Steam (new tab)">Steam page ↗</a>` : ''}
           ${inLibrary
             ? '<span class="chip chip-good">in your library</span>'
             : `<button class="btn btn-sm btn-primary" data-add="${g.appid}">+ Add to library</button>`}

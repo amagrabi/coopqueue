@@ -842,6 +842,12 @@ permanently lit control that usually does nothing.
 ordering is the shipped ordering — behind
 `functions/api/g/[slug]/recommend.js`.
 
+Both these catalogue cards and the Add-game Steam search expose an official store
+link as a separate `target="_blank"` action with `rel="noopener"`. Do not put it
+inside the Add button: nested interactive controls are invalid, and opening a page
+for research must never accidentally add the game. Already-added search results
+keep the store link active.
+
 **Why it is a separate route and not `sort=fit` on `/api/coop`.** The catalogue
 endpoint is deliberately group-blind: no slug, no membership read, nothing
 group-scoped, asserted by two tests. Ranking needs the group's ratings, so it has
