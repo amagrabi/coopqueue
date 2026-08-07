@@ -1119,6 +1119,9 @@ function renderNext() {
   $('#next-list').innerHTML = playable.map((g, i) => `
     <li class="rank-row" data-id="${g.id}">
       <div class="rank-num">${i + 1}</div>
+      ${g.header_image
+        ? `<img class="rank-art" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
+        : '<span class="rank-art rank-art-none" aria-hidden="true"></span>'}
       <div class="rank-main">
         <div class="rank-name">${esc(g.name)}</div>
         <div class="rank-meta">${metaChips(g, g.attendeeFit, need)}${
@@ -1133,7 +1136,9 @@ function renderNext() {
        <p>Verified player caps. They stay on the list so nobody re-suggests them.</p>
        ${blocked.map((g) => `
          <div class="unviable-row" data-id="${g.id}">
-           <span><strong>${esc(g.name)}</strong> · ${fmt(g.attendeeScore, 1)}</span>
+           <span class="unviable-game">${g.header_image
+             ? `<img class="rank-art rank-art-small" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
+             : '<span class="rank-art rank-art-small rank-art-none" aria-hidden="true"></span>'}<span><strong>${esc(g.name)}</strong> · ${fmt(g.attendeeScore, 1)}</span></span>
            <span class="why">${esc(g.attendeeFit.reason || `caps at ${g.max_players}`)}</span>
          </div>`).join('')}`;
 

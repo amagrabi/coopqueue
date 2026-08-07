@@ -538,7 +538,9 @@ returned zero. Available minutes and the separate build step are gone. Attendee
 chips now sit directly above the backlog and update the list immediately. Ranking
 is the plain mean of only the selected people's ratings, with vote count visible.
 A verified cap below that crew is excluded; an unknown cap stays in the list and is
-labelled unknown rather than being treated as either a fit or a failure.
+labelled unknown rather than being treated as either a fit or a failure. Both the
+ranked and too-small lists use the cached Steam header art already returned with the
+library data; they do not make another metadata request.
 
 `POST /api/g/:slug/play-night` retains the same attendee-specific semantics for API
 callers and accepts 1–64 group members, which also supports personal workspaces. It
