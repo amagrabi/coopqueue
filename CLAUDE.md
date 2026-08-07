@@ -545,7 +545,9 @@ library data; they do not make another metadata request.
 For publishable screenshots, run `MARKETING=1 node test/harness.mjs`. It keeps the
 realistic `g4m1ng` game and rating fixture while replacing group/member display
 names with neutral identities. Linked games derive their header image from their
-real Steam appid; unlinked legacy rows retain the generic fallback. Do not capture
+real Steam appid; unlinked legacy rows retain the generic fallback. It also hides
+the signed-in member's Complete our history prompt so the reusable Library image
+stays focused on the shared data rather than one person's housekeeping. Do not capture
 the production group directly or commit its private comments, invite code, account
 identifiers or avatars.
 

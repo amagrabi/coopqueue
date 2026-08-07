@@ -412,6 +412,16 @@ td.miss { color: #4a4a47; }
 .shape-sampled { background: var(--warning); }
 .shape-unfinished, .shape-dropped { background: var(--critical); }
 
+.stats-shape-compact {
+  display: grid; grid-template-columns: minmax(180px,.42fr) minmax(0,1.58fr);
+  align-items: center; gap: 28px; padding-top: 16px; padding-bottom: 16px;
+}
+.stats-shape-compact .panel-title { margin-bottom: 5px; }
+.stats-shape-compact .panel-sub { margin: 0; }
+.stats-shape-compact .shape-legend {
+  grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 11px;
+}
+
 .timeline-legend { display: flex; gap: 16px; margin-bottom: 9px; font-size: 11.5px; color: var(--text-muted); }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .timeline-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--series-1); }
@@ -718,8 +728,11 @@ td.miss { color: #4a4a47; }
 .hero-sub em { color: var(--text-primary); font-style: normal; font-weight: 600; }
 .hero-fine { color: var(--text-muted); font-size: 13px; margin: 14px 0 0; }
 
+.landing-showcase { margin-bottom: 34px; }
 .landing-shot { margin: 0; min-width: 0; }
 .landing-shot picture { display: block; }
+.landing-shot > a { display: block; border-radius: 12px; }
+.landing-shot > a:focus-visible { outline: 3px solid var(--series-1); outline-offset: 4px; }
 .landing-shot img {
   display: block; width: 100%; height: auto; border: 1px solid var(--border);
   border-radius: 12px; background: var(--surface-1);
@@ -729,8 +742,30 @@ td.miss { color: #4a4a47; }
   margin: 12px 4px 0; color: var(--text-secondary); font-size: 13.5px; line-height: 1.5;
 }
 .landing-shot figcaption strong { color: var(--text-primary); }
-.landing-shot-main { margin-bottom: 34px; }
-.landing-shot-main figcaption { text-align: center; }
+.landing-shot-panel figcaption { text-align: center; }
+.landing-shot-picker {
+  display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px;
+  margin-bottom: 18px;
+}
+.landing-shot-choice {
+  min-width: 0; padding: 8px; display: grid; grid-template-columns: minmax(86px,130px) minmax(0,1fr);
+  align-items: center; gap: 12px; text-align: left; color: var(--text-secondary);
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  font: inherit; cursor: pointer; transition: border-color .12s, background .12s, color .12s;
+}
+.landing-shot-choice:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.landing-shot-choice[aria-pressed="true"] {
+  border-color: var(--series-1); background: rgba(56,139,229,.12); color: var(--text-primary);
+}
+.landing-shot-choice:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.landing-shot-choice picture { display: block; width: 100%; min-width: 0; }
+.landing-shot-choice img {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--border);
+}
+.landing-shot-choice span { display: grid; gap: 3px; min-width: 0; }
+.landing-shot-choice strong { font-size: 13.5px; }
+.landing-shot-choice small { color: var(--text-muted); font-size: 11.5px; line-height: 1.35; }
 
 .feature-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -739,16 +774,17 @@ td.miss { color: #4a4a47; }
 .feature { background: var(--surface-1); padding: 24px 22px; }
 .feature h2 { font-size: 15px; margin-bottom: 8px; }
 .feature p { color: var(--text-secondary); font-size: 13.5px; line-height: 1.55; margin: 0; }
-.landing-gallery {
-  display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px;
-  margin-top: 34px;
-}
 .landing-foot { margin-top: 40px; color: var(--text-muted); font-size: 12.5px; text-align: center; }
 
 @media (max-width: 720px) {
-  .landing-shot-main { margin-bottom: 26px; }
-  .landing-shot-main figcaption { text-align: left; }
-  .landing-gallery { grid-template-columns: 1fr; gap: 26px; margin-top: 26px; }
+  .stats-shape-compact { grid-template-columns: 1fr; gap: 12px; }
+  .stats-shape-compact .shape-legend { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .landing-showcase { margin-bottom: 26px; }
+  .landing-shot-panel figcaption { text-align: left; }
+  .landing-shot-picker { gap: 7px; margin-bottom: 12px; }
+  .landing-shot-choice { display: block; padding: 5px; }
+  .landing-shot-choice span { padding: 7px 3px 3px; }
+  .landing-shot-choice small { display: none; }
 }
 
 /* ═══════════════════════════ onboarding ═════════════════════════════════ */

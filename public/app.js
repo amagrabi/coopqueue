@@ -270,9 +270,27 @@ async function boot() {
 
 function showLanding(message) {
   show('landing');
+  wireLandingShowcase();
   const box = $('#landing-error');
   box.hidden = !message;
   if (message) box.textContent = message;
+}
+
+let landingShowcaseWired = false;
+function wireLandingShowcase() {
+  if (landingShowcaseWired) return;
+  landingShowcaseWired = true;
+  $$('.landing-shot-choice').forEach((button) => {
+    button.addEventListener('click', () => {
+      const selected = button.dataset.showcaseShot;
+      $$('.landing-shot-choice').forEach((choice) => {
+        choice.setAttribute('aria-pressed', String(choice === button));
+      });
+      $$('.landing-shot-panel').forEach((panel) => {
+        panel.hidden = panel.dataset.showcasePanel !== selected;
+      });
+    });
+  });
 }
 
 /* ───────────────────────── onboarding: no groups ─────────────────────── */

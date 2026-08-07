@@ -518,6 +518,10 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (sub === '/history' && req.method === 'GET') {
+      // Screenshot mode is for the public product tour. Keep the realistic
+      // library rows, but omit a member-specific housekeeping prompt from the
+      // clean Library composition shown on the landing page and in the README.
+      if (MARKETING) return send(res, 200, { total: 0, items: [] });
       return send(res, 200, historyFor(gid, true, ctx.workspace_mode));
     }
     if (sub === '/history' && req.method === 'POST') {

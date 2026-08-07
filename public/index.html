@@ -55,14 +55,69 @@
     <p id="landing-error" class="gate-error" hidden></p>
   </div>
 
-  <figure class="landing-shot landing-shot-main">
-    <picture>
-      <source srcset="/screenshots/play-next.webp" type="image/webp">
-      <img src="/screenshots/play-next.jpg" width="1440" height="900" loading="lazy" decoding="async"
-           alt="Play next ranking for a four-person group, with attendee filters, game artwork, player caps and scores">
-    </picture>
-    <figcaption><strong>Pick tonight's crew.</strong> The backlog re-ranks instantly and checks verified player caps against the people who are actually there.</figcaption>
-  </figure>
+  <div class="landing-showcase" aria-label="CoopQueue screenshots">
+    <div class="landing-shot-picker" aria-label="Choose a screenshot">
+      <button class="landing-shot-choice" type="button" data-showcase-shot="library"
+              aria-controls="landing-shot-library" aria-pressed="true">
+        <picture>
+          <source srcset="/screenshots/library.webp" type="image/webp">
+          <img src="/screenshots/library.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="">
+        </picture>
+        <span><strong>Library</strong><small>Everything in one place</small></span>
+      </button>
+      <button class="landing-shot-choice" type="button" data-showcase-shot="play-next"
+              aria-controls="landing-shot-play-next" aria-pressed="false">
+        <picture>
+          <source srcset="/screenshots/play-next.webp" type="image/webp">
+          <img src="/screenshots/play-next.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="">
+        </picture>
+        <span><strong>Play next</strong><small>A shortlist that fits</small></span>
+      </button>
+      <button class="landing-shot-choice" type="button" data-showcase-shot="stats"
+              aria-controls="landing-shot-stats" aria-pressed="false">
+        <picture>
+          <source srcset="/screenshots/stats.webp" type="image/webp">
+          <img src="/screenshots/stats.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="">
+        </picture>
+        <span><strong>Stats</strong><small>Your group's story</small></span>
+      </button>
+    </div>
+    <div class="landing-shot-stage">
+      <figure class="landing-shot landing-shot-panel" id="landing-shot-library" data-showcase-panel="library">
+        <a href="/screenshots/library.jpg" target="_blank" rel="noopener"
+           aria-label="Open the Library screenshot at full size">
+          <picture>
+            <source srcset="/screenshots/library.webp" type="image/webp">
+            <img src="/screenshots/library.jpg" width="1440" height="900" loading="lazy" decoding="async"
+                 alt="Shared game library with statuses and ratings from four players">
+          </picture>
+        </a>
+        <figcaption><strong>Keep the whole history together.</strong> Games, votes and outcomes stay easy to scan.</figcaption>
+      </figure>
+      <figure class="landing-shot landing-shot-panel" id="landing-shot-play-next" data-showcase-panel="play-next" hidden>
+        <a href="/screenshots/play-next.jpg" target="_blank" rel="noopener"
+           aria-label="Open the Play next screenshot at full size">
+          <picture>
+            <source srcset="/screenshots/play-next.webp" type="image/webp">
+            <img src="/screenshots/play-next.jpg" width="1440" height="900" loading="lazy" decoding="async"
+                 alt="Play next ranking for a four-person group, with attendee filters, game artwork, player caps and scores">
+          </picture>
+        </a>
+        <figcaption><strong>Pick tonight's crew.</strong> The backlog re-ranks instantly and checks verified player caps against the people who are actually there.</figcaption>
+      </figure>
+      <figure class="landing-shot landing-shot-panel" id="landing-shot-stats" data-showcase-panel="stats" hidden>
+        <a href="/screenshots/stats.jpg" target="_blank" rel="noopener"
+           aria-label="Open the Stats screenshot at full size">
+          <picture>
+            <source srcset="/screenshots/stats.webp" type="image/webp">
+            <img src="/screenshots/stats.jpg" width="1440" height="900" loading="lazy" decoding="async"
+                 alt="Group statistics showing tracked games, playtime, ratings, genres and gaming history">
+          </picture>
+        </a>
+        <figcaption><strong>See the history take shape.</strong> Useful group statistics appear as soon as there is enough real data behind them.</figcaption>
+      </figure>
+    </div>
+  </div>
 
   <div class="feature-grid">
     <div class="feature">
@@ -85,25 +140,6 @@
       <p>Per-person taste profiles, genre track records, and a chart of the games you disagreed
          about most violently.</p>
     </div>
-  </div>
-
-  <div class="landing-gallery">
-    <figure class="landing-shot">
-      <picture>
-        <source srcset="/screenshots/library.webp" type="image/webp">
-        <img src="/screenshots/library.jpg" width="1440" height="900" loading="lazy" decoding="async"
-             alt="Shared game library with statuses, ratings from four players and a prompt to complete missing history">
-      </picture>
-      <figcaption><strong>Keep the whole history together.</strong> Games, votes, outcomes and the facts your group still needs to fill in.</figcaption>
-    </figure>
-    <figure class="landing-shot">
-      <picture>
-        <source srcset="/screenshots/stats.webp" type="image/webp">
-        <img src="/screenshots/stats.jpg" width="1440" height="900" loading="lazy" decoding="async"
-             alt="Group statistics showing tracked games, playtime, ratings, library status and genres">
-      </picture>
-      <figcaption><strong>See the history take shape.</strong> Useful group statistics appear as soon as there is enough real data behind them.</figcaption>
-    </figure>
   </div>
 
 </section>
@@ -437,25 +473,13 @@
 
     <section class="view" data-view="stats">
       <div class="tiles" id="stat-tiles"></div>
-      <div class="grid-2 stats-grid">
-        <section class="panel" id="stats-shape">
+      <section class="panel stats-shape-compact" id="stats-shape">
+        <div class="stats-shape-copy">
           <h3 class="panel-title">Library shape</h3>
           <p class="panel-sub">Where the games in this library currently stand.</p>
-          <div id="status-shape"></div>
-        </section>
-        <section class="panel" id="stats-genres">
-          <div class="panel-head">
-            <h3 class="panel-title">Genres</h3>
-            <div class="metric-tabs" id="genre-metrics" aria-label="Genre statistic">
-              <button type="button" data-metric="games" aria-pressed="true">Games</button>
-              <button type="button" data-metric="hours" aria-pressed="false">Hours</button>
-              <button type="button" data-metric="rating" aria-pressed="false">Rating</button>
-            </div>
-          </div>
-          <p class="panel-sub" id="genre-note"></p>
-          <div id="genre-chart" class="bars"></div>
-        </section>
-      </div>
+        </div>
+        <div id="status-shape"></div>
+      </section>
       <div class="grid-2 stats-grid">
         <section class="panel" id="stats-timeline">
           <h3 class="panel-title">Gaming over time</h3>
@@ -470,12 +494,26 @@
         </section>
       </div>
       <div class="grid-2 stats-grid">
+        <section class="panel" id="stats-genres">
+          <div class="panel-head">
+            <h3 class="panel-title">Genres</h3>
+            <div class="metric-tabs" id="genre-metrics" aria-label="Genre statistic">
+              <button type="button" data-metric="games" aria-pressed="true">Games</button>
+              <button type="button" data-metric="hours" aria-pressed="false">Hours</button>
+              <button type="button" data-metric="rating" aria-pressed="false">Rating</button>
+            </div>
+          </div>
+          <p class="panel-sub" id="genre-note"></p>
+          <div id="genre-chart" class="bars"></div>
+        </section>
         <section class="panel" id="stats-people">
           <h3 class="panel-title">Who rates how</h3>
           <p class="panel-sub">A 7 from one person is not a 7 from another. Scores are taken at face
             value, so this is context for reading them rather than a correction applied to them.</p>
           <div id="people-list" class="people"></div>
         </section>
+      </div>
+      <div class="grid-2 stats-grid">
         <section class="panel" id="stats-pairs">
           <h3 class="panel-title">Who agrees with whom</h3>
           <p class="panel-sub">Average gap between two people's scores, over the games they have both
@@ -483,8 +521,6 @@
           <div id="twins-summary" class="stat-callouts"></div>
           <div id="pairs-chart" class="bars"></div>
         </section>
-      </div>
-      <div class="grid-2 stats-grid">
         <section class="panel" id="stats-outliers">
           <h3 class="panel-title">Who is out on a limb</h3>
           <p class="panel-sub">How far each person sits from what everyone else said, and the genre
@@ -492,16 +528,17 @@
           <div id="contrarian-chart" class="bars"></div>
           <div id="offbeat-list" class="stat-callouts"></div>
         </section>
+      </div>
+      <div class="grid-2 stats-grid">
         <section class="panel" id="stats-top">
           <h3 class="panel-title">Best games you've played</h3>
           <div id="top-chart" class="bars"></div>
         </section>
+        <section class="panel" id="stats-hours">
+          <h3 class="panel-title">Where the hours went</h3>
+          <div id="hours-chart" class="bars"></div>
+        </section>
       </div>
-
-      <section class="panel" id="stats-hours">
-        <h3 class="panel-title">Where the hours went</h3>
-        <div id="hours-chart" class="bars"></div>
-      </section>
 
       <section class="panel" id="stats-shrugged">
         <h3 class="panel-title">Nobody has an opinion</h3>

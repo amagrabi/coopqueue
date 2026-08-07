@@ -21,16 +21,16 @@ does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
 
 ## See it in action
 
-![Play next ranking with attendee filters, artwork, player caps and group scores](public/screenshots/play-next.webp)
+![Shared library with statuses and ratings from four players](public/screenshots/library.webp)
 
 <table>
   <tr>
     <td width="50%">
-      <img src="public/screenshots/library.webp" alt="Shared library with statuses, member ratings and a missing-history prompt"><br>
-      <strong>One shared history.</strong> Games, votes, outcomes and missing facts stay visible.
+      <img src="public/screenshots/play-next.webp" alt="Play next ranking with attendee filters, artwork, player caps and group scores"><br>
+      <strong>A shortlist that fits.</strong> Choose tonight's crew and the backlog re-ranks immediately.
     </td>
     <td width="50%">
-      <img src="public/screenshots/stats.webp" alt="Group statistics for tracked games, playtime, ratings, statuses and genres"><br>
+      <img src="public/screenshots/stats.webp" alt="Group statistics for tracked games, playtime, ratings, genres and gaming history"><br>
       <strong>Statistics backed by real data.</strong> Empty charts simply stay out of the way.
     </td>
   </tr>
@@ -83,7 +83,7 @@ tab ranks everyone by how much of the library they have scored. Rating coverage
 is the thing that decides whether any of the scoring means anything, so it is
 not hidden in a stats page.
 
-**Stats.** Library status, genres by games / recorded hours / average rating,
+**Stats.** A compact full-width library-status summary, genres by games / recorded hours / average rating,
 yearly starts and finishes, time-versus-rating, per-person baselines, and a dot
 plot of your biggest arguments. Missing hours remain unknown and every history
 chart shows its date coverage. Panels with no underlying data stay hidden.
