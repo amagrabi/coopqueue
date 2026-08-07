@@ -17,7 +17,7 @@ const state = {
   queue: [],
   qIndex: 0,
   rateMode: 'played',   // 'played' | 'want' — see renderQueue
-  playNight: null,      // server-ranked session shortlist, or null for group ranking
+  nextAttendees: null,  // selected member ids; null means everybody in the workspace
   history: null,        // current member's missing shared-history facts
   view: 'queue',
   cache: {},
@@ -56,6 +56,22 @@ const nameOf = (steamId) =>
 const STATUS_LABEL = {
   backlog: 'Backlog', playing: 'Playing', finished: 'Finished',
   unfinished: 'Failed to finish', dropped: 'Dropped', sampled: 'Sampled',
+};
+
+// The library payload's viability is for the workspace's usual headcount. Play
+// Next can select a different crew, so it must recompute the same rule locally.
+const viabilityFor = (game, need) => {
+  const cap = game.max_players;
+  if (cap == null) return { ok: null, label: 'unknown', reason: 'Player count not set yet' };
+  if (cap >= need) return { ok: true, label: `${cap}p`, reason: null };
+  if (game.coop_note && /remote play|only the host|manual/i.test(game.coop_note)) {
+    return { ok: 'workaround', label: `${cap}p`, reason: game.coop_note };
+  }
+  return {
+    ok: false,
+    label: `${cap}p`,
+    reason: game.coop_note || `Caps out at ${cap} player${cap === 1 ? '' : 's'}, and ${need} are selected`,
+  };
 };
 
 /* ─────────────────────────────── api ─────────────────────────────────── */
@@ -260,17 +276,30 @@ function showOnboard() {
   show('onboard');
   $('#onboard-name').textContent = state.me.displayName || 'stranger';
 
+  const syncCreateMode = () => {
+    const personal = $('[name="create-mode"]:checked').value === 'personal';
+    $('#create-size-field').hidden = personal;
+    $('#create-name-label').textContent = personal ? 'Library name' : 'Group name';
+    $('#create-name').placeholder = personal ? 'My games' : 'Wednesday Night Crew';
+    $('#create-submit').textContent = personal ? 'Create personal library' : 'Create group';
+  };
+  $$('[name="create-mode"]').forEach((radio) => { radio.onchange = syncCreateMode; });
+  syncCreateMode();
+
   $('#create-form').onsubmit = async (e) => {
     e.preventDefault();
     const name = $('#create-name').value.trim();
-    const maxPlayers = Number($('#create-size').value) || 4;
+    const mode = $('[name="create-mode"]:checked').value;
+    const maxPlayers = mode === 'personal' ? 1 : Number($('#create-size').value) || 4;
     $('#onboard-status').textContent = 'Creating…';
     try {
-      const r = await api('/api/groups', { method: 'POST', body: { name, maxPlayers } });
+      const r = await api('/api/groups', { method: 'POST', body: { name, maxPlayers, mode } });
       state.groups = (await api('/api/me')).groups;
       location.hash = `#/g/${r.slug}/queue`;
       await openFromHash();
-      toast(`${r.name} created — invite the others from the Group tab`);
+      toast(mode === 'personal'
+        ? `${r.name} is ready — add the first game`
+        : `${r.name} created — invite the others from the Group tab`);
     } catch (err) { $('#onboard-status').textContent = err.message; }
   };
 
@@ -337,7 +366,7 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.group = lib.group;
   state.model = lib.model;
   state.queue = q.queue;
-  state.playNight = null;
+  state.nextAttendees = null;
   state.history = null;
   historySeq++;
   invalidateViewCache();
@@ -394,6 +423,17 @@ function renderChrome() {
     || state.me.displayName || '';
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
   $('#group-name').textContent = state.group.name;
+  $('#workspace-tab').textContent = state.group.mode === 'personal' ? 'Settings' : 'Group';
+  $('#queue-empty-copy').textContent = state.group.mode === 'personal'
+    ? 'You have rated or skipped everything in this library. Add a game, or revisit one you already rated.'
+    : 'You have rated or skipped everything in this group. Add a game, or go argue on the Play next tab.';
+  $('#browse-fit-option').textContent = state.group.mode === 'personal' ? 'Recommended for me' : 'Recommended for us';
+  $('#browse-coop-label span').textContent = state.group.mode === 'personal' ? 'Co-op catalogue only' : 'Co-op only';
+  $('#browse-fits-label').hidden = state.group.mode === 'personal';
+  if (state.group.mode === 'personal') $('#browse-fits').checked = false;
+  $('#browse-intro').textContent = state.group.mode === 'personal'
+    ? 'A co-op-first Steam catalogue, ranked from your ratings. Add any other Steam game with + Add game.'
+    : 'Popular online co-op games on Steam. Add the ones this group might actually play — only games in your library appear in anyone’s rating queue, which keeps the votes focused.';
   $('#queue-count').textContent = state.queue.length || '';
   renderMyCoverage();
   renderGroupMenu();
@@ -405,12 +445,12 @@ function renderGroupMenu() {
   const items = state.groups.map((g) => `
     <button class="group-item${g.slug === state.group.slug ? ' is-current' : ''}" data-slug="${esc(g.slug)}" role="menuitem">
       <span class="group-item-name">${esc(g.name)}</span>
-      <span class="group-item-meta">${g.members} member${g.members === 1 ? '' : 's'} · ${g.games} games${
+      <span class="group-item-meta">${g.mode === 'personal' ? 'Personal' : `${g.members} member${g.members === 1 ? '' : 's'}`} · ${g.games} games${
         g.unrated ? ` · <b>${g.unrated} to rate</b>` : ''}</span>
     </button>`).join('');
   $('#group-menu').innerHTML = items + `
     <div class="group-menu-sep"></div>
-    <button class="group-item" data-new role="menuitem"><span class="group-item-name">+ New group</span></button>
+    <button class="group-item" data-new role="menuitem"><span class="group-item-name">+ New workspace</span></button>
     <button class="group-item" data-joincode role="menuitem"><span class="group-item-name">Join with a code</span></button>`;
 
   $$('#group-menu .group-item').forEach((b) => b.addEventListener('click', async () => {
@@ -534,17 +574,7 @@ function wireOnce() {
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
-  $('#hide-ea').addEventListener('change', () => {
-    // A session result includes this setting server-side. Drop it when the input
-    // changes instead of leaving a list on screen that no longer matches its controls.
-    state.playNight = null;
-    renderNext();
-  });
-  $('#pn-build').addEventListener('click', buildPlayNight);
-  $('#pn-reset').addEventListener('click', () => {
-    state.playNight = null;
-    renderNext();
-  });
+  $('#hide-ea').addEventListener('change', renderNext);
 
   let browseTimer;
   $('#browse-search').addEventListener('input', () => {
@@ -627,7 +657,11 @@ const factIsApproximate = (g, field) =>
 const factSourceHelp = (g, field) => {
   const fact = factSource(g, field);
   if (!fact) return '';
-  const label = FACT_SOURCE_LABEL[fact.source] || 'Recorded source';
+  const label = state.group.mode === 'personal' && fact.source === 'manual'
+    ? 'Entered by you'
+    : state.group.mode === 'personal' && fact.source === 'steam-hours'
+      ? 'Your Steam playtime'
+      : FACT_SOURCE_LABEL[fact.source] || 'Recorded source';
   const who = fact.setByName
     ? ` · ${fact.source === 'manual' ? 'entered' : 'accepted'} by ${esc(fact.setByName)}`
     : '';
@@ -837,7 +871,9 @@ function renderQueue() {
   const satOut = (g.notPlayed || []).filter((id) => id !== state.me.steamId)
     .map((id) => `<span class="other-vote other-out"><i class="dot" style="background:${colorOf(id)}"></i>${esc(nameOf(id))} didn't play</span>`)
     .join('');
-  if (state.group.blindRating) {
+  if (state.group.mode === 'personal') {
+    $('#rate-others').innerHTML = '';
+  } else if (state.group.blindRating) {
     // Say that opinions exist without revealing them, so the queue still tells
     // you whether you are the first to look at this.
     $('#rate-others').innerHTML = `<span class="other-vote" style="color:var(--text-muted)">${
@@ -852,7 +888,7 @@ function renderQueue() {
       : '<span class="other-vote" style="color:var(--text-muted)">Nobody else has rated this yet</span>';
   }
   // Who sat it out is not a score, so it shows even under blind rating.
-  $('#rate-others').innerHTML += satOut;
+  if (state.group.mode !== 'personal') $('#rate-others').innerHTML += satOut;
 
   // The slider normally opens on the group's current average, which is a second
   // and less obvious source of anchoring: hiding the numbers but still starting
@@ -868,11 +904,10 @@ function renderQueue() {
   $('#score-out').textContent = fmt(start, 1);
 }
 
-function metaChips(g) {
-  const need = state.group.maxPlayers;
+function metaChips(g, fit = g.viability, need = state.group.maxPlayers) {
   const chips = [];
   if (g.genre) chips.push(`<span class="chip">${esc(g.genre)}</span>`);
-  const v = g.viability;
+  const v = fit;
   if (v.ok === true)              chips.push(`<span class="chip chip-good">${esc(v.label)} co-op</span>`);
   else if (v.ok === 'workaround') chips.push(`<span class="chip chip-warn">works for ${need} with a workaround</span>`);
   else if (v.ok === false)        chips.push(`<span class="chip chip-bad">only ${esc(v.label)} — we can't all play</span>`);
@@ -1036,129 +1071,88 @@ async function skipGame(notPlayed = false) {
 
 /* ══════════════════════════════ PLAY NEXT ═════════════════════════════ */
 function renderNext() {
-  renderPlayNightControls();
-  const need = state.group.maxPlayers;
-  const session = state.playNight;
-  $('#pn-reset').hidden = !session;
+  renderAttendeeFilter();
+  const attendees = state.nextAttendees || state.members.map((member) => member.steam_id);
+  const selected = new Set(attendees);
+  const need = attendees.length;
+  const names = attendees.map(nameOf);
+  $('#next-sub').textContent = need
+    ? `Ranked using only ratings from ${names.join(', ')}. `
+      + 'Verified player caps are checked against the selected player count; unknown caps stay visible.'
+    : 'Select at least one player to rank the backlog.';
 
-  if (session) {
-    const names = session.attendees.map(nameOf);
-    $('#next-sub').textContent = `${names.join(', ')} · ${session.minutes} minutes. `
-      + 'Scores use only tonight’s attendees; every result has a verified player cap and session length.';
-    const ranked = session.games.map((result) => ({ game: gameById(result.id), result }))
-      .filter(({ game }) => game);
-    $('#next-list').innerHTML = ranked.map(({ game, result }, i) => `
-      <li class="rank-row" data-id="${game.id}">
-        <div class="rank-num">${i + 1}</div>
-        <div class="rank-main">
-          <div class="rank-name">${esc(game.name)}</div>
-          <div class="rank-meta">${metaChips(game)}
-            <span class="chip chip-good">fits a ${result.minSessionMinutes}-minute session</span>
-            ${result.votes === 1 ? '<span class="chip chip-warn">only 1 attendee rated it</span>' : ''}
-          </div>
-        </div>
-        <div class="rank-score"><b>${fmt(result.score, 1)}</b><span>${result.votes} attendee vote${result.votes === 1 ? '' : 's'}</span></div>
-      </li>`).join('') || `<p class="view-sub">Nothing clears every hard gate yet. ${
-        session.excluded.sessionLengthUnknown
-          ? 'Add a typical minimum session in game details, or loosen tonight’s inputs.'
-          : 'Try changing the crew, time, or ownership requirement.'}</p>`;
+  if (!need) {
+    $('#next-list').innerHTML = '<p class="view-sub">Choose who is playing above.</p>';
     $('#unviable-block').innerHTML = '';
-    $$('#next-list .rank-row').forEach((row) =>
-      row.addEventListener('click', () => openDetail(Number(row.dataset.id))));
     return;
   }
-
-  $('#next-sub').textContent =
-    `Backlog games ranked by the group's average score. ` +
-    `Read each score alongside its vote count; one vote is thin evidence. ` +
-    `Anything that can't fit ${need} players is flagged.`;
 
   /* Early access is filtered here rather than merely flagged: Play next answers
      "what should we start", and starting something unfinished is usually the wrong
      answer however much the group wants it. Off this list, not out of the library. */
   const hideEa = $('#hide-ea').checked;
   const backlog = activeGames()
-    .filter((g) => g.status === 'backlog' && g.n > 0)
-    .filter((g) => !(hideEa && g.early_access));
+    .filter((g) => g.status === 'backlog')
+    .filter((g) => !(hideEa && g.early_access))
+    .map((g) => {
+      const votes = Object.entries(g.votes || {})
+        .filter(([steamId]) => selected.has(steamId))
+        .map(([, score]) => Number(score));
+      return {
+        ...g,
+        attendeeScore: votes.length ? votes.reduce((sum, score) => sum + score, 0) / votes.length : null,
+        attendeeVotes: votes.length,
+        attendeeFit: viabilityFor(g, need),
+      };
+    })
+    .filter((g) => g.attendeeVotes > 0);
   const hide = $('#hide-unviable').checked;
-  const playable = backlog.filter((g) => g.viability.ok !== false).sort((a, b) => b.raw - a.raw);
-  const blocked  = backlog.filter((g) => g.viability.ok === false).sort((a, b) => b.raw - a.raw);
+  const rank = (a, b) => b.attendeeScore - a.attendeeScore
+    || b.attendeeVotes - a.attendeeVotes || a.name.localeCompare(b.name);
+  const playable = backlog.filter((g) => g.attendeeFit.ok !== false).sort(rank);
+  const blocked  = backlog.filter((g) => g.attendeeFit.ok === false).sort(rank);
 
   $('#next-list').innerHTML = playable.map((g, i) => `
     <li class="rank-row" data-id="${g.id}">
       <div class="rank-num">${i + 1}</div>
       <div class="rank-main">
         <div class="rank-name">${esc(g.name)}</div>
-        <div class="rank-meta">${metaChips(g)}${
-          g.n === 1 ? '<span class="chip chip-warn">only 1 vote</span>' : ''}</div>
+        <div class="rank-meta">${metaChips(g, g.attendeeFit, need)}${
+          g.attendeeVotes === 1 && need > 1 ? '<span class="chip chip-warn">only 1 selected player rated it</span>' : ''}</div>
       </div>
-      <div class="rank-score"><b>${fmt(g.raw, 1)}</b><span>${g.n} vote${g.n === 1 ? '' : 's'}</span></div>
-    </li>`).join('') || '<p class="view-sub">Nothing rated in the backlog yet — go rate some games.</p>';
+      <div class="rank-score"><b>${fmt(g.attendeeScore, 1)}</b><span>${g.attendeeVotes} selected vote${g.attendeeVotes === 1 ? '' : 's'}</span></div>
+    </li>`).join('') || '<p class="view-sub">None of the selected players has rated a backlog game yet.</p>';
 
   $('#unviable-block').innerHTML = (hide || !blocked.length)
-    ? (blocked.length ? `<h3>${blocked.length} more can't be played by ${need} of us</h3><p>Untick the box above to see them.</p>` : '')
-    : `<h3>${need} of us can't play these</h3>
+    ? (blocked.length ? `<h3>${blocked.length} more ${blocked.length === 1 ? 'doesn’t' : 'don’t'} fit ${need} player${need === 1 ? '' : 's'}</h3><p>Untick the box above to see them.</p>` : '')
+    : `<h3>These don't fit ${need} player${need === 1 ? '' : 's'}</h3>
        <p>Verified player caps. They stay on the list so nobody re-suggests them.</p>
        ${blocked.map((g) => `
          <div class="unviable-row" data-id="${g.id}">
-           <span><strong>${esc(g.name)}</strong> · ${fmt(g.raw, 1)}</span>
-           <span class="why">${esc(g.viability.reason || `caps at ${g.max_players}`)}</span>
+           <span><strong>${esc(g.name)}</strong> · ${fmt(g.attendeeScore, 1)}</span>
+           <span class="why">${esc(g.attendeeFit.reason || `caps at ${g.max_players}`)}</span>
          </div>`).join('')}`;
 
   $$('#next-list .rank-row, #unviable-block .unviable-row')
     .forEach((r) => r.addEventListener('click', () => openDetail(Number(r.dataset.id))));
 }
 
-function renderPlayNightControls() {
+function renderAttendeeFilter() {
   const box = $('#pn-attendees');
-  const signature = state.members.map((member) => member.steam_id).join('|');
+  const signature = `${state.group.slug}|${state.members.map((member) => member.steam_id).join('|')}`;
   if (box.dataset.members === signature) return;
   box.dataset.members = signature;
+  const selected = new Set(state.nextAttendees || state.members.map((member) => member.steam_id));
   box.innerHTML = state.members.map((member) => `
     <label class="attendee">
-      <input type="checkbox" value="${esc(member.steam_id)}" checked>
+      <input type="checkbox" value="${esc(member.steam_id)}" ${selected.has(member.steam_id) ? 'checked' : ''}>
       <i class="dot" style="background:${colorOf(member.steam_id)}"></i>
       <span>${esc(member.short_name)}</span>
     </label>`).join('');
-}
-
-async function buildPlayNight() {
-  const attendees = $$('#pn-attendees input:checked').map((input) => input.value);
-  const minutes = Number($('#pn-minutes').value);
-  const button = $('#pn-build');
-  const status = $('#pn-status');
-  const slug = state.group.slug;
-  button.disabled = true;
-  status.textContent = 'Checking caps, time and tonight’s ratings…';
-  try {
-    const result = await gapiFor(slug, '/play-night', {
-      method: 'POST',
-      body: {
-        attendees,
-        minutes,
-        requireOwnership: $('#pn-owned').checked,
-        excludeEarlyAccess: $('#hide-ea').checked,
-      },
-    });
-    if (state.group?.slug !== slug) return;
-    state.playNight = result;
-    const reasons = [
-      [result.excluded.tooLong, 'too long'],
-      [result.excluded.sessionLengthUnknown, 'missing session length'],
-      [result.excluded.tooFewPlayers, 'too few players'],
-      [result.excluded.playerCountUnknown, 'unverified player cap'],
-      [result.excluded.notOwnedByEveryone, 'not owned by everyone'],
-      [result.excluded.ownershipUnknown, 'ownership unknown'],
-      [result.excluded.noAttendeeRatings, 'no attendee ratings'],
-      [result.excluded.earlyAccess, 'early access'],
-    ].filter(([count]) => count).map(([count, label]) => `${count} ${label}`);
-    status.textContent = `${result.games.length} fit${reasons.length ? ` · filtered: ${reasons.join(', ')}` : ''}`;
+  $$('input', box).forEach((input) => input.addEventListener('change', () => {
+    state.nextAttendees = $$('input:checked', box).map((checked) => checked.value);
     renderNext();
-  } catch (error) {
-    status.textContent = error.message;
-  } finally {
-    button.disabled = false;
-  }
+  }));
 }
 
 /* ══════════════════════════════ LIBRARY ═══════════════════════════════ */
@@ -1296,6 +1290,8 @@ function renderMyCoverage() {
 const HISTORY_FIELD_LABEL = {
   started: 'First played', finished: 'Last played', hours: 'Hours together',
 };
+const historyFieldLabel = (field) => field === 'hours' && state.group.mode === 'personal'
+  ? 'Hours played' : HISTORY_FIELD_LABEL[field];
 
 async function loadHistory(force = false) {
   const slug = state.group?.slug;
@@ -1314,6 +1310,11 @@ async function loadHistory(force = false) {
 
 function renderHistoryCard() {
   const box = $('#history-card');
+  const personal = state.group.mode === 'personal';
+  $('#history-heading').textContent = personal ? 'Complete my history' : 'Complete our history';
+  $('#history-intro').textContent = personal
+    ? 'One small gap at a time, starting with facts Steam can suggest or you may remember.'
+    : 'One small gap at a time, shown first to people most likely to remember.';
   const item = state.history?.items?.[0];
   if (!item) { box.hidden = true; return; }
   box.hidden = false;
@@ -1338,7 +1339,7 @@ function renderHistoryCard() {
         : '<span class="history-art history-art-none" aria-hidden="true">?</span>'}
       <div class="history-copy">
         <div class="rank-meta">
-          <span class="chip">${esc(HISTORY_FIELD_LABEL[item.field])}</span>
+          <span class="chip">${esc(historyFieldLabel(item.field))}</span>
           ${suggestion ? `<span class="chip chip-warn">Approximate suggestion</span>` : ''}
         </div>
         <h4>${esc(item.game)}</h4>
@@ -1375,12 +1376,13 @@ async function historyAction(action) {
     if (state.group?.slug !== slug) return;
     if (action === 'accept') {
       if (!await reloadGroupView(slug, 'library')) return;
-      toast(`${HISTORY_FIELD_LABEL[item.field]} saved as an approximate value`);
+      toast(`${historyFieldLabel(item.field)} saved as an approximate value`);
       return;
     }
     state.history = null;
     await loadHistory(true);
-    toast(action === 'snooze' ? 'I’ll ask again next week' : 'Left for somebody else to answer');
+    toast(action === 'snooze' ? 'I’ll ask again next week'
+      : state.group.mode === 'personal' ? 'Removed from your history prompts' : 'Left for somebody else to answer');
   } catch (e) {
     toast(e.message);
     renderHistoryCard();
@@ -1517,13 +1519,20 @@ async function renderStats() {
   }
   if (seq !== statsSeq || state.group?.slug !== slug || state.view !== 'stats') return;
   state.cache.stats = { slug, data: s };
+  const personal = state.group.mode === 'personal';
 
-  $('#stat-tiles').innerHTML = `
+  $('#stat-tiles').innerHTML = personal ? `
+    ${tile(s.totals.games, 'games tracked')}
+    ${tile(s.totals.finished, 'finished')}
+    ${tile(s.totals.backlog, 'in the backlog')}
+    ${tile(s.totals.hours.toLocaleString(), 'hours played', 'Steam sync or a manual entry')}
+    ${tile(s.totals.ratings, 'ratings given')}
+    ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'average rating')}` : `
     ${tile(s.totals.games, 'games tracked')}
     ${tile(s.totals.finished, 'finished together')}
     ${tile(s.totals.hours.toLocaleString(), 'hours logged', 'only where someone filled it in')}
     ${tile(s.totals.ratings, 'ratings given')}
-    ${tile(fmt(s.totals.groupMean, 2), 'group average', 'across every score anyone has given')}
+    ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'group average', 'across every score anyone has given')}
     ${tile(s.totals.unviableBacklog, 'backlog games we cannot play', `fewer than ${s.totals.maxPlayers} co-op slots`, true)}`;
 
   $('#people-list').innerHTML = s.people.map((p) => `
@@ -1552,7 +1561,7 @@ async function renderStats() {
           ).join('')}</div>
           <span class="dot-spread">${fmt(a.spread, 1)}</span>
         </div>`).join('') + '<div class="dot-axis"><span>1</span><span>4</span><span>7</span><span>10</span></div>'
-    : '<p class="panel-sub">Nothing to argue about yet — you need three people to rate the same finished game.</p>';
+    : '<p class="panel-sub">Nothing to argue about yet — two people need to rate the same played game.</p>';
 
   $('#top-chart').innerHTML = barChart(s.topRated.map((g) => ({ label: g.name, value: g.raw })), 10);
 
@@ -1606,6 +1615,26 @@ async function renderStats() {
   $('#hours-chart').innerHTML = barChart(
     s.mostHours.map((g) => ({ label: g.name, value: g.hours })),
     Math.max(...s.mostHours.map((g) => g.hours), 1), () => '', 0);
+
+  // An empty chart is not a statistic. Personal workspaces also omit every
+  // comparison that needs another person, while retaining their own history,
+  // genres, ratings and playtime.
+  const panelData = {
+    'stats-people': !personal && s.people.some((person) => person.count > 0),
+    'stats-genres': s.genres.length > 0,
+    'stats-pairs': !personal && s.pairs.length > 0,
+    'stats-outliers': !personal && (s.contrarian.length > 0 || s.offbeat.length > 0),
+    'stats-top': s.topRated.length > 0,
+    'stats-hours': s.mostHours.length > 0,
+    'stats-shrugged': !personal && s.shrugged.length > 0,
+    'stats-arguments': !personal && s.arguments.length > 0,
+  };
+  for (const [id, visible] of Object.entries(panelData)) $(`#${id}`).hidden = !visible;
+  $$('.stats-grid').forEach((row) => {
+    const visible = [...row.children].filter((panel) => !panel.hidden).length;
+    row.hidden = visible === 0;
+    row.classList.toggle('single', visible === 1);
+  });
 }
 
 const tile = (val, label, note = '', alert = false) => `
@@ -1642,6 +1671,20 @@ async function renderMembers() {
   if (seq !== membersSeq || state.group?.slug !== slug || state.view !== 'members') return;
   state.cache.members = { slug, data: d };
   const isOwner = d.group.role === 'owner';
+  const personal = d.group.mode === 'personal';
+  $('#workspace-heading').textContent = personal ? 'Personal library settings' : 'Group';
+  $('#group-coverage-panel').hidden = personal;
+  $('#group-members-panel').hidden = personal;
+  $('#group-invite-panel').hidden = personal;
+  $('#workspace-settings-grid').classList.toggle('single', personal);
+  $('#playtime-title').textContent = personal ? 'Your Steam playtime' : 'Steam playtime';
+  $('#playtime-copy').innerHTML = personal
+    ? 'Sync your public Steam library to fill ownership, playtime and recent-played hints. '
+      + 'Steam never exposes a first-played date, so that remains yours to record.'
+    : 'Group hours are estimated from Steam: the smallest playtime among the people who actually '
+      + 'played a game. That is an upper bound on time you played it <em>together</em> — Steam records '
+      + 'how long each of you played, never when or with whom. A figure saved in the Library stays put; '
+      + 'accepted estimates remain visibly approximate.';
 
   /* ── coverage leaderboard ──────────────────────────────────────────────── */
   const active = activeGames();
@@ -1709,29 +1752,39 @@ async function renderMembers() {
 
   $('#group-settings').innerHTML = `
     <div class="detail-field">
-      <label for="s-myname">Your name in this group</label>
+      <label for="s-myname">${personal ? 'Your display name' : 'Your name in this group'}</label>
       <input id="s-myname" class="input" maxlength="16" value="${esc(
         d.members.find((m) => m.steam_id === state.me.steamId)?.short_name || '')}">
     </div>
     <div class="detail-field" style="margin-top:12px">
-      <label for="s-name">Group name</label>
+      <label for="s-name">Workspace name</label>
       <input id="s-name" class="input" maxlength="60" value="${esc(d.group.name)}" ${isOwner ? '' : 'disabled'}>
     </div>
     <div class="detail-field" style="margin-top:12px">
-      <label for="s-size">How many of you play together</label>
-      <input id="s-size" class="input" type="number" min="2" max="64" value="${d.group.maxPlayers}" ${isOwner ? '' : 'disabled'}>
+      <label for="s-mode">Workspace type</label>
+      <select id="s-mode" class="input" ${isOwner ? '' : 'disabled'}>
+        <option value="coop"${personal ? '' : ' selected'}>Co-op group</option>
+        <option value="personal"${personal ? ' selected' : ''}${d.members.length > 1 ? ' disabled' : ''}>Personal library</option>
+      </select>
     </div>
-    <p class="field-help">Games that can't fit this many get flagged on Play next.</p>
+    <p class="field-help">${d.members.length > 1
+      ? 'A group can become personal only after the other members leave or are removed.'
+      : 'You can switch a one-person group without losing its games, ratings or history.'}</p>
+    <div class="detail-field" id="s-size-wrap" style="margin-top:12px" ${personal ? 'hidden' : ''}>
+      <label for="s-size">How many of you play together</label>
+      <input id="s-size" class="input" type="number" min="2" max="64" value="${d.group.maxPlayers < 2 ? 4 : d.group.maxPlayers}" ${isOwner ? '' : 'disabled'}>
+    </div>
+    <p class="field-help" id="s-size-help" ${personal ? 'hidden' : ''}>Games that can't fit this many get flagged on Play next.</p>
     <button class="btn btn-primary" id="s-save" style="margin-top:12px">Save</button>
 
     ${isOwner ? `
     <hr class="settings-rule">
     <div class="danger">
-      <strong>Delete this group</strong>
-      <p class="field-help">Removes the group and everything in it — every game, every rating,
+      <strong>Delete this ${personal ? 'personal library' : 'group'}</strong>
+      <p class="field-help">Removes the workspace and everything in it — every game, every rating,
         every comment and every member. There is no undo. Download a portable backup first;
         archiving a single game is on its row in the Library.</p>
-      <div class="export-links" aria-label="Download group backup">
+      <div class="export-links" aria-label="Download ${personal ? 'personal library' : 'group'} backup">
         <a class="btn btn-sm" href="/api/g/${encodeURIComponent(slug)}/export?format=json">Download JSON backup</a>
         <span>CSV:</span>
         ${['games', 'history', 'ratings', 'comments', 'members'].map((table) =>
@@ -1741,11 +1794,11 @@ async function renderMembers() {
         <span>Type <code>${esc(d.group.name)}</code> to confirm</span>
         <input class="input" id="s-del-name" autocomplete="off" placeholder="${esc(d.group.name)}">
       </label>
-      <button class="btn btn-danger" id="s-delete">Delete group permanently</button>
+      <button class="btn btn-danger" id="s-delete">Delete ${personal ? 'library' : 'group'} permanently</button>
       <p id="s-del-status" class="add-status"></p>
     </div>` : ''}
 
-    <hr class="settings-rule">
+    ${personal ? '' : `<hr class="settings-rule">
     <label class="toggle" for="s-blind">
       <input type="checkbox" id="s-blind" ${d.group.blindRating ? 'checked' : ''} ${isOwner ? '' : 'disabled'}>
       Everyone rates blind
@@ -1755,7 +1808,7 @@ async function renderMembers() {
         + 'slider opening on the current average — which anchors just as much as seeing the numbers. '
         + 'Applies immediately.'
       : 'Only the group owner can change this. It applies to everyone, because one person rating '
-        + 'blind while the rest see the numbers achieves nothing.'}</p>`;
+        + 'blind while the rest see the numbers achieves nothing.'}</p>`}`;
 
   if (isOwner) $('#s-delete').addEventListener('click', async () => {
     const slug = state.group.slug;
@@ -1783,7 +1836,7 @@ async function renderMembers() {
   void renderPlaytime();
   $('#pt-sync').addEventListener('click', syncPlaytime);
 
-  if (isOwner) $('#s-blind').addEventListener('change', async (e) => {
+  if (isOwner) $('#s-blind')?.addEventListener('change', async (e) => {
     const slug = state.group.slug;
     try {
       await gapiFor(slug, '/members', { method: 'PATCH', body: { blindRating: e.target.checked } });
@@ -1796,13 +1849,23 @@ async function renderMembers() {
   $('#s-save').addEventListener('click', async () => {
     const slug = state.group.slug;
     const patch = { myName: $('#s-myname').value };
-    if (isOwner) { patch.name = $('#s-name').value; patch.maxPlayers = Number($('#s-size').value); }
+    if (isOwner) {
+      patch.name = $('#s-name').value;
+      patch.mode = $('#s-mode').value;
+      if (patch.mode === 'coop') patch.maxPlayers = Number($('#s-size').value);
+    }
     try {
       await gapiFor(slug, '/members', { method: 'PATCH', body: patch });
       if (state.group?.slug !== slug) return;
       state.groups = (await api('/api/me')).groups;
       if (await reloadGroupView(slug, 'members')) toast('Saved');
     } catch (e) { toast(e.message); }
+  });
+
+  $('#s-mode')?.addEventListener('change', (event) => {
+    const isPersonal = event.target.value === 'personal';
+    $('#s-size-wrap').hidden = isPersonal;
+    $('#s-size-help').hidden = isPersonal;
   });
 
   const link = d.group.inviteCode ? `${location.origin}/?join=${d.group.inviteCode}` : null;
@@ -1960,7 +2023,7 @@ async function renderPlaytime() {
     const blocked = members.filter((m) => m.readable === false);
     $('#pt-status').innerHTML = blocked.length
       ? blocked.map((m) => `<span class="pt-fix">${esc(m.name)}: ${esc(m.reason || '')}</span>`).join('')
-        + '<span class="pt-fix">Estimates still work from whoever we can read.</span>'
+        + (state.group.mode === 'personal' ? '' : '<span class="pt-fix">Estimates still work from whoever we can read.</span>')
       : '';
   } catch (e) {
     if (seq === playtimeSeq && state.group?.slug === slug && state.view === 'members') {
@@ -1979,7 +2042,9 @@ async function syncPlaytime() {
     if (!await reloadGroupView(slug, 'members')) return;
     await renderPlaytime();
     const ok = r.members.filter((m) => m.ok).length;
-    toast(`Synced ${ok}/${r.members.length} — ${r.gamesEstimated} games got an estimate`);
+    toast(state.group.mode === 'personal'
+      ? 'Your Steam library is up to date'
+      : `Synced ${ok}/${r.members.length} — ${r.gamesEstimated} games got an estimate`);
   } catch (e) {
     $('#pt-status').textContent = e.message;
   } finally { btn.disabled = false; }
@@ -2070,7 +2135,7 @@ async function renderBrowse(reset) {
   if (sort !== 'fit') why.hidden = true;
   else if (d.basis === 'popularity') {
     why.hidden = false;
-    why.textContent = `Not enough ratings yet to tell what this group likes `
+    why.textContent = `Not enough ratings yet to tell what ${state.group.mode === 'personal' ? 'you like' : 'this group likes'} `
       + `(${d.ratedGames} of ${d.needed} games rated) — showing the most popular instead.`;
   } else {
     why.hidden = false;
@@ -2078,7 +2143,8 @@ async function renderBrowse(reset) {
       .map((t) => `<span class="chip ${cls}">${esc(t.tag)} ${t.points > 0 ? '+' : ''}${t.points}</span>`)
       .join('');
     why.innerHTML = `Ranked against ${d.ratedGames} games you have rated. `
-      + `This group rates these higher than its own average: ${chips(d.likes, 'chip-good') || '—'}`
+      + `${state.group.mode === 'personal' ? 'You rate' : 'This group rates'} these higher than ${
+        state.group.mode === 'personal' ? 'your' : 'its own'} average: ${chips(d.likes, 'chip-good') || '—'}`
       + (d.dislikes?.length ? ` and lower: ${chips(d.dislikes, 'chip-bad')}` : '');
   }
 
@@ -2142,9 +2208,11 @@ async function addFromCatalogue(btn) {
       body: { input: String(appid), maxPlayers: entry?.max_players ?? null },
     });
     if (!await reloadGroupView(slug, 'browse')) return;
-    toast(entry?.max_players
-      ? `Added ${r.name} — it's in everyone's rating queue now.`
-      : `Added ${r.name}. Set its player count so we know if we can all play.`);
+    toast(state.group.mode === 'personal'
+      ? `Added ${r.name} to your library.`
+      : entry?.max_players
+        ? `Added ${r.name} — it's in everyone's rating queue now.`
+        : `Added ${r.name}. Set its player count so we know if we can all play.`);
   } catch (e) {
     toast(e.message);
     btn.disabled = false;
@@ -2219,12 +2287,6 @@ function openDetail(id, focusField = null) {
           ${factSourceHelp(g, 'hours')}
         </div>
       </div>
-      <div class="detail-field">
-        <label for="d-session">Shortest worthwhile session (minutes)</label>
-        <input id="d-session" class="input" type="number" step="15" min="15" max="720"
-               value="${g.min_session_minutes ?? ''}" placeholder="unknown">
-        <p class="field-help">A human estimate for Play Night — not total playtime or campaign length.</p>
-      </div>
       <div class="detail-row2">
         <div class="detail-field">
           <label for="d-started">First played</label>
@@ -2239,15 +2301,15 @@ function openDetail(id, focusField = null) {
             `<p class="field-help">The most recent play date Steam will tell us is
               <b>${esc(shortDate(g.finished_estimated))}</b> — Steam only reports that for
               the account the API key belongs to, so treat it as a prompt rather than
-              the group's answer. Typing a date here replaces it.</p>`}
+              ${state.group.mode === 'personal' ? 'your final answer' : 'the group’s answer'}. Typing a date here replaces it.</p>`}
           ${factSourceHelp(g, 'finished')}
         </div>
       </div>
       ${g.started ? '' : `<p class="field-help">Steam publishes no first-played date.
         A release date or earliest achievement can only be an approximate prompt;
-        enter what the group remembers when you can.</p>`}
+        enter what ${state.group.mode === 'personal' ? 'you remember' : 'the group remembers'} when you can.</p>`}
 
-      <div class="detail-field">
+      ${state.group.mode === 'personal' ? '' : `<div class="detail-field">
         <label for="d-addedby">Added by</label>
         <select id="d-addedby" class="input">
           <option value=""${g.added_by ? '' : ' selected'}>Unknown</option>
@@ -2256,7 +2318,7 @@ function openDetail(id, focusField = null) {
         </select>
         <p class="field-help">Filled in automatically for games added here. Imported
           games predate that, so you can set it yourself.</p>
-      </div>
+      </div>`}
       ${g.steam_appid ? '' : `
         <div class="detail-field">
           <label for="d-link">Link to Steam (paste a store URL or appid)</label>
@@ -2302,8 +2364,7 @@ function openDetail(id, focusField = null) {
         max_players: $('#d-players').value === '' ? null : Number($('#d-players').value),
         genre: $('#d-genre').value.trim() || null,
         hours: $('#d-hours').value === '' ? null : Number($('#d-hours').value),
-        min_session_minutes: $('#d-session').value === '' ? null : Number($('#d-session').value),
-        added_by: $('#d-addedby').value || null,
+        added_by: state.group.mode === 'personal' ? g.added_by : $('#d-addedby').value || null,
         started: $('#d-started').value || null,
         finished: $('#d-finished').value || null,
       }});
@@ -2375,11 +2436,23 @@ async function loadAchievements(gameId, slug = state.group.slug) {
     const view = await gapiFor(slug, `/achievements?gameId=${gameId}`);
     if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
     renderAchievements(gameId, slug, view);
+    maybeAutoSyncAchievements(gameId, slug, view);
   } catch (error) {
     if (detailGameId === gameId && box) {
       box.innerHTML = `<h4>🏆 Trophy relay</h4><p class="panel-sub" style="margin:0">${esc(error.message)}</p>`;
     }
   }
+}
+
+const achievementAutoAttempts = new Set();
+const ACHIEVEMENT_REFRESH_SECONDS = 7 * 24 * 60 * 60;
+
+function achievementLevel(pct) {
+  if (pct >= 100) return 'Completionist';
+  if (pct >= 75) return 'Trophy hunter';
+  if (pct >= 50) return 'Halfway hero';
+  if (pct >= 25) return 'On a roll';
+  return 'First steps';
 }
 
 function renderAchievements(gameId, slug, view) {
@@ -2388,16 +2461,21 @@ function renderAchievements(gameId, slug, view) {
   const relay = view.relay || { unlocked: 0, total: 0, synced: 0, eligible: 0, nearSweep: [], latest: [] };
   const pct = relay.total ? Math.round((relay.unlocked / relay.total) * 100) : 0;
   const syncedMembers = (view.members || []).filter((member) => member.total != null);
+  const personal = state.group.mode === 'personal';
+  const title = personal ? '🏆 Trophy trail' : '🏆 Trophy relay';
   box.innerHTML = `
     <div class="trophy-head">
       <div>
-        <h4>🏆 Trophy relay</h4>
+        <h4>${title}</h4>
         <p>${relay.total
-          ? `${relay.unlocked}/${relay.total} different achievements unlocked somewhere in the group`
+          ? personal
+            ? `${relay.unlocked}/${relay.total} achievements unlocked`
+            : `${relay.unlocked}/${relay.total} different achievements unlocked somewhere in the group`
           : syncedMembers.length ? 'Steam reports no achievements for this game.'
-            : 'No one has handed off the trophy baton yet.'}</p>
+            : personal ? 'No achievement progress synced yet.'
+              : 'No one has handed off the trophy baton yet.'}</p>
       </div>
-      ${relay.total ? `<strong>${pct}%</strong>` : ''}
+      ${relay.total ? `<div class="trophy-score"><strong>${pct}%</strong><span>${achievementLevel(pct)}</span></div>` : ''}
     </div>
     ${relay.total ? `<div class="trophy-track"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}
     <div class="trophy-people">
@@ -2414,24 +2492,44 @@ function renderAchievements(gameId, slug, view) {
     ${(relay.latest || []).length ? `<div class="trophy-calls"><strong>Fresh trophies</strong>${relay.latest.map((item) =>
       `<span>${esc(item.member)} unlocked ${esc(item.name)} · ${when(item.unlocktime)}</span>`).join('')}</div>` : ''}
     <div class="trophy-actions">
-      <button class="btn btn-sm" id="d-ach-sync">Sync my progress</button>
-      <span id="d-ach-status">${relay.synced}/${relay.eligible} accounts synced for this game</span>
+      <button class="btn btn-sm" id="d-ach-sync">${
+        (view.members || []).find((member) => member.steamId === state.me.steamId)?.total == null
+          ? 'Sync my progress' : 'Refresh my progress'}</button>
+      <span id="d-ach-status">${personal
+        ? (syncedMembers.length ? `Synced ${when(syncedMembers[0].fetchedAt)}` : 'Syncs automatically when you open a game')
+        : `${relay.synced}/${relay.eligible} accounts synced for this game`}</span>
     </div>`;
 
-  $('#d-ach-sync').addEventListener('click', async () => {
-    const button = $('#d-ach-sync');
-    const status = $('#d-ach-status');
-    button.disabled = true;
-    status.textContent = 'Asking Steam…';
-    try {
-      const updated = await gapiFor(slug, '/achievements', { method: 'POST', body: { gameId } });
-      if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
-      renderAchievements(gameId, slug, updated);
-    } catch (error) {
-      status.textContent = error.message;
-      button.disabled = false;
-    }
-  });
+  $('#d-ach-sync').addEventListener('click', () => syncAchievements(gameId, slug, false));
+}
+
+function maybeAutoSyncAchievements(gameId, slug, view) {
+  const mine = (view.members || []).find((member) => member.steamId === state.me.steamId);
+  const stale = mine?.fetchedAt != null
+    && Date.now() / 1000 - Number(mine.fetchedAt) >= ACHIEVEMENT_REFRESH_SECONDS;
+  const ownership = gameById(gameId)?.ownership?.[state.me.steamId];
+  const key = `${slug}:${gameId}`;
+  if (!mine?.account || ownership === false || (!stale && mine.total != null)
+      || achievementAutoAttempts.has(key)) return;
+  achievementAutoAttempts.add(key);
+  void syncAchievements(gameId, slug, true);
+}
+
+async function syncAchievements(gameId, slug, automatic) {
+  const button = $('#d-ach-sync');
+  const status = $('#d-ach-status');
+  if (!button || !status) return;
+  button.disabled = true;
+  status.textContent = automatic ? 'Syncing from Steam automatically…' : 'Asking Steam…';
+  try {
+    const updated = await gapiFor(slug, '/achievements', { method: 'POST', body: { gameId } });
+    if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
+    renderAchievements(gameId, slug, updated);
+  } catch (error) {
+    if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
+    status.textContent = error.message;
+    button.disabled = false;
+  }
 }
 
 /** Fetched per game rather than bundled into the library payload — see the route. */

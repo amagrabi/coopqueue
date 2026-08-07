@@ -59,8 +59,10 @@ export async function onRequestGet({ request, env, data }) {
 
   const [group, ...results] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, slug, name, max_players, blind_rating, created_by, created_at
-         FROM groups WHERE id = ?`
+      `SELECT g.id, g.slug, g.name, g.max_players, g.blind_rating, g.created_by, g.created_at,
+              COALESCE(w.mode, 'coop') AS mode
+         FROM groups g LEFT JOIN workspace_settings w ON w.group_id = g.id
+        WHERE g.id = ?`
     ).bind(gid).first(),
     ...Object.values(TABLES).map((table) => env.DB.prepare(table.sql).bind(gid).all()),
   ]);

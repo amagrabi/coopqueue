@@ -265,21 +265,8 @@ kbd {
 .kbd-hint { font-size: 12px; color: var(--text-muted); margin: 14px 0 0; }
 
 /* ───────────────────────────── play next ──────────────────────────────── */
-.play-night {
-  margin: 0 0 20px; padding: 18px 20px; border-radius: var(--radius);
-  border: 1px solid rgba(57,135,229,.35);
-  background: linear-gradient(135deg, rgba(57,135,229,.10), rgba(181,91,207,.05));
-}
-.play-night-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-.play-night-head h3 { font-size: 16px; }
-.play-night-head p, .play-night-status { margin: 3px 0 0; color: var(--text-muted); font-size: 12.5px; }
-.play-night-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.play-night-controls {
-  display: grid; grid-template-columns: minmax(260px,1fr) 150px auto;
-  gap: 18px; align-items: end; margin-top: 16px;
-}
-.play-night-controls fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.play-night-controls legend, .play-night-controls .detail-field > span {
+.attendee-filter { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
+.attendee-filter legend {
   display: block; margin-bottom: 7px; font-size: 11.5px; font-weight: 600;
   letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted);
 }
@@ -291,8 +278,6 @@ kbd {
 }
 .attendee:has(input:checked) { border-color: rgba(57,135,229,.55); color: var(--text-primary); }
 .attendee input { margin: 0; }
-.pn-own { padding-bottom: 8px; }
-.play-night-status { min-height: 18px; margin-top: 12px; }
 .rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rank-row {
   display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: center;
@@ -376,6 +361,7 @@ td.miss { color: #4a4a47; }
 .tile-alert .tile-val { color: var(--serious); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(340px,1fr)); gap: 16px; margin-bottom: 16px; }
+.grid-2.single { grid-template-columns: 1fr; }
 .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; }
 .panel-title { font-size: 15.5px; margin-bottom: 14px; }
 .panel-title + .panel-sub { margin-top: -9px; }
@@ -468,8 +454,9 @@ td.miss { color: #4a4a47; }
   margin: 10px 0 0; padding: 10px 12px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
 }
-/* Long Steam tags must stay inside the explanation on narrow screens. */
-.browse-why .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+/* Keep a tag and its signed score as one pill. Let the whole pill move to the
+   next line instead of breaking "Gore -0.63" across two rows inside one border. */
+.browse-why .chip { display: inline-flex; white-space: nowrap; }
 
 /* Secondary text inside a bar label, e.g. the raw 25/114 behind a percentage. */
 .bar-sub { color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -566,6 +553,9 @@ td.miss { color: #4a4a47; }
 .trophy-calls strong { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .trophy-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 13px; }
 .trophy-actions span { color: var(--text-muted); font-size: 11.5px; }
+.trophy-score { display: grid; justify-items: end; gap: 1px; }
+.trophy-score strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.trophy-score span { color: #f2d79a; font-size: 11px; white-space: nowrap; }
 
 .toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
@@ -591,8 +581,6 @@ td.miss { color: #4a4a47; }
   .dot-row { grid-template-columns: 110px 1fr 30px; }
   .dot-axis { margin-left: 122px; margin-right: 42px; }
   .detail-row2 { grid-template-columns: 1fr; }
-  .play-night-controls { grid-template-columns: 1fr; gap: 13px; align-items: start; }
-  .pn-own { padding-bottom: 0; }
   .rank-row { grid-template-columns: 30px minmax(0,1fr); gap: 10px; }
   .rank-score { grid-column: 2; text-align: left; display: flex; gap: 7px; align-items: baseline; }
   .rank-score span { display: inline; }
@@ -637,6 +625,16 @@ td.miss { color: #4a4a47; }
   padding: 20px; display: grid; gap: 12px; align-content: start;
 }
 .onboard-card h2 { font-size: 15px; }
+.workspace-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.workspace-choice label {
+  display: flex; gap: 8px; align-items: flex-start; padding: 9px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+}
+.workspace-choice label:has(input:checked) { border-color: rgba(57,135,229,.65); background: rgba(57,135,229,.08); }
+.workspace-choice input { margin: 3px 0 0; }
+.workspace-choice span { display: grid; gap: 2px; }
+.workspace-choice strong { font-size: 12.5px; }
+.workspace-choice small { color: var(--text-muted); font-size: 11px; line-height: 1.3; }
 .field { display: grid; gap: 5px; }
 .field > span {
   font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
@@ -688,6 +686,7 @@ td.miss { color: #4a4a47; }
   }
   .group-item-meta { white-space: normal; }
 }
+@media (max-width: 480px) { .workspace-choice { grid-template-columns: 1fr; } }
 
 /* Divider between the group's settings and the viewer's own preferences. */
 .settings-rule { border: 0; border-top: 1px solid var(--border); margin: 20px 0 14px; }

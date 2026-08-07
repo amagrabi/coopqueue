@@ -47,7 +47,7 @@ const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
        commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute,
-       historyRoute] = await Promise.all([
+       historyRoute, statsRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -63,6 +63,7 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/play-night.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/achievements.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/history.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/stats.js')),
 ]);
 const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
 const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
@@ -226,6 +227,54 @@ await check('a reserved slug is never handed out', async () => {
 await check('group size is validated', async () => {
   const r = await groupsRoute.onRequestPost({ request: req({ name: 'Too Big', maxPlayers: 999 }), env, data: { user: user(MALLORY) } });
   return r.status === 400 || `got ${r.status}`;
+});
+
+await check('creating a personal workspace records intent, one player, and no invite', async () => {
+  const r = await groupsRoute.onRequestPost({
+    request: req({ name: 'My history', mode: 'personal' }), env, data: { user: user(MALLORY) },
+  });
+  const b = await r.json();
+  const row = sqlite.prepare(
+    `SELECT g.id,g.max_players,g.invite_code,w.mode,m.role
+       FROM groups g JOIN workspace_settings w ON w.group_id=g.id
+       JOIN memberships m ON m.group_id=g.id AND m.steam_id=?
+      WHERE g.slug=?`
+  ).get(MALLORY, b.slug);
+  const scoped = await ctxFor(MALLORY, b.slug);
+  const library = await (await gamesRoute.onRequestGet({ env, data: scoped.data })).json();
+  return (r.status === 201 && b.mode === 'personal' && row?.mode === 'personal'
+      && row.max_players === 1 && row.invite_code == null && row.role === 'owner'
+      && library.group.mode === 'personal')
+    || `status ${r.status}, ${JSON.stringify({ row, group: library.group })}`;
+});
+
+await check('a one-person workspace can switch modes without losing its identity', async () => {
+  const row = sqlite.prepare(
+    "SELECT g.slug FROM groups g JOIN workspace_settings w ON w.group_id=g.id WHERE w.mode='personal' LIMIT 1"
+  ).get();
+  const { data } = await ctxFor(MALLORY, row.slug);
+  const toCoop = await membersRoute.onRequestPatch({
+    request: new Request('https://x/', { method: 'PATCH', body: JSON.stringify({ mode: 'coop', maxPlayers: 5 }) }),
+    env, data,
+  });
+  const changed = sqlite.prepare(
+    `SELECT g.max_players,w.mode FROM groups g JOIN workspace_settings w ON w.group_id=g.id WHERE g.slug=?`
+  ).get(row.slug);
+  return (toCoop.status === 200 && changed.mode === 'coop' && changed.max_players === 5)
+    || `status ${toCoop.status}, ${JSON.stringify(changed)}`;
+});
+
+await check('a workspace with other members cannot be changed to personal', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await membersRoute.onRequestPatch({
+    request: new Request('https://x/', { method: 'PATCH', body: JSON.stringify({ mode: 'personal' }) }),
+    env, data,
+  });
+  const mode = sqlite.prepare(
+    `SELECT COALESCE(w.mode,'coop') AS mode FROM groups g
+       LEFT JOIN workspace_settings w ON w.group_id=g.id WHERE g.id=1`
+  ).get().mode;
+  return (r.status === 409 && mode === 'coop') || `status ${r.status}, mode ${mode}`;
 });
 
 console.log('\nGlobal catalogue & pools');
@@ -617,13 +666,13 @@ await check('comments go with the game when the group is deleted', async () => {
   return left === 0 || `${left} comments survived the group deletion`;
 });
 
-console.log('\nExports, ownership & play night');
+console.log('\nExports, ownership & attendee ranking');
 
 sqlite.exec(`INSERT INTO games
   (id, group_id, name, steam_appid, status, max_players, min_session_minutes, enriched_at, created_at)
   VALUES
   (8200,1,'Tonight Shortlist',982000,'backlog',4,60,100,100),
-  (8201,1,'Tonight Too Long',982001,'backlog',4,180,100,100),
+  (8201,1,'Tonight Too Small',982001,'backlog',1,180,100,100),
   (8202,1,'Tonight Duration Unknown',982002,'backlog',4,NULL,500,100),
   (8203,1,'Tonight Cap Unknown',982003,'backlog',NULL,60,100,100)`);
 sqlite.exec(`INSERT OR REPLACE INTO ratings (game_id, steam_id, score) VALUES
@@ -647,24 +696,37 @@ await check('ownership is true, false, or unknown — never guessed from stale d
     || `owned=${JSON.stringify(owned)} stale=${JSON.stringify(stale)}`;
 });
 
-await check('Play Night uses only attendees ratings and hard session-fit gates', async () => {
+await check('attendee ranking uses only selected ratings and excludes only verified small caps', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const r = await playNightRoute.onRequestPost({
-    request: req({ attendees: [ALICE, MALLORY], minutes: 90, requireOwnership: true }), env, data,
+    request: req({ attendees: [ALICE, MALLORY] }), env, data,
   });
   const result = await r.json();
   const short = result.games.find((game) => game.id === 8200);
   if (!short) return `short game missing: ${JSON.stringify(result.excluded)}`;
   if (short.score !== 8.5 || short.votes !== 2) return `attendee score ${short.score}/${short.votes}`;
-  if (result.games.some((game) => [8201, 8202, 8203].includes(game.id))) return 'a non-fitting fixture leaked in';
-  return (result.excluded.tooLong > 0 && result.excluded.sessionLengthUnknown > 0
-      && result.excluded.playerCountUnknown > 0) || JSON.stringify(result.excluded);
+  if (result.games.some((game) => game.id === 8201)) return 'a verified one-player game leaked in';
+  if (!result.games.some((game) => game.id === 8202)) return 'missing session length was still treated as a gate';
+  const unknown = result.games.find((game) => game.id === 8203);
+  return (unknown?.playerCountVerified === false && result.excluded.tooFewPlayers > 0)
+    || JSON.stringify({ unknown, excluded: result.excluded });
 });
 
-await check('Play Night rejects an attendee outside the group', async () => {
+await check('attendee ranking supports a solo player', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const r = await playNightRoute.onRequestPost({
-    request: req({ attendees: [ALICE, '76561198000000999'], minutes: 90 }), env, data,
+    request: req({ attendees: [ALICE] }), env, data,
+  });
+  const result = await r.json();
+  const short = result.games.find((game) => game.id === 8200);
+  return (r.status === 200 && short?.score === 8 && short?.votes === 1)
+    || `status ${r.status}, ${JSON.stringify(short)}`;
+});
+
+await check('attendee ranking rejects a player outside the group', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await playNightRoute.onRequestPost({
+    request: req({ attendees: [ALICE, '76561198000000999'] }), env, data,
   });
   return r.status === 400 || `got ${r.status}`;
 });
@@ -681,6 +743,21 @@ await check('session length accepts a real range and rejects invented values', a
   sqlite.exec('UPDATE games SET min_session_minutes=60 WHERE id=8200');
   return (badPatch.status === 400 && goodPatch.status === 200 && value === 75)
     || `bad ${badPatch.status}, good ${goodPatch.status}, value ${value}`;
+});
+
+sqlite.exec(`INSERT INTO games (id,group_id,name,status,max_players)
+             VALUES (8250,1,'Two-person Argument','finished',4)`);
+sqlite.exec(`INSERT OR REPLACE INTO ratings (game_id,steam_id,score) VALUES
+             (8250,'${ALICE}',5),(8250,'${MALLORY}',9)`);
+
+await check('Biggest arguments includes a real two-person disagreement', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await statsRoute.onRequestGet({ env, data });
+  const result = await r.json();
+  const argument = result.arguments.find((game) => game.id === 8250);
+  return (r.status === 200 && argument?.spread === 4
+      && Object.keys(argument.votes).length === 2)
+    || `status ${r.status}, ${JSON.stringify(argument)}`;
 });
 
 sqlite.exec(`INSERT INTO games
@@ -708,14 +785,21 @@ await check('history suggestions use bounded evidence and leave moving facts alo
     ]),
   }];
   const items = buildHistoryItems(games, achievements, [], Date.parse('2025-01-01T00:00:00Z'));
+  const personalItems = buildHistoryItems(
+    [{ ...games[0], my_minutes: 765 }], achievements, [], Date.parse('2025-01-01T00:00:00Z'),
+    { mode: 'personal' }
+  );
   const finished = Object.fromEntries(items.filter((item) => item.gameId === 1)
     .map((item) => [item.field, item.suggestion]));
+  const personalHours = personalItems.find((item) => item.field === 'hours');
   const moving = items.filter((item) => item.gameId === 2).map((item) => item.field);
   return (finished.started?.source === 'achievement' && finished.started.value === '2021-03-01'
       && finished.hours?.source === 'steam-hours'
       && finished.finished?.source === 'achievement' && finished.finished.value === '2024-04-01'
+      && personalHours?.suggestion?.value === 12.8
+      && personalHours.prompt === 'Roughly how many hours did you play?'
       && moving.length === 1 && moving[0] === 'started')
-    || JSON.stringify({ finished, moving });
+    || JSON.stringify({ finished, personalHours, moving });
 });
 
 await check('history prompts are targeted and never leak another group', async () => {
@@ -860,6 +944,31 @@ await check('achievement sync fetches and stores only the signed-in member', asy
     return (r.status === 200 && row?.achieved === 1 && row?.total === 2
         && unlocked.length === 1 && unlocked[0].key === 'first')
       || `status ${r.status}, row ${JSON.stringify(row)}`;
+  } finally {
+    env.STEAM_API_KEY = originalKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await check('achievement sync preserves Steam private/unavailable errors instead of calling them silence', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = env.STEAM_API_KEY;
+  env.STEAM_API_KEY = 'test-key';
+  let publicHost = false;
+  globalThis.fetch = async (url) => {
+    publicHost = String(url).startsWith('https://api.steampowered.com/');
+    return new Response(JSON.stringify({
+      playerstats: { success: false, error: 'Profile is not public' },
+    }), { status: 400, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const { data } = await ctxFor(ALICE, 'g4m1ng');
+    const r = await achievementsRoute.onRequestPost({
+      request: req({ gameId: 8200 }), env, data,
+    });
+    const result = await r.json();
+    return (r.status === 409 && publicHost && result.error === 'Profile is not public')
+      || `status ${r.status}, host ${publicHost}, ${JSON.stringify(result)}`;
   } finally {
     env.STEAM_API_KEY = originalKey;
     globalThis.fetch = originalFetch;
@@ -1213,7 +1322,6 @@ await check('a game you failed to finish counts as played, not as backlog', asyn
 console.log('\n"I didn\'t play this"');
 
 const skipRoute = await import(path.join(SITE, 'functions/api/g/[slug]/skip.js'));
-const statsRoute = await import(path.join(SITE, 'functions/api/g/[slug]/stats.js'));
 
 await check('"no opinion" and "didn\'t play" both leave the queue', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');

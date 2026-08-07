@@ -4,14 +4,15 @@
 
 # CoopQueue
 
-A co-op game tracker for groups of friends. Sign in with Steam, create a group,
+A co-op game tracker for groups of friends, with a personal-library mode that
+reuses the same backlog and history tools without diluting the co-op defaults. Sign in with Steam, create a group,
 rate games in a queue with the trailer playing, suggest new ones by pasting a
 store link, and settle "what next" with a group score shown next to how many
 people voted for it — and with a check on whether your whole group can even fit
 in the lobby.
 
-Multi-tenant: any number of groups, each with its own library, members and
-headcount. One person can belong to several.
+Multi-tenant: any number of co-op groups or personal workspaces, each with its
+own library. One person can belong to several.
 
 **Running cost: €0/month** on Cloudflare's free tier, which is not a trial and
 does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
@@ -28,12 +29,11 @@ and the more perishable, since memory fades. Keyboard-driven: `1`–`9` (`0` = 1
 `←` `→` to nudge by half a point, `Enter` to save and advance, `S` to skip.
 Forty unrated games takes about three minutes.
 
-**Play next.** The backlog ranked, with anything that can't fit your group
-pushed into a separate block rather than silently sorted to the bottom. **Play
-Night** narrows that further to the people who are actually present and the time
-available tonight. It only calls a game a fit when both its online player cap and
-human-entered minimum worthwhile session are known; its score uses only those
-attendees' ratings.
+**Play next.** The backlog ranked, with attendee chips directly above it. Changing
+who is playing immediately recomputes the score from only those people's ratings
+and checks verified player caps against that crew. Unknown caps stay visibly
+unknown instead of emptying the list; verified games that are too small move to a
+separate block.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
@@ -60,16 +60,25 @@ is the thing that decides whether any of the scoring means anything, so it is
 not hidden in a stats page.
 
 **Stats.** Per-person baselines, genre track record, and a dot plot of your
-biggest arguments.
+biggest arguments. Panels with no underlying data stay hidden. Personal
+workspaces keep the useful history, rating and playtime views while omitting
+comparisons that require another person.
 
 **Steam ownership and trophies.** A three-state ownership badge uses the public
 libraries already synced from the Group tab: owned, absent from a sufficiently
 recent sync, or unknown. Private and stale data are never relabelled "not owned".
-Each game's detail panel also has a **Trophy relay**: members sync their own Steam
-achievement progress one game at a time, then the group sees its combined progress,
-fresh unlocks and achievements that are one person short of a clean sweep.
+Each game's detail panel also has a **Trophy relay**: opening it automatically
+refreshes the signed-in member's stale or missing progress for that one game, then
+the group sees its combined progress, fresh unlocks and achievements that are one
+person short of a clean sweep. Personal workspaces turn it into a **Trophy trail**
+with playful progress ranks. A refresh button remains for retries.
 
-**Group.** Members, invite links you can rotate or disable, the headcount that
+**Personal workspaces.** Create one directly during onboarding, or convert an
+existing one-person group from Settings without losing games, ratings or history.
+They have no invite link or group-only comparisons, use your Steam playtime in
+history and Stats, and retain the co-op-first catalogue and verified-cap metadata.
+
+**Group / Settings.** Members, invite links you can rotate or disable, the headcount that
 drives the viability check, and owner-only JSON or per-table CSV exports — including
 history provenance — before a group is permanently deleted.
 
@@ -118,7 +127,7 @@ What actually happens on first sign-in:
    set a signed session cookie good for 90 days.
 
 That account is just an identity. It grants access to nothing until they either
-**create a group** or **join one with an invite link**. Groups are private by
+**create a co-op group or personal workspace** or **join one with an invite link**. Groups are private by
 default: a non-member asking for `/api/g/some-group/games` gets a 404, not a
 403, so a private group can't even be confirmed to exist by guessing the URL.
 
@@ -224,7 +233,7 @@ harness instead — it serves the real frontend against an in-memory copy of the
 schema with auth stubbed:
 
 ```bash
-node test/harness.mjs                 # signed in, claimed, two groups
+node test/harness.mjs                 # signed in, co-op and personal fixtures
 SCENARIO=anon  node test/harness.mjs  # landing page
 SCENARIO=fresh node test/harness.mjs  # signed in, no groups
 SCENARIO=claim node test/harness.mjs  # first run in a group
@@ -233,7 +242,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 145 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 151 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -262,7 +271,7 @@ functions/
       games/index.js             GET the group library with scores · POST add
       games/[id].js              PATCH · DELETE · PUT to link a Steam appid
       history.js                 shared-history cleanup prompts
-      play-night.js              session-specific shortlist
+      play-night.js              attendee-specific backlog ranking
       export.js                  owner-only JSON and CSV downloads
       achievements.js            cached per-game Trophy relay
       rate.js  skip.js  stats.js  claim.js  members.js  enrich.js
@@ -361,8 +370,9 @@ account; the existing group, member, and game caps remain the longer-term guardr
 
 ## What's next
 
-Steam playtime/ownership sync, Play Night, group exports, per-game achievement
-progress, Complete our history, comments, archiving and the recommender are
+Steam playtime/ownership sync, attendee filtering, personal workspaces, group
+exports, automatic per-game achievement progress, Complete our history, comments,
+archiving and the recommender are
 **done**. Still open,
 roughly in value order:
 

@@ -139,7 +139,7 @@ export async function onRequestGet({ env, data }) {
     members: memberRows.map(({ account, synced_games, synced_at, ...member }) => member),
     group: {
       slug: data.group.slug, name: data.group.name, maxPlayers: need, role: data.group.role,
-      blindRating: !!data.group.blind_rating,
+      blindRating: !!data.group.blind_rating, mode: data.group.workspace_mode,
     },
     model: { mean: Math.round(glob.mean * 100) / 100, sd: Math.round(glob.sd * 100) / 100 },
   });

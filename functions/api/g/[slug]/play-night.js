@@ -1,27 +1,22 @@
 import { json, bad, body } from '../../../../lib/http.js';
-import { ownershipForGames } from '../../../../lib/ownership.js';
 import { viability } from '../../../../lib/score.js';
 
 /**
- * Build a shortlist for one actual session, not the group's usual headcount.
+ * Rank the backlog for the people who are actually playing.
  *
- * Player cap and minimum useful session length are both hard gates: unknown is
- * excluded rather than treated as a fit. The score is the plain mean of only the
- * attendees' ratings, preserving the product's deliberately uncalibrated model.
+ * A verified cap below the selected headcount is a hard exclusion. Unknown caps
+ * stay visible as unknown rather than emptying a list whose catalogue coverage is
+ * still incomplete. The score is the plain mean of only the selected members'
+ * ratings, preserving the deliberately uncalibrated model.
  */
 export async function onRequestPost({ request, env, data }) {
   const input = await body(request);
   const attendees = Array.isArray(input.attendees) ? input.attendees.map(String) : [];
   const unique = [...new Set(attendees)];
-  const minutes = Number(input.minutes);
-  const requireOwnership = !!input.requireOwnership;
   const excludeEarlyAccess = input.excludeEarlyAccess !== false;
 
   if (unique.length !== attendees.length) return bad('each attendee can only be selected once');
-  if (unique.length < 2 || unique.length > 64) return bad('select 2–64 attendees');
-  if (!Number.isInteger(minutes) || minutes < 30 || minutes > 720) {
-    return bad('available time must be a whole number from 30 to 720 minutes');
-  }
+  if (unique.length < 1 || unique.length > 64) return bad('select 1–64 players');
 
   const gid = data.group.group_id;
   const [gamesRes, membersRes] = await Promise.all([
@@ -31,14 +26,8 @@ export async function onRequestPost({ request, env, data }) {
         WHERE g.group_id = ? AND g.archived_at IS NULL AND g.status = 'backlog'`
     ).bind(gid).all(),
     env.DB.prepare(
-      `SELECT m.steam_id, m.short_name, m.is_seed,
-              COALESCE(a.steam_id, m.steam_id) AS account,
-              s.games AS synced_games, s.synced_at
+      `SELECT m.steam_id, m.short_name
          FROM memberships m
-         LEFT JOIN seed_assignments a
-                ON a.group_id = m.group_id AND a.seed_steam_id = m.steam_id
-         LEFT JOIN group_library_sync s
-                ON s.group_id = m.group_id AND s.steam_id = COALESCE(a.steam_id, m.steam_id)
         WHERE m.group_id = ? ORDER BY m.short_name COLLATE NOCASE`
     ).bind(gid).all(),
   ]);
@@ -48,16 +37,11 @@ export async function onRequestPost({ request, env, data }) {
   if (unique.some((steamId) => !memberIds.has(steamId))) return bad('every attendee must belong to this group');
 
   const marks = unique.map(() => '?').join(',');
-  const [ratingsRes, ownership] = await Promise.all([
-    env.DB.prepare(
-      `SELECT r.game_id, r.steam_id, r.score FROM ratings r
-         JOIN games g ON g.id = r.game_id
-        WHERE g.group_id = ? AND r.steam_id IN (${marks})`
-    ).bind(gid, ...unique).all(),
-    requireOwnership
-      ? ownershipForGames(env.DB, gid, games, members)
-      : Promise.resolve({ byGame: new Map() }),
-  ]);
+  const ratingsRes = await env.DB.prepare(
+    `SELECT r.game_id, r.steam_id, r.score FROM ratings r
+       JOIN games g ON g.id = r.game_id
+      WHERE g.group_id = ? AND r.steam_id IN (${marks})`
+  ).bind(gid, ...unique).all();
 
   const ratings = new Map();
   for (const rating of ratingsRes.results || []) {
@@ -67,40 +51,24 @@ export async function onRequestPost({ request, env, data }) {
 
   const excluded = {
     earlyAccess: 0,
-    playerCountUnknown: 0,
     tooFewPlayers: 0,
-    sessionLengthUnknown: 0,
-    tooLong: 0,
     noAttendeeRatings: 0,
-    ownershipUnknown: 0,
-    notOwnedByEveryone: 0,
   };
   const shortlist = [];
   for (const game of games) {
     if (excludeEarlyAccess && game.early_access) { excluded.earlyAccess++; continue; }
     const fit = viability(game, unique.length);
-    if (fit.ok == null) { excluded.playerCountUnknown++; continue; }
     if (fit.ok === false) { excluded.tooFewPlayers++; continue; }
-    if (game.min_session_minutes == null) { excluded.sessionLengthUnknown++; continue; }
-    if (game.min_session_minutes > minutes) { excluded.tooLong++; continue; }
 
     const votes = ratings.get(game.id) || [];
     if (!votes.length) { excluded.noAttendeeRatings++; continue; }
-
-    const ownershipStates = requireOwnership ? ownership.byGame.get(game.id) || {} : {};
-    if (requireOwnership) {
-      const selectedStates = unique.map((steamId) => ownershipStates[steamId]);
-      if (selectedStates.some((state) => state == null)) { excluded.ownershipUnknown++; continue; }
-      if (selectedStates.some((state) => state === false)) { excluded.notOwnedByEveryone++; continue; }
-    }
 
     const score = votes.reduce((sum, vote) => sum + vote.score, 0) / votes.length;
     shortlist.push({
       id: game.id,
       score: Math.round(score * 100) / 100,
       votes: votes.length,
-      minSessionMinutes: game.min_session_minutes,
-      ownership: ownershipStates,
+      playerCountVerified: fit.ok != null,
       workaround: fit.ok === 'workaround',
     });
   }
@@ -112,8 +80,6 @@ export async function onRequestPost({ request, env, data }) {
   return json({
     games: shortlist.slice(0, 30),
     attendees: unique,
-    minutes,
-    requireOwnership,
     excluded,
   });
 }

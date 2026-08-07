@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS skips;
 DROP TABLE IF EXISTS ratings;
 DROP TABLE IF EXISTS games;
 DROP TABLE IF EXISTS memberships;
+DROP TABLE IF EXISTS workspace_settings;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS steam_apps;
@@ -50,6 +51,14 @@ CREATE TABLE groups (
   blind_rating INTEGER NOT NULL DEFAULT 0,
   created_by   TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
   created_at   INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+-- Workspace intent is explicit rather than inferred from member count. Every new
+-- co-op group starts with one owner too, so "one member" cannot distinguish it
+-- from a personal library. Missing rows are legacy co-op workspaces.
+CREATE TABLE workspace_settings (
+  group_id INTEGER PRIMARY KEY REFERENCES groups(id) ON DELETE CASCADE,
+  mode     TEXT NOT NULL CHECK (mode IN ('coop','personal'))
 );
 
 CREATE TABLE memberships (
@@ -144,9 +153,9 @@ CREATE TABLE games (
                       -- neither 'dropped' (gave up) nor 'sampled' (barely started).
                       CHECK (status IN ('backlog','playing','finished','unfinished','dropped','sampled')),
   max_players       INTEGER,                  -- max simultaneous ONLINE co-op players
-  -- Shortest session that is still worth starting, set by this group. Steam's
-  -- lifetime hours cannot answer "does this fit tonight?" and must never be used
-  -- as a substitute. Mirrors migrations/021-session-and-achievements.sql.
+  -- Retained for compatibility with the earlier Play Night experiment. It is not
+  -- exposed by the current attendee filter; Steam lifetime hours must never be
+  -- repurposed as a session-length estimate.
   min_session_minutes INTEGER,
   coop_note         TEXT,                     -- 'Remote Play Together', 'needs a mod', …
   header_image      TEXT,

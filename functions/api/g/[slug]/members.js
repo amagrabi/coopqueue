@@ -21,9 +21,11 @@ export async function onRequestGet({ env, data }) {
       name: data.group.name,
       maxPlayers: data.group.max_players,
       role: data.group.role,
+      mode: data.group.workspace_mode,
       blindRating: !!data.group.blind_rating,
       // Only an owner needs the code, and only they can rotate it.
-      inviteCode: data.group.role === 'owner' ? data.group.invite_code : null,
+      inviteCode: data.group.role === 'owner' && data.group.workspace_mode === 'coop'
+        ? data.group.invite_code : null,
     },
   });
 }
@@ -36,6 +38,11 @@ export async function onRequestPatch({ request, env, data }) {
   const patch = await body(request);
   const gid = data.group.group_id;
   const isOwner = data.group.role === 'owner';
+  const requestedMode = patch.mode == null ? null : String(patch.mode);
+  if (requestedMode != null && !['coop', 'personal'].includes(requestedMode)) {
+    return bad('workspace mode must be coop or personal');
+  }
+  const effectiveMode = requestedMode || data.group.workspace_mode;
 
   if (patch.myName != null) {
     const name = String(patch.myName).trim().slice(0, 16);
@@ -80,9 +87,38 @@ export async function onRequestPatch({ request, env, data }) {
 
   if (patch.maxPlayers != null) {
     if (!isOwner) return bad('only the group owner can change the group size', 403);
+    if (effectiveMode === 'personal') {
+      return bad('personal workspaces have one player; switch to co-op first', 409);
+    }
     const cap = Number(patch.maxPlayers);
     if (!Number.isInteger(cap) || cap < 2 || cap > 64) return bad('group size must be 2–64');
     await env.DB.prepare('UPDATE groups SET max_players = ? WHERE id = ?').bind(cap, gid).run();
+  }
+
+  if (patch.mode != null) {
+    if (!isOwner) return bad('only the group owner can change the workspace type', 403);
+    const mode = requestedMode;
+    if (mode === 'personal') {
+      const count = await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM memberships WHERE group_id = ?'
+      ).bind(gid).first();
+      if ((count?.n ?? 0) !== 1) {
+        return bad('remove the other members before making this a personal workspace', 409);
+      }
+    }
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO workspace_settings (group_id, mode) VALUES (?,?)
+         ON CONFLICT(group_id) DO UPDATE SET mode = excluded.mode`
+      ).bind(gid, mode),
+      env.DB.prepare(
+        `UPDATE groups
+            SET max_players = CASE WHEN ?2 = 'personal' THEN 1
+                                   WHEN max_players < 2 THEN 4 ELSE max_players END,
+                invite_code = CASE WHEN ?2 = 'personal' THEN NULL ELSE invite_code END
+          WHERE id = ?1`
+      ).bind(gid, mode),
+    ]);
   }
 
   if (patch.blindRating != null) {
@@ -95,6 +131,9 @@ export async function onRequestPatch({ request, env, data }) {
 
   if (patch.invite != null) {
     if (!isOwner) return bad('only the group owner can manage the invite link', 403);
+    if (effectiveMode === 'personal') {
+      return bad('personal workspaces do not have invite links', 409);
+    }
     // 'rotate' issues a fresh code and kills the old link; 'off' disables joining.
     const code = patch.invite === 'off' ? null : randomToken(10);
     await env.DB.prepare('UPDATE groups SET invite_code = ? WHERE id = ?').bind(code, gid).run();

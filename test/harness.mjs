@@ -194,13 +194,6 @@ db.exec(`INSERT INTO playtime_sync (steam_id, games, played, synced_at) VALUES
   ('${ME}',122,98,unixepoch()), ('${LEO_ACCOUNT}',455,0,unixepoch())`);
 db.exec(`INSERT INTO group_library_sync (group_id, steam_id, games, played, synced_at) VALUES
   (1,'${ME}',122,98,unixepoch()), (1,'${LEO_ACCOUNT}',455,0,unixepoch())`);
-// Enough human-entered session estimates to make Play Night demonstrable. Unknown
-// rows remain too, so its explanation is visible rather than every game pretending
-// to fit a two-hour slot.
-db.exec(`UPDATE games SET min_session_minutes=90
-          WHERE id IN (SELECT id FROM games WHERE group_id=1 AND status='backlog'
-                        AND max_players IS NOT NULL LIMIT 8)`);
-
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -220,10 +213,32 @@ if (SCENARIO === 'member') {
            (900,2,'Trine 2','Puzzle','backlog',3),
            (901,2,'Secret Trio Game','Shooter','finished',3)`);
   db.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (901,'${OTHER}',9)`);
+
+  // A real personal workspace beside the co-op fixtures, so every view can be
+  // checked in both modes without pretending that "one current member" implies
+  // personal intent.
+  db.exec(`INSERT INTO groups (id, slug, name, invite_code, max_players)
+           VALUES (3,'my-games','My games',NULL,1)`);
+  db.exec(`INSERT INTO workspace_settings (group_id, mode) VALUES (3,'personal')`);
+  db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES
+           (3,'${ME}','Amadeus','owner')`);
+  db.exec(`INSERT INTO games
+           (id, group_id, name, steam_appid, genre, status, max_players, header_image, release_date, started, finished)
+           VALUES
+           (910,3,'Stardew Valley',413150,'Simulation','finished',4,NULL,'26 Feb, 2016','2022-03-01','2023-01-15'),
+           (911,3,'Portal 2',620,'Puzzle','finished',2,NULL,'19 Apr, 2011','2017-04-01','2017-04-20'),
+           (912,3,'Valheim',892970,'Survival','backlog',10,NULL,'2 Feb, 2021',NULL,NULL)`);
+  db.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES
+           (910,'${ME}',9.5),(911,'${ME}',9),(912,'${ME}',8.5)`);
+  db.exec(`INSERT OR REPLACE INTO playtime (steam_id, appid, minutes, last_played, fetched_at) VALUES
+           ('${ME}',413150,7200,1673740800,unixepoch()),
+           ('${ME}',620,840,1492646400,unixepoch()),
+           ('${ME}',892970,0,NULL,unixepoch())`);
 }
 
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const one = (sql, ...a) => db.prepare(sql).get(...a);
+let freshCreated = false;
 const send = (res, code, data) => {
   res.writeHead(code, { 'content-type': 'application/json' });
   res.end(JSON.stringify(data));
@@ -233,8 +248,10 @@ const readBody = async (req) => { let b = ''; for await (const c of req) b += c;
 function groupCtx(slug) {
   return one(
     `SELECT g.id AS group_id, g.slug, g.name, g.invite_code, g.max_players, g.blind_rating,
+            COALESCE(w.mode,'coop') AS workspace_mode,
             m.short_name, m.role
-       FROM groups g JOIN memberships m ON m.group_id=g.id AND m.steam_id=?
+       FROM groups g LEFT JOIN workspace_settings w ON w.group_id=g.id
+       JOIN memberships m ON m.group_id=g.id AND m.steam_id=?
       WHERE g.slug=?`, ME, slug);
 }
 
@@ -310,7 +327,7 @@ function libraryFor(gid, need) {
   };
 }
 
-function historyFor(gid, includeNudges = true) {
+function historyFor(gid, includeNudges = true, mode = 'coop') {
   const games = q(
     `SELECT g.id, g.name, g.status, g.header_image, g.steam_appid, g.release_date,
             g.started, g.hours, g.hours_estimated, g.hours_participants,
@@ -337,7 +354,7 @@ function historyFor(gid, includeNudges = true) {
   const nudges = includeNudges ? q(
     'SELECT game_id,field,state,snoozed_until FROM history_nudges WHERE group_id=? AND steam_id=?',
     gid, ME) : [];
-  const items = buildHistoryItems(games, achievements, nudges);
+  const items = buildHistoryItems(games, achievements, nudges, Date.now(), { mode });
   return { total: items.length, items: items.slice(0, 20) };
 }
 
@@ -351,18 +368,35 @@ const server = http.createServer(async (req, res) => {
 
   if (p === '/api/me') {
     const groups = q(
-      `SELECT g.slug, g.name, m.role, m.short_name,
+      `SELECT g.slug, g.name, m.role, m.short_name, COALESCE(w.mode,'coop') AS mode,
               (SELECT COUNT(*) FROM memberships mm WHERE mm.group_id=g.id) AS members,
               (SELECT COUNT(*) FROM games gg WHERE gg.group_id=g.id) AS games,
               (SELECT COUNT(*) FROM games gg WHERE gg.group_id=g.id
                  AND NOT EXISTS (SELECT 1 FROM ratings r WHERE r.game_id=gg.id AND r.steam_id=?1)
                  AND NOT EXISTS (SELECT 1 FROM skips s WHERE s.game_id=gg.id AND s.steam_id=?1)) AS unrated
-         FROM groups g JOIN memberships m ON m.group_id=g.id
+         FROM groups g LEFT JOIN workspace_settings w ON w.group_id=g.id
+         JOIN memberships m ON m.group_id=g.id
         WHERE m.steam_id=?1 ORDER BY g.name COLLATE NOCASE`, ME);
     return send(res, 200, {
       user: { steamId: ME, displayName: 'Amadeus', avatar: null },
-      groups: SCENARIO === 'fresh' ? [] : groups,
+      groups: SCENARIO === 'fresh' && !freshCreated ? [] : groups,
     });
+  }
+
+  if (p === '/api/groups' && req.method === 'POST') {
+    const b = await readBody(req);
+    const name = String(b.name || '').trim().slice(0, 60);
+    const mode = b.mode === 'personal' ? 'personal' : 'coop';
+    if (name.length < 2) return send(res, 400, { error: 'give the workspace a name' });
+    const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace'}-local`;
+    db.prepare('INSERT INTO groups (slug,name,invite_code,max_players,created_by) VALUES (?,?,?,?,?)')
+      .run(slug, name, mode === 'personal' ? null : 'LOCALCODE99', mode === 'personal' ? 1 : Number(b.maxPlayers) || 4, ME);
+    const gid = one('SELECT id FROM groups WHERE slug=?', slug).id;
+    db.prepare("INSERT INTO memberships (group_id,steam_id,short_name,role) VALUES (?,?,?,'owner')")
+      .run(gid, ME, 'Amadeus');
+    db.prepare('INSERT INTO workspace_settings (group_id,mode) VALUES (?,?)').run(gid, mode);
+    freshCreated = true;
+    return send(res, 201, { ok: true, slug, name, mode });
   }
 
   // The global catalogue. Group-blind, exactly like the real handler — the
@@ -418,12 +452,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, {
         games: L.games, members: L.members,
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
-                 blindRating: !!ctx.blind_rating },
+                 blindRating: !!ctx.blind_rating, mode: ctx.workspace_mode },
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
     if (sub === '/history' && req.method === 'GET') {
-      return send(res, 200, historyFor(gid));
+      return send(res, 200, historyFor(gid, true, ctx.workspace_mode));
     }
     if (sub === '/history' && req.method === 'POST') {
       const b = await readBody(req);
@@ -435,7 +469,7 @@ const server = http.createServer(async (req, res) => {
       if (!one('SELECT 1 AS x FROM games WHERE id=? AND group_id=?', gameId, gid)) {
         return send(res, 404, { error: 'no such game' });
       }
-      const item = historyFor(gid, false).items
+      const item = historyFor(gid, false, ctx.workspace_mode).items
         .find((candidate) => candidate.gameId === gameId && candidate.field === field);
       if (!item) return send(res, 409, { error: 'that history field no longer needs a prompt' });
       if (action === 'dismiss' || action === 'snooze') {
@@ -490,37 +524,23 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const attendees = Array.isArray(b.attendees) ? [...new Set(b.attendees.map(String))] : [];
       const memberIds = new Set(q('SELECT steam_id FROM memberships WHERE group_id=?', gid).map((m) => m.steam_id));
-      if (attendees.length < 2 || attendees.some((id) => !memberIds.has(id))) {
-        return send(res, 400, { error: 'select at least two members of this group' });
-      }
-      const minutes = Number(b.minutes);
-      if (!Number.isInteger(minutes) || minutes < 30 || minutes > 720) {
-        return send(res, 400, { error: 'available time must be 30–720 minutes' });
+      if (attendees.length < 1 || attendees.some((id) => !memberIds.has(id))) {
+        return send(res, 400, { error: 'select at least one member of this workspace' });
       }
       const L = libraryFor(gid, attendees.length);
-      const excluded = { earlyAccess: 0, playerCountUnknown: 0, tooFewPlayers: 0,
-        sessionLengthUnknown: 0, tooLong: 0, noAttendeeRatings: 0,
-        ownershipUnknown: 0, notOwnedByEveryone: 0 };
+      const excluded = { earlyAccess: 0, tooFewPlayers: 0, noAttendeeRatings: 0 };
       const games = [];
       for (const g of L.games.filter((game) => !game.archived_at && game.status === 'backlog')) {
         if (b.excludeEarlyAccess !== false && g.early_access) { excluded.earlyAccess++; continue; }
         const fit = viability(g, attendees.length);
-        if (fit.ok == null) { excluded.playerCountUnknown++; continue; }
         if (fit.ok === false) { excluded.tooFewPlayers++; continue; }
-        if (g.min_session_minutes == null) { excluded.sessionLengthUnknown++; continue; }
-        if (g.min_session_minutes > minutes) { excluded.tooLong++; continue; }
         const votes = attendees.map((id) => g.votes[id]).filter((score) => score != null);
         if (!votes.length) { excluded.noAttendeeRatings++; continue; }
-        if (b.requireOwnership) {
-          const own = attendees.map((id) => g.ownership[id]);
-          if (own.some((value) => value == null)) { excluded.ownershipUnknown++; continue; }
-          if (own.some((value) => value === false)) { excluded.notOwnedByEveryone++; continue; }
-        }
         games.push({ id: g.id, score: votes.reduce((a, n) => a + n, 0) / votes.length,
-          votes: votes.length, minSessionMinutes: g.min_session_minutes, ownership: g.ownership });
+          votes: votes.length, playerCountVerified: fit.ok != null });
       }
       games.sort((a, b2) => b2.score - a.score || b2.votes - a.votes);
-      return send(res, 200, { games, attendees, minutes, requireOwnership: !!b.requireOwnership, excluded });
+      return send(res, 200, { games, attendees, excluded });
     }
 
     if (sub.startsWith('/achievements')) {
@@ -528,17 +548,40 @@ const server = http.createServer(async (req, res) => {
         ? Number(url.searchParams.get('gameId')) : Number((await readBody(req)).gameId);
       const game = one('SELECT id, steam_appid FROM games WHERE id=? AND group_id=?', id, gid);
       if (!game) return send(res, 404, { error: 'no such game' });
-      if (req.method === 'POST') return send(res, 409, { error: 'Steam sync is disabled in the local harness' });
+      if (!game.steam_appid) return send(res, 200, { supported: false, members: [] });
+      if (req.method === 'POST') {
+        db.prepare(`INSERT INTO achievement_progress
+          (steam_id,appid,achieved,total,unlocked,fetched_at) VALUES (?,?,2,5,?,unixepoch())
+          ON CONFLICT(steam_id,appid) DO UPDATE SET
+            achieved=2,total=5,unlocked=excluded.unlocked,fetched_at=unixepoch()`)
+          .run(ME, game.steam_appid, JSON.stringify([
+            { key: 'first', name: 'First steps', unlocktime: Math.floor(Date.now() / 1000) - 86400 },
+            { key: 'secret', name: 'A good start', unlocktime: Math.floor(Date.now() / 1000) - 3600 },
+          ]));
+      }
       const members = q(`SELECT m.steam_id, m.short_name, m.is_seed,
-                                COALESCE(a.steam_id,m.steam_id) AS account
+                                COALESCE(a.steam_id,m.steam_id) AS account,
+                                p.achieved,p.total,p.unlocked,p.fetched_at
                            FROM memberships m LEFT JOIN seed_assignments a
                              ON a.group_id=m.group_id AND a.seed_steam_id=m.steam_id
-                          WHERE m.group_id=? ORDER BY m.short_name`, gid)
+                           LEFT JOIN achievement_progress p
+                             ON p.steam_id=COALESCE(a.steam_id,m.steam_id) AND p.appid=?
+                          WHERE m.group_id=? ORDER BY m.short_name`, game.steam_appid, gid)
         .map((m) => ({ steamId: m.steam_id, name: m.short_name,
-          account: !(m.is_seed && m.account === m.steam_id), achieved: null, total: null, fetchedAt: null }));
-      const eligible = members.filter((m) => m.account).length;
-      return send(res, 200, { supported: false, members,
-        relay: { unlocked: 0, total: 0, synced: 0, eligible, unanimous: null, nearSweep: [], latest: [] } });
+          account: !(m.is_seed && m.account === m.steam_id),
+          achieved: m.achieved ?? null, total: m.total ?? null, fetchedAt: m.fetched_at ?? null,
+          unlocked: m.unlocked ? JSON.parse(m.unlocked) : [] }));
+      const eligible = members.filter((m) => m.account);
+      const synced = eligible.filter((m) => m.total != null);
+      const total = Math.max(0, ...synced.map((m) => m.total));
+      const unlocked = new Set(synced.flatMap((m) => m.unlocked.map((a) => a.key)));
+      const latest = synced.flatMap((m) => m.unlocked.map((a) => ({
+        name: a.name, member: m.name, unlocktime: a.unlocktime,
+      }))).sort((a, b2) => b2.unlocktime - a.unlocktime).slice(0, 3);
+      return send(res, 200, { supported: total > 0,
+        members: members.map(({ unlocked: _unlocked, ...member }) => member),
+        relay: { unlocked: unlocked.size, total, synced: synced.length, eligible: eligible.length,
+          unanimous: null, nearSweep: [], latest } });
     }
 
     // Taste ranking. Shares lib/recommend.js with the real route, so the Browse
@@ -752,8 +795,9 @@ const server = http.createServer(async (req, res) => {
              FROM memberships m JOIN users u ON u.steam_id=m.steam_id
             WHERE m.group_id=? ORDER BY m.is_seed, m.short_name COLLATE NOCASE`, gid),
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
-                 blindRating: !!ctx.blind_rating,
-                 inviteCode: ctx.role === 'owner' ? ctx.invite_code : null },
+                 blindRating: !!ctx.blind_rating, mode: ctx.workspace_mode,
+                 inviteCode: ctx.role === 'owner' && ctx.workspace_mode === 'coop'
+                   ? ctx.invite_code : null },
       });
     }
     // Enough of the members PATCH to exercise the settings panel locally.
@@ -770,6 +814,19 @@ const server = http.createServer(async (req, res) => {
       if (b.name != null && ctx.role === 'owner') {
         db.prepare('UPDATE groups SET name=? WHERE id=?').run(String(b.name).slice(0, 60), gid);
       }
+      if (b.mode != null && ctx.role === 'owner') {
+        const mode = String(b.mode);
+        const count = one('SELECT COUNT(*) AS n FROM memberships WHERE group_id=?', gid).n;
+        if (!['coop', 'personal'].includes(mode) || (mode === 'personal' && count !== 1)) {
+          return send(res, 409, { error: 'this workspace cannot use that type' });
+        }
+        db.prepare(`INSERT INTO workspace_settings (group_id,mode) VALUES (?,?)
+                    ON CONFLICT(group_id) DO UPDATE SET mode=excluded.mode`).run(gid, mode);
+        db.prepare(`UPDATE groups SET max_players=CASE WHEN ?='personal' THEN 1
+                          WHEN max_players<2 THEN 4 ELSE max_players END,
+                          invite_code=CASE WHEN ?='personal' THEN NULL ELSE invite_code END
+                     WHERE id=?`).run(mode, mode, gid);
+      }
       if (b.maxPlayers != null && ctx.role === 'owner') {
         db.prepare('UPDATE groups SET max_players=? WHERE id=?').run(Number(b.maxPlayers), gid);
       }
@@ -777,20 +834,29 @@ const server = http.createServer(async (req, res) => {
     }
     if (sub === '/stats') {
       const L = libraryFor(gid, need);
-      const PLAYED = new Set(['finished', 'dropped', 'sampled']);
+      const personal = ctx.workspace_mode === 'personal';
+      const PLAYED = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
       const played = L.games.filter((g) => PLAYED.has(g.status) && g.n > 0);
       const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
       const gmap = new Map();
       for (const g of played) { if (!g.genre) continue; if (!gmap.has(g.genre)) gmap.set(g.genre, []); gmap.get(g.genre).push(g.raw); }
       return send(res, 200, {
+        mode: ctx.workspace_mode,
         totals: {
           games: L.games.length,
           finished: L.games.filter((g) => g.status === 'finished').length,
           backlog: L.games.filter((g) => g.status === 'backlog').length,
           ratings: L.ratings.length,
-          hours: Math.round(L.games.reduce((a, g) => a + (g.hours || 0), 0)),
-          unviableBacklog: L.games.filter((g) => g.status === 'backlog' && g.max_players != null && g.max_players < need).length,
-          groupMean: r2(L.glob.mean), maxPlayers: need,
+          hours: Math.round(L.games.reduce((a, g) => {
+            const minutes = personal && g.steam_appid
+              ? one('SELECT minutes FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)?.minutes
+              : null;
+            return a + (g.hours ?? (minutes != null ? minutes / 60 : 0));
+          }, 0)),
+          unviableBacklog: personal ? 0 : L.games.filter(
+            (g) => g.status === 'backlog' && g.max_players != null && g.max_players < need
+          ).length,
+          groupMean: L.ratings.length ? r2(L.glob.mean) : null, maxPlayers: need,
         },
         people: L.members.map((u) => {
           const c = L.cal.get(u.steam_id);
@@ -870,12 +936,16 @@ const server = http.createServer(async (req, res) => {
           };
         })(),
         genres: [...gmap.entries()].map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) })).sort((a, b) => b.avg - a.avg),
-        arguments: played.filter((g) => g.n >= 3 && g.spread >= 2).sort((a, b) => b.spread - a.spread).slice(0, 10)
+        arguments: played.filter((g) => g.n >= 2 && g.spread >= 2).sort((a, b) => b.spread - a.spread).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, spread: g.spread, votes: g.votes })),
         topRated: played.slice().sort((a, b) => b.raw - a.raw).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, raw: g.raw, n: g.n })),
-        mostHours: L.games.filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8)
-          .map((g) => ({ id: g.id, name: g.name, hours: g.hours })),
+        mostHours: L.games.map((g) => {
+          const minutes = personal && g.steam_appid
+            ? one('SELECT minutes FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)?.minutes
+            : null;
+          return { id: g.id, name: g.name, hours: g.hours ?? (minutes != null ? minutes / 60 : 0) };
+        }).filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8),
       });
     }
     return send(res, 200, { ok: true });

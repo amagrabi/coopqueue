@@ -20,8 +20,8 @@ export async function onRequestPost({ request, env, data }) {
   if (!game.steam_appid) return bad('link this game to Steam first', 409);
 
   const result = await playerAchievements(env.STEAM_API_KEY, data.user.steam_id, game.steam_appid);
-  if (result === null) return bad('Steam did not answer — try again later', 502);
-  if (!result.available) return bad(result.reason, 409);
+  if (result === null) return bad('STEAM_API_KEY is not configured', 500);
+  if (!result.available) return bad(result.reason, result.retryable ? 502 : 409);
 
   const unlocked = result.achievements
     .filter((achievement) => achievement.achieved)

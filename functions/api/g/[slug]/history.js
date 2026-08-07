@@ -53,14 +53,16 @@ async function historyData(db, gid, steamId) {
   };
 }
 
-async function view(db, gid, steamId) {
+async function view(db, gid, steamId, mode) {
   const data = await historyData(db, gid, steamId);
-  const items = buildHistoryItems(data.games, data.achievements, data.nudges);
+  const items = buildHistoryItems(data.games, data.achievements, data.nudges, Date.now(), { mode });
   return { total: items.length, items: items.slice(0, 20) };
 }
 
 export async function onRequestGet({ env, data }) {
-  return json(await view(env.DB, data.group.group_id, data.user.steam_id));
+  return json(await view(
+    env.DB, data.group.group_id, data.user.steam_id, data.group.workspace_mode
+  ));
 }
 
 export async function onRequestPost({ request, env, data }) {
@@ -82,7 +84,9 @@ export async function onRequestPost({ request, env, data }) {
   // Ignore an existing personal dismissal while validating the fact itself.
   // Otherwise a delayed double click on "later" turns into a misleading 409.
   const loaded = await historyData(env.DB, gid, steamId);
-  const candidates = buildHistoryItems(loaded.games, loaded.achievements, []);
+  const candidates = buildHistoryItems(
+    loaded.games, loaded.achievements, [], Date.now(), { mode: data.group.workspace_mode }
+  );
   const item = candidates.find((candidate) => candidate.gameId === gameId && candidate.field === field);
   if (!item) return bad('that history field is already filled or does not need a prompt', 409);
 

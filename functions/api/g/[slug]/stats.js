@@ -7,14 +7,19 @@ const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 export async function onRequestGet({ env, data }) {
   const gid = data.group.group_id;
   const need = data.group.max_players;
+  const personal = data.group.workspace_mode === 'personal';
 
   const [gamesRes, ratingsRes, membersRes, skipsRes] = await Promise.all([
     // Archived games are out of the stats too: they are no longer part of what
     // the group is choosing between, and leaving them in would quietly inflate
     // coverage denominators and genre averages.
     env.DB.prepare(
-      'SELECT id, name, genre, status, hours, max_players FROM games WHERE group_id = ? AND archived_at IS NULL'
-    ).bind(gid).all(),
+      `SELECT g.id, g.name, g.genre, g.status, g.hours, g.max_players,
+              p.minutes AS personal_minutes
+         FROM games g
+         LEFT JOIN playtime p ON p.appid = g.steam_appid AND p.steam_id = ?2
+        WHERE g.group_id = ?1 AND g.archived_at IS NULL`
+    ).bind(gid, data.user.steam_id).all(),
     env.DB.prepare(
       `SELECT r.game_id, r.steam_id, r.score FROM ratings r
          JOIN games g ON g.id = r.game_id
@@ -32,7 +37,11 @@ export async function onRequestGet({ env, data }) {
     ).bind(gid).all(),
   ]);
 
-  const games = gamesRes.results || [];
+  const games = (gamesRes.results || []).map((game) => ({
+    ...game,
+    effectiveHours: game.hours ?? (personal && game.personal_minutes != null
+      ? Number(game.personal_minutes) / 60 : null),
+  }));
   const skips = skipsRes.results || [];
   const ratings = ratingsRes.results || [];
   const members = membersRes.results || [];
@@ -172,16 +181,17 @@ export async function onRequestGet({ env, data }) {
   }
 
   return json({
+    mode: data.group.workspace_mode,
     totals: {
       games: games.length,
       finished: games.filter((g) => g.status === 'finished').length,
       backlog: games.filter((g) => g.status === 'backlog').length,
       ratings: ratings.length,
-      hours: Math.round(games.reduce((a, g) => a + (g.hours || 0), 0)),
-      unviableBacklog: games.filter(
+      hours: Math.round(games.reduce((a, g) => a + (g.effectiveHours || 0), 0)),
+      unviableBacklog: personal ? 0 : games.filter(
         (g) => g.status === 'backlog' && g.max_players != null && g.max_players < need
       ).length,
-      groupMean: r2(glob.mean),
+      groupMean: ratings.length ? r2(glob.mean) : null,
       maxPlayers: need,
     },
     people,
@@ -189,7 +199,7 @@ export async function onRequestGet({ env, data }) {
       .map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) }))
       .sort((a, b) => b.avg - a.avg),
     arguments: played
-      .filter((g) => g.n >= 3 && g.spread >= 2)
+      .filter((g) => g.n >= 2 && g.spread >= 2)
       .sort((a, b) => b.spread - a.spread)
       .slice(0, 10)
       .map((g) => ({
@@ -204,7 +214,8 @@ export async function onRequestGet({ env, data }) {
     shrugged,
     topRated: played.slice().sort((a, b) => b.raw - a.raw).slice(0, 10)
       .map((g) => ({ id: g.id, name: g.name, raw: g.raw, n: g.n })),
-    mostHours: games.filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8)
-      .map((g) => ({ id: g.id, name: g.name, hours: g.hours })),
+    mostHours: games.filter((g) => g.effectiveHours)
+      .sort((a, b) => b.effectiveHours - a.effectiveHours).slice(0, 8)
+      .map((g) => ({ id: g.id, name: g.name, hours: r2(g.effectiveHours) })),
   });
 }

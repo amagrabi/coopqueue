@@ -53,7 +53,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 145 assertions — ALWAYS before a deploy
+npm test          # 151 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -135,11 +135,17 @@ without it, authenticated API requests fail closed with a logged 500 instead of
 silently running without protection.
 
 Migration `021-session-and-achievements.sql` must likewise be applied before this
-feature set is deployed. It adds the human-entered Play Night session length, the
-achievement cache, and the group-specific library-sync watermark used to prove a
-negative ownership result. Until a group runs **Sync playtime from Steam** once
-after this migration, owned rows can still show positive but every absence remains
-unknown; that is the deliberate safe upgrade path.
+feature set is deployed. It adds the achievement cache, the group-specific
+library-sync watermark used to prove a negative ownership result, and the retained
+legacy session-length column. The current attendee filter does not use session
+length. Until a group runs **Sync playtime from Steam** once after this migration,
+owned rows can still show positive but every absence remains unknown; that is the
+deliberate safe upgrade path.
+
+Migration `024-personal-workspaces.sql` must be applied before deploying the
+personal-workspace code. It adds only the idempotent `workspace_settings` table;
+existing groups have no row and therefore remain co-op. Workspace type is never
+inferred from a one-member count, because every new co-op group starts that way.
 
 ### Useful queries
 

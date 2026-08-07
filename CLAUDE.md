@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 145 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 151 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -376,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-145/145 assertions pass. `npm run test:ui` does **not** run on macOS: it
+151/151 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -530,15 +530,19 @@ stores only the launching group's games. Reusing it across groups creates false
 negatives, which is why migration 021 adds the group-scoped watermark and existing
 groups need one fresh sync before negative ownership appears.
 
-## Play Night
+## Attendee filtering on Play next
 
-`POST /api/g/:slug/play-night` accepts 2–64 membership Steam IDs, 30–720 available
-minutes, and an optional require-ownership flag. It hard-excludes unknown or too-low
-verified player caps, unknown or too-long `games.min_session_minutes`, and (when
-requested) any false/unknown ownership. That session length is a human estimate;
-neither lifetime hours nor campaign length is a valid substitute. Ranking is the
-plain mean of the selected attendees' ratings only, with vote count as visible thin
-evidence. No session state is persisted.
+The old Play Night card over-constrained the answer: 57 of group 1's games had no
+human-entered minimum session length, so its default button honestly but uselessly
+returned zero. Available minutes and the separate build step are gone. Attendee
+chips now sit directly above the backlog and update the list immediately. Ranking
+is the plain mean of only the selected people's ratings, with vote count visible.
+A verified cap below that crew is excluded; an unknown cap stays in the list and is
+labelled unknown rather than being treated as either a fit or a failure.
+
+`POST /api/g/:slug/play-night` retains the same attendee-specific semantics for API
+callers and accepts 1–64 group members, which also supports personal workspaces. It
+does not persist session state.
 
 ## Exports and achievements
 
@@ -550,13 +554,31 @@ CSV text beginning with a spreadsheet formula character is prefixed with an
 apostrophe, while JSON keeps the exact source text. Response serialization streams
 each row so a large group does not allocate a second group-sized output string.
 
-Achievements are also bounded on purpose. A game detail POST syncs only the signed-
-in member for that one Steam app through `GetPlayerAchievements`; it never launches
-a members × games crawl. `achievement_progress` is global by SteamID64/appid, while
+Achievements are also bounded on purpose. Opening a game detail lazily syncs only
+the signed-in member for that one Steam app through `GetPlayerAchievements`, and
+refreshes rows older than seven days; it never launches a members × games crawl.
+The manual button remains as a retry. HTTP 400 responses are parsed because Steam
+uses them for meaningful negatives such as private or unavailable achievement data;
+they must not be collapsed into "Steam did not answer". `achievement_progress` is global by SteamID64/appid, while
 the GET view is group-scoped through the requested game. The Trophy relay shows the
 union unlocked, per-person progress, fresh unlocks and (only when every resolvable
 account has synced) achievements one member short or unanimous. Steam privacy and
 games with no achievements are explicit states, not zero progress.
+
+## Personal workspaces
+
+`workspace_settings.mode` is explicit (`coop | personal`), with a missing row
+meaning co-op for every pre-024 group. Never infer this from member count: a new
+co-op group also has one member before its invites are used. Migration 024 creates
+the side table rather than altering `groups`, keeping the migration idempotent.
+
+A personal workspace is still a group of one internally, so the tenancy boundary,
+library, ratings, archive/restore, comments, exports and history provenance all stay
+on the existing code paths. It has `max_players = 1`, no invite link, and hides
+coverage leaderboards, member comparisons, blind-rating controls and empty Stats
+panels. Stats and Complete our history use that account's Steam playtime directly.
+A one-member co-op group can be converted in Settings; a multi-member group must
+remove the others first, and conversion is a transactional D1 batch.
 
 ## Comments
 

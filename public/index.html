@@ -81,21 +81,31 @@
 <section id="onboard" class="gate" hidden>
   <div class="gate-card gate-card-wide">
     <h1 class="gate-title">Welcome, <span id="onboard-name"></span></h1>
-    <p class="gate-sub">You're not in a group yet. Start one and invite the others, or join with a code.</p>
+    <p class="gate-sub">Start a co-op group, make a personal game library, or join friends with a code.</p>
 
     <div class="onboard-split">
       <form class="onboard-card" id="create-form">
-        <h2>Start a group</h2>
+        <h2>Create a workspace</h2>
+        <div class="workspace-choice" role="radiogroup" aria-label="Workspace type">
+          <label>
+            <input type="radio" name="create-mode" value="coop" checked>
+            <span><strong>Co-op group</strong><small>Rate and choose games with friends</small></span>
+          </label>
+          <label>
+            <input type="radio" name="create-mode" value="personal">
+            <span><strong>Personal library</strong><small>Track your backlog and gaming history</small></span>
+          </label>
+        </div>
         <label class="field">
-          <span>Group name</span>
+          <span id="create-name-label">Group name</span>
           <input class="input" id="create-name" placeholder="Wednesday Night Crew" maxlength="60" required>
         </label>
-        <label class="field">
+        <label class="field" id="create-size-field">
           <span>How many of you play together?</span>
           <input class="input" id="create-size" type="number" min="2" max="64" value="4">
         </label>
         <p class="field-help">Used to flag games that can't fit everyone. Changeable later.</p>
-        <button class="btn btn-primary" type="submit">Create group</button>
+        <button class="btn btn-primary" type="submit" id="create-submit">Create group</button>
       </form>
 
       <form class="onboard-card" id="join-form">
@@ -145,7 +155,7 @@
       <button class="tab" data-view="library">Library</button>
       <button class="tab" data-view="browse">Find games</button>
       <button class="tab" data-view="stats">Stats</button>
-      <button class="tab" data-view="members">Group</button>
+      <button class="tab" data-view="members" id="workspace-tab">Group</button>
     </nav>
 
     <div class="topbar-right">
@@ -209,7 +219,7 @@
 
       <div id="queue-empty" class="empty" hidden>
         <h2>Queue clear</h2>
-        <p>You've rated or skipped everything in this group. Add a game, or go argue on the Play next tab.</p>
+        <p id="queue-empty-copy">You've rated or skipped everything in this group. Add a game, or go argue on the Play next tab.</p>
         <button class="btn btn-primary" data-open-add>+ Add a game</button>
       </div>
 
@@ -274,33 +284,10 @@
           <span>Hide early access games</span>
         </label>
       </div>
-      <section class="play-night" aria-labelledby="play-night-title">
-        <div class="play-night-head">
-          <div>
-            <h3 id="play-night-title">Play Night</h3>
-            <p>Who is here, and how much time do you actually have?</p>
-          </div>
-          <div class="play-night-actions">
-            <button class="btn btn-primary" id="pn-build">Build tonight's shortlist</button>
-            <button class="btn btn-ghost" id="pn-reset" hidden>Back to group ranking</button>
-          </div>
-        </div>
-        <div class="play-night-controls">
-          <fieldset>
-            <legend>Tonight's crew</legend>
-            <div id="pn-attendees" class="attendee-list"></div>
-          </fieldset>
-          <label class="detail-field" for="pn-minutes">
-            <span>Available minutes</span>
-            <input class="input" id="pn-minutes" type="number" min="30" max="720" step="15" value="120">
-          </label>
-          <label class="toggle pn-own">
-            <input type="checkbox" id="pn-owned">
-            <span>Everyone selected must own it</span>
-          </label>
-        </div>
-        <p id="pn-status" class="play-night-status" aria-live="polite"></p>
-      </section>
+      <fieldset class="attendee-filter">
+        <legend>Who's playing?</legend>
+        <div id="pn-attendees" class="attendee-list"></div>
+      </fieldset>
       <ol id="next-list" class="rank-list"></ol>
       <div id="unviable-block" class="unviable-block"></div>
     </section>
@@ -365,8 +352,8 @@
       <section id="history-card" class="history-card" hidden aria-live="polite">
         <div class="history-head">
           <div>
-            <h3>Complete our history</h3>
-            <p>One small gap at a time, shown first to people most likely to remember.</p>
+            <h3 id="history-heading">Complete our history</h3>
+            <p id="history-intro">One small gap at a time, shown first to people most likely to remember.</p>
           </div>
           <span id="history-count" class="history-count"></span>
         </div>
@@ -386,23 +373,23 @@
       <div class="view-head">
         <div>
           <h2>Find new games</h2>
-          <p class="view-sub">Popular online co-op games on Steam. Add the ones this group
+          <p class="view-sub" id="browse-intro">Popular online co-op games on Steam. Add the ones this group
             might actually play — only games in your library appear in anyone's rating queue, which
             is what stops a big catalogue from burying the votes that matter.</p>
         </div>
         <div class="filters">
           <input id="browse-search" class="input" type="search" placeholder="Search the catalogue…" autocomplete="off" aria-label="Search game catalogue">
           <select id="browse-sort" class="input" aria-label="Sort game catalogue">
-            <option value="fit">Recommended for us</option>
+            <option value="fit" id="browse-fit-option">Recommended for us</option>
             <option value="rank">Most popular</option>
             <option value="name">A–Z</option>
             <option value="new">Newest</option>
           </select>
-          <label class="toggle">
-            <input type="checkbox" id="browse-coop" checked> Co-op only
+          <label class="toggle" id="browse-coop-label">
+            <input type="checkbox" id="browse-coop" checked><span>Co-op only</span>
           </label>
-          <label class="toggle">
-            <input type="checkbox" id="browse-fits"> Only ones we can all play
+          <label class="toggle" id="browse-fits-label">
+            <input type="checkbox" id="browse-fits"><span>Only ones we can all play</span>
           </label>
           <label class="toggle">
             <input type="checkbox" id="browse-hide-owned" checked> Hide games we already have
@@ -419,28 +406,28 @@
 
     <section class="view" data-view="stats">
       <div class="tiles" id="stat-tiles"></div>
-      <div class="grid-2">
-        <section class="panel">
+      <div class="grid-2 stats-grid">
+        <section class="panel" id="stats-people">
           <h3 class="panel-title">Who rates how</h3>
           <p class="panel-sub">A 7 from one person is not a 7 from another. Scores are taken at face
             value, so this is context for reading them rather than a correction applied to them.</p>
           <div id="people-list" class="people"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="stats-genres">
           <h3 class="panel-title">Genre track record</h3>
           <p class="panel-sub">Average score of games you actually played, by genre.</p>
           <div id="genre-chart" class="bars"></div>
         </section>
       </div>
-      <div class="grid-2">
-        <section class="panel">
+      <div class="grid-2 stats-grid">
+        <section class="panel" id="stats-pairs">
           <h3 class="panel-title">Who agrees with whom</h3>
           <p class="panel-sub">Average gap between two people's scores, over the games they have both
             rated. Pairs need at least five games in common to appear.</p>
           <div id="twins-summary" class="stat-callouts"></div>
           <div id="pairs-chart" class="bars"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="stats-outliers">
           <h3 class="panel-title">Who is out on a limb</h3>
           <p class="panel-sub">How far each person sits from what everyone else said, and the genre
             they are most out of step on.</p>
@@ -449,24 +436,24 @@
         </section>
       </div>
 
-      <div class="grid-2">
-        <section class="panel">
+      <div class="grid-2 stats-grid">
+        <section class="panel" id="stats-top">
           <h3 class="panel-title">Best games you've played</h3>
           <div id="top-chart" class="bars"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="stats-hours">
           <h3 class="panel-title">Where the hours went</h3>
           <div id="hours-chart" class="bars"></div>
         </section>
       </div>
 
-      <section class="panel">
+      <section class="panel" id="stats-shrugged">
         <h3 class="panel-title">Nobody has an opinion</h3>
         <p class="panel-sub">Games at least two of you looked at and skipped, and none of you rated.
           The clearest candidates for removing from the library.</p>
         <div id="shrugged-list" class="shrug-list"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="stats-arguments">
         <h3 class="panel-title">Biggest arguments</h3>
         <p class="panel-sub">Games you played where the gap between the highest and lowest score was 2 or more.</p>
         <div id="arg-legend" class="legend"></div>
@@ -476,9 +463,9 @@
 
     <!-- ══════════════ GROUP ══════════════ -->
     <section class="view" data-view="members">
-      <div class="view-head"><h2>Group</h2></div>
+      <div class="view-head"><h2 id="workspace-heading">Group</h2></div>
 
-      <section class="panel">
+      <section class="panel" id="group-coverage-panel">
         <h3 class="panel-title">Rating coverage</h3>
         <p class="panel-sub">How much of the library each person has actually scored. Everything on the
           Play next tab is only as trustworthy as the thinnest bar here.</p>
@@ -486,8 +473,8 @@
         <p id="coverage-note" class="panel-sub" style="margin-bottom:0"></p>
       </section>
 
-      <div class="grid-2">
-        <section class="panel">
+      <div class="grid-2" id="workspace-settings-grid">
+        <section class="panel" id="group-members-panel">
           <h3 class="panel-title">Members</h3>
           <p class="panel-sub">Placeholder rows are imported identities nobody has claimed yet.</p>
           <div id="member-list" class="people"></div>
@@ -497,16 +484,16 @@
           <div id="group-settings"></div>
         </section>
       </div>
-      <section class="panel">
+      <section class="panel" id="group-invite-panel">
         <h3 class="panel-title">Invite</h3>
         <div id="invite-panel"></div>
       </section>
 
       <!-- The privacy caveat lives here rather than as a banner: it matters when
            you are looking at the hours or fixing them, and nowhere else. -->
-      <section class="panel">
-        <h3 class="panel-title">Steam playtime</h3>
-        <p class="panel-sub">Group hours are estimated from Steam: the smallest playtime among the
+      <section class="panel" id="playtime-panel">
+        <h3 class="panel-title" id="playtime-title">Steam playtime</h3>
+        <p class="panel-sub" id="playtime-copy">Group hours are estimated from Steam: the smallest playtime among the
           people who actually played a game. That is an upper bound on time you played it
           <em>together</em> — Steam records how long each of you played, never when or with whom. A
           figure saved in the Library stays put; accepted estimates remain visibly approximate.</p>
