@@ -565,6 +565,14 @@ union unlocked, per-person progress, fresh unlocks and (only when every resolvab
 account has synced) achievements one member short or unanimous. Steam privacy and
 games with no achievements are explicit states, not zero progress.
 
+Do not diagnose every `GetPlayerAchievements` 403 as a dead site key. Measured on
+production, the same key successfully completed all four `GetOwnedGames` library
+syncs while `ISteamUserStats` refused PEAK; the signed-in profile's public Steam
+Community XML returned the game's full achievement list at the same time. On a
+401/403, `playerAchievements` therefore falls back to that public per-game XML view,
+including its privacy state and unlock timestamps. The documented JSON Web API
+remains first because the older Community view is not a complete replacement.
+
 ## Personal workspaces
 
 `workspace_settings.mode` is explicit (`coop | personal`), with a missing row

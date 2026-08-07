@@ -138,9 +138,11 @@ on the Group tab, and send it to the other three. They click it, sign in with
 Steam, and land straight in the group with the claim prompt waiting.
 
 Using Steam rather than email has one more payoff. Because a SteamID64 is a real
-Steam account, playtime, ownership and achievement completion come from Steam's
-public Web API keyed on the ID already stored. They still respect Steam privacy:
-hidden or stale data is shown as unknown, never guessed.
+Steam account, playtime and ownership come from Steam's public Web API keyed on the
+ID already stored. Achievement completion uses that API first and Steam's public
+Community profile as a fallback when its stats method refuses an otherwise valid
+key. Both paths respect Steam privacy: hidden or stale data is shown as unknown,
+never guessed.
 
 If you want the instance private while you try it out, set `ALLOWED_STEAM_IDS`
 and only those Steam accounts can sign in at all. Leave it unset to let anyone

@@ -950,25 +950,53 @@ await check('achievement sync fetches and stores only the signed-in member', asy
   }
 });
 
-await check('achievement sync preserves Steam private/unavailable errors instead of calling them silence', async () => {
+await check('achievement sync preserves private errors and falls back when the keyed endpoint refuses one app', async () => {
   const originalFetch = globalThis.fetch;
   const originalKey = env.STEAM_API_KEY;
   env.STEAM_API_KEY = 'test-key';
   let publicHost = false;
+  let fallback = false;
   globalThis.fetch = async (url) => {
     publicHost = String(url).startsWith('https://api.steampowered.com/');
+    if (fallback && publicHost) {
+      return new Response(null, { status: 403 });
+    }
+    if (fallback && String(url).startsWith('https://steamcommunity.com/profiles/')) {
+      return new Response(`<?xml version="1.0"?><playerstats>
+        <privacyState>public</privacyState>
+        <game><gameName><![CDATA[Tonight Shortlist]]></gameName></game>
+        <achievements>
+          <achievement closed="1"><name>First &amp; Night</name><apiname>first</apiname>
+            <unlockTimestamp>456</unlockTimestamp></achievement>
+          <achievement closed="0"><name>Another Night</name><apiname>later</apiname></achievement>
+        </achievements>
+      </playerstats>`, { headers: { 'content-type': 'application/xml' } });
+    }
     return new Response(JSON.stringify({
       playerstats: { success: false, error: 'Profile is not public' },
     }), { status: 400, headers: { 'content-type': 'application/json' } });
   };
   try {
     const { data } = await ctxFor(ALICE, 'g4m1ng');
-    const r = await achievementsRoute.onRequestPost({
+    const privateResponse = await achievementsRoute.onRequestPost({
       request: req({ gameId: 8200 }), env, data,
     });
-    const result = await r.json();
-    return (r.status === 409 && publicHost && result.error === 'Profile is not public')
-      || `status ${r.status}, host ${publicHost}, ${JSON.stringify(result)}`;
+    const privateResult = await privateResponse.json();
+    if (privateResponse.status !== 409 || !publicHost || privateResult.error !== 'Profile is not public') {
+      return `private status ${privateResponse.status}, host ${publicHost}, ${JSON.stringify(privateResult)}`;
+    }
+
+    fallback = true;
+    const fallbackResponse = await achievementsRoute.onRequestPost({
+      request: req({ gameId: 8200 }), env, data,
+    });
+    const row = sqlite.prepare(
+      'SELECT achieved, total, unlocked FROM achievement_progress WHERE steam_id=? AND appid=?'
+    ).get(ALICE, 982000);
+    const unlocked = JSON.parse(row?.unlocked || '[]');
+    return (fallbackResponse.status === 200 && row?.achieved === 1 && row?.total === 2
+        && unlocked[0]?.name === 'First & Night' && unlocked[0]?.unlocktime === 456)
+      || `fallback status ${fallbackResponse.status}, row ${JSON.stringify(row)}`;
   } finally {
     env.STEAM_API_KEY = originalKey;
     globalThis.fetch = originalFetch;

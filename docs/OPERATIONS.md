@@ -327,6 +327,7 @@ whole-image bounding box instead lets the watermark set the right edge and leave
 | Harness refuses to start | `schema.sql` drifted from `migrations/` | add the missing column to `schema.sql` |
 | Trailers silent in Chrome | `hls.light.min.js` cannot play Steam's separate audio rendition | keep the **full** `hls.min.js` |
 | A game shows the wrong trailer | a bad Steam appid match | relink by pasting the store URL in the Library |
+| Achievement sync says Steam refused access | `GetPlayerAchievements` rejected this call, which does not prove the key is globally invalid | confirm library sync still works; the app falls back to the public per-game Community profile before showing this error |
 | Catalogue browse looks empty | co-op filter plus untagged rows | untagged rows stay visible by design; check `is_coop` |
 | `pkill -f harness.mjs` kills your shell | the pattern matches the shell's own command line | `pkill -f "[h]arness.mjs"` |
 
