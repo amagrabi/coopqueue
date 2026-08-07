@@ -2510,7 +2510,7 @@ function renderAchievements(gameId, slug, view) {
       <button class="btn btn-sm" id="d-ach-sync">${
         (view.members || []).find((member) => member.steamId === state.me.steamId)?.total == null
           ? 'Sync my progress' : 'Refresh my progress'}</button>
-      <span id="d-ach-status">${personal
+      <span id="d-ach-status">${view.notice ? esc(view.notice) : personal
         ? (syncedMembers.length ? `Synced ${when(syncedMembers[0].fetchedAt)}` : 'Syncs automatically when you open a game')
         : `${relay.synced}/${relay.eligible} accounts synced for this game`}</span>
     </div>`;

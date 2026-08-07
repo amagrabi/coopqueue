@@ -568,10 +568,14 @@ games with no achievements are explicit states, not zero progress.
 Do not diagnose every `GetPlayerAchievements` 403 as a dead site key. Measured on
 production, the same key successfully completed all four `GetOwnedGames` library
 syncs while `ISteamUserStats` refused PEAK; the signed-in profile's public Steam
-Community XML returned the game's full achievement list at the same time. On a
-401/403, `playerAchievements` therefore falls back to that public per-game XML view,
-including its privacy state and unlock timestamps. The documented JSON Web API
-remains first because the older Community view is not a complete replacement.
+Community XML returned the game's full achievement list at the same time. But that
+XML's `privacyState=public` covers only the profile: for Abiotic Factor it marked all
+53 locked while the same account's signed-in Steam page showed 10/53. On a 401/403,
+`playerAchievements` therefore uses the Community view only when it contains at
+least one positive unlock (or a genuinely empty achievement list). An all-zero list
+is ambiguous, stays unsynced, and invalidates an older cached zero rather than
+turning hidden data into 0%. The documented JSON Web API remains first because the
+older Community view is not a complete replacement.
 
 ## Personal workspaces
 

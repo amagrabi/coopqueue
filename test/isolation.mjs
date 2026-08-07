@@ -956,18 +956,21 @@ await check('achievement sync preserves private errors and falls back when the k
   env.STEAM_API_KEY = 'test-key';
   let publicHost = false;
   let fallback = false;
+  let masked = false;
   globalThis.fetch = async (url) => {
     publicHost = String(url).startsWith('https://api.steampowered.com/');
     if (fallback && publicHost) {
       return new Response(null, { status: 403 });
     }
     if (fallback && String(url).startsWith('https://steamcommunity.com/profiles/')) {
+      const first = masked
+        ? '<achievement closed="0"><name>First Night</name><apiname>first</apiname></achievement>'
+        : '<achievement closed="1"><name>First &amp; Night</name><apiname>first</apiname><unlockTimestamp>456</unlockTimestamp></achievement>';
       return new Response(`<?xml version="1.0"?><playerstats>
         <privacyState>public</privacyState>
         <game><gameName><![CDATA[Tonight Shortlist]]></gameName></game>
         <achievements>
-          <achievement closed="1"><name>First &amp; Night</name><apiname>first</apiname>
-            <unlockTimestamp>456</unlockTimestamp></achievement>
+          ${first}
           <achievement closed="0"><name>Another Night</name><apiname>later</apiname></achievement>
         </achievements>
       </playerstats>`, { headers: { 'content-type': 'application/xml' } });
@@ -994,9 +997,26 @@ await check('achievement sync preserves private errors and falls back when the k
       'SELECT achieved, total, unlocked FROM achievement_progress WHERE steam_id=? AND appid=?'
     ).get(ALICE, 982000);
     const unlocked = JSON.parse(row?.unlocked || '[]');
-    return (fallbackResponse.status === 200 && row?.achieved === 1 && row?.total === 2
-        && unlocked[0]?.name === 'First & Night' && unlocked[0]?.unlocktime === 456)
-      || `fallback status ${fallbackResponse.status}, row ${JSON.stringify(row)}`;
+    if (fallbackResponse.status !== 200 || row?.achieved !== 1 || row?.total !== 2
+        || unlocked[0]?.name !== 'First & Night' || unlocked[0]?.unlocktime !== 456) {
+      return `fallback status ${fallbackResponse.status}, row ${JSON.stringify(row)}`;
+    }
+
+    sqlite.prepare(
+      'UPDATE achievement_progress SET achieved=0, unlocked=? WHERE steam_id=? AND appid=?'
+    ).run('[]', ALICE, 982000);
+    masked = true;
+    const maskedResponse = await achievementsRoute.onRequestPost({
+      request: req({ gameId: 8200 }), env, data,
+    });
+    const maskedView = await maskedResponse.json();
+    const maskedRow = sqlite.prepare(
+      'SELECT achieved FROM achievement_progress WHERE steam_id=? AND appid=?'
+    ).get(ALICE, 982000);
+    const mine = maskedView.members.find((member) => member.steamId === ALICE);
+    return (maskedResponse.status === 200 && maskedView.notice?.includes('Game details to Public')
+        && mine?.total == null && !maskedRow)
+      || `masked status ${maskedResponse.status}, row ${JSON.stringify(maskedRow)}, ${JSON.stringify(maskedView)}`;
   } finally {
     env.STEAM_API_KEY = originalKey;
     globalThis.fetch = originalFetch;

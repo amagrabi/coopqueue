@@ -21,7 +21,18 @@ export async function onRequestPost({ request, env, data }) {
 
   const result = await playerAchievements(env.STEAM_API_KEY, data.user.steam_id, game.steam_appid);
   if (result === null) return bad('STEAM_API_KEY is not configured', 500);
-  if (!result.available) return bad(result.reason, result.retryable ? 502 : 409);
+  if (!result.available) {
+    if (result.invalidateZero) {
+      // This is derived cache, not user data. An older fallback briefly stored
+      // privacy-masked all-zero responses as progress; remove only that exact
+      // ambiguous shape while preserving any real positive/stale result.
+      await env.DB.prepare(
+        'DELETE FROM achievement_progress WHERE steam_id = ? AND appid = ? AND achieved = 0'
+      ).bind(data.user.steam_id, game.steam_appid).run();
+      return achievementView(env.DB, data.group.group_id, id, result.reason);
+    }
+    return bad(result.reason, result.retryable ? 502 : 409);
+  }
 
   const unlocked = result.achievements
     .filter((achievement) => achievement.achieved)
@@ -40,7 +51,7 @@ export async function onRequestPost({ request, env, data }) {
   return achievementView(env.DB, data.group.group_id, id);
 }
 
-async function achievementView(db, groupId, gameId) {
+async function achievementView(db, groupId, gameId, notice = null) {
   const game = await db.prepare(
     'SELECT id, steam_appid FROM games WHERE id = ? AND group_id = ?'
   ).bind(gameId, groupId).first();
@@ -105,6 +116,7 @@ async function achievementView(db, groupId, gameId) {
 
   return json({
     supported: total > 0,
+    notice,
     members: members.map(({ unlocked, ...member }) => member),
     relay: {
       unlocked: unlockedByKey.size,
