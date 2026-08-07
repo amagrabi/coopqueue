@@ -937,7 +937,13 @@ when the logo changes: `python3 scripts/build-brand.py path/to/logo.png`. Two de
 `logo.png` is 448×96 — 3× a 26–30px display height, not the full-resolution crop,
 which was 116 KB for a mark nobody sees above 30px. On screens under 560px the
 topbar clips the lockup to the controller with `object-fit: cover`, because the
-wordmark, the group switcher and the tab row cannot share one line.
+wordmark, the group switcher and the tab row cannot share one line. Keep the small
+extra margin after that crop: its bright outline reaches the image boundary and the
+normal flex gap otherwise looks like an overlap against the group button's border.
+
+Both landing-page Steam links use the same Steam glyph. The top link wraps below the
+wordmark on phones, so omitting the glyph there reads as a second, unrelated action
+rather than a compact copy of the hero call to action.
 
 The source image had a generator watermark in its bottom-right corner. It sits
 outside the lockup's bounding box, so the tight crop removes it — but check for one

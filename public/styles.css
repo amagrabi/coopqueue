@@ -130,6 +130,9 @@ kbd {
    for one line. The controller alone is still recognisable, so crop to it rather
    than shrinking the whole lockup into illegibility. */
 @media (max-width: 560px) {
+  /* The controller's bright outline reaches the edge of its crop, so the normal
+     flex gap looks smaller than it is beside the switcher's border. */
+  .topbar > .brand { margin-right: 6px; }
   .topbar .brand-logo {
     height: 24px; width: 28px; object-fit: cover; object-position: left center;
   }
