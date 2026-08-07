@@ -174,11 +174,22 @@ export async function recomputeEstimates(env, gid) {
   for (const [id, { mins, last }] of byGame) {
     // Fewer than two participants is not co-op, whatever the hours say.
     const hours = mins.length >= 2 ? Math.round((Math.min(...mins) / 60) * 10) / 10 : 0;
-    /* The group stopped when the LAST of them stopped, so this is a max where the
-       hours estimate is a min. Same participant filter, so somebody who never
-       really played cannot set the date. Stored as an ISO day — the clock time
-       Steam gives is more precision than "when did we play this" deserves. */
-    const ended = last.length >= 2
+    /* The most recent time ANYONE here was in the game — a max, where the hours
+       estimate is a min.
+
+       No two-person floor, unlike hours, and that is forced rather than chosen:
+       **Steam only returns `rtime_last_played` for the account that owns the API
+       key.** Measured on this group — Pat has 188 played games visible and zero
+       last-played timestamps, Dave 23 and zero, while Ama (whose key it is) has all
+       98. Playtime and last-played are separate privacy facets and the second is not
+       exposed for other people at all. Requiring two participants would therefore
+       make this permanently null for every group.
+
+       So it is deliberately NOT "when the group finished" — it is the latest play
+       date we can see, which is a good prompt for typing the real one. The UI says
+       exactly that. Stored as an ISO day; the clock time Steam gives is more
+       precision than "when did we play this" deserves. */
+    const ended = last.length
       ? new Date(Math.max(...last) * 1000).toISOString().slice(0, 10)
       : null;
     stmts.push(env.DB.prepare(

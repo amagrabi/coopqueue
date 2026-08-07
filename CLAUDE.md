@@ -627,13 +627,21 @@ content_descriptorids, playtime_disconnected`. No first-played, no acquired, no
 purchase date. So a start date is manual, always, and the UI says so rather than
 leaving people hunting for a sync button that cannot exist.
 
-The **end** is derivable and worth having. `finished_estimated` is the **latest**
-`rtime_last_played` across participants — the group stopped when the last of them
-stopped. Note this is a `max` where the hours estimate is a `min`, and for the same
-reason in mirror image: you cannot all have played together *longer* than whoever
-played least, and the group cannot have stopped *before* its last player did. Same
-`PARTICIPANT_MINUTES` filter and same two-person floor, so one person idling in a
-game cannot date it. Shown with "≈" and only when nobody has typed `finished`.
+The **end** is partly derivable. `finished_estimated` is the **latest**
+`rtime_last_played` across participants — a `max`, where the hours estimate is a
+`min`.
+
+**But Steam only returns `rtime_last_played` for the account that owns the API key.**
+Measured on this group: Pat has 188 played games visible and **zero** last-played
+timestamps, Dave 23 and zero, while Ama — whose key it is — has all 98. Playtime and
+last-played are separate privacy facets, and the second is simply not exposed for
+other people. There is no setting the others can change to fix it.
+
+So this has **no two-person floor**, unlike hours: requiring two would make it
+permanently null for every group. That means it is *not* "when the group finished" —
+it is the latest play date we can see, which is a good prompt for typing the real one,
+and the UI says exactly that rather than dressing one person's timestamp up as the
+group's. Shown only when nobody has typed `finished`.
 
 ## The Library's default view
 

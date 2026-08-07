@@ -1672,9 +1672,10 @@ function openDetail(id) {
           <input id="d-finished" class="input" type="date" value="${esc(g.finished || '')}"
                  placeholder="${esc(g.finished_estimated || '')}">
           ${g.finished || !g.finished_estimated ? '' :
-            `<p class="field-help">Steam says you last played this around
-              <b>${esc(shortDate(g.finished_estimated))}</b>. Typing a date here replaces
-              that estimate.</p>`}
+            `<p class="field-help">The most recent play date Steam will tell us is
+              <b>${esc(shortDate(g.finished_estimated))}</b> — Steam only reports that for
+              the account the API key belongs to, so treat it as a prompt rather than
+              the group's answer. Typing a date here replaces it.</p>`}
         </div>
       </div>
       ${g.started ? '' : `<p class="field-help">Steam publishes no first-played date for

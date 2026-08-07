@@ -774,19 +774,24 @@ await check('the end estimate is the LAST participant to stop, not the first', a
     || `expected the later date 2024-09-09, got ${row.finished_estimated}`;
 });
 
-await check('one participant is not a group, so no end date is claimed', async () => {
+await check('one participant is enough for an end date, unlike hours', async () => {
+  /* Forced by Steam: rtime_last_played comes back only for the account owning the
+     API key, so a two-person floor would make this permanently null. It is labelled
+     as "the latest date Steam will tell us", not as the group's finish date. */
   const playtime = await import(path.join(SITE, 'functions/api/g/[slug]/playtime.js'));
   const g = sqlite.prepare(
     'SELECT id, steam_appid FROM games WHERE group_id=1 AND steam_appid IS NOT NULL LIMIT 1 OFFSET 2').get();
   const who = sqlite.prepare(
     'SELECT steam_id FROM memberships WHERE group_id=1 AND is_seed=0 LIMIT 1').get();
-  sqlite.prepare(`INSERT INTO playtime (steam_id, appid, minutes, last_played) VALUES (?,?,?,?)
-                  ON CONFLICT(steam_id, appid) DO UPDATE SET
-                    minutes=excluded.minutes, last_played=excluded.last_played`)
+  // Exactly one participant, so the contrast with hours is the thing being tested.
+  sqlite.prepare('DELETE FROM playtime WHERE appid=?').run(g.steam_appid);
+  sqlite.prepare('INSERT INTO playtime (steam_id, appid, minutes, last_played) VALUES (?,?,?,?)')
     .run(who.steam_id, g.steam_appid, 900, Math.floor(Date.UTC(2024, 1, 2) / 1000));
   await playtime.recomputeEstimates(env, 1);
-  const row = sqlite.prepare('SELECT finished_estimated FROM games WHERE id=?').get(g.id);
-  return row.finished_estimated === null || `claimed ${row.finished_estimated} off one player`;
+  const row = sqlite.prepare('SELECT finished_estimated, hours_estimated FROM games WHERE id=?').get(g.id);
+  // The date is set from one player; the HOURS estimate still refuses to be.
+  return (row.finished_estimated === '2024-02-02' && row.hours_estimated === 0)
+    || `date ${row.finished_estimated}, hours ${row.hours_estimated}`;
 });
 
 console.log('\nRe-rating');
