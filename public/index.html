@@ -362,6 +362,16 @@
                   title="Reset filters and sorting to the default" aria-label="Reset to default">↺</button>
         </div>
       </div>
+      <section id="history-card" class="history-card" hidden aria-live="polite">
+        <div class="history-head">
+          <div>
+            <h3>Complete our history</h3>
+            <p>One small gap at a time, shown first to people most likely to remember.</p>
+          </div>
+          <span id="history-count" class="history-count"></span>
+        </div>
+        <div id="history-prompt"></div>
+      </section>
       <div class="table-wrap">
         <table class="table" id="lib-table">
           <thead><tr id="lib-head"></tr></thead>
@@ -499,7 +509,7 @@
         <p class="panel-sub">Group hours are estimated from Steam: the smallest playtime among the
           people who actually played a game. That is an upper bound on time you played it
           <em>together</em> — Steam records how long each of you played, never when or with whom. A
-          figure typed by hand in the Library always wins over the estimate.</p>
+          figure saved in the Library stays put; accepted estimates remain visibly approximate.</p>
         <div id="pt-members" class="people"></div>
         <button class="btn" id="pt-sync" style="margin-top:14px">Sync playtime from Steam</button>
         <p id="pt-status" class="add-status"></p>

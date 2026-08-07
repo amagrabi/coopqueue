@@ -53,7 +53,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 139 assertions — ALWAYS before a deploy
+npm test          # 145 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -193,9 +193,24 @@ A backup you have never restored is a guess. Rehearse it after any migration tha
 recreates a table.
 
 The owner-facing JSON/CSV export beside **Delete group** is a portable copy of that
-one group's games, ratings, comments and members. It is useful before deletion, but
-it is not a database backup: only D1 Time Travel or `npm run db:backup` can restore
-the whole instance and its shared Steam/catalogue caches.
+one group's games, ratings, comments, members and shared-history provenance. It is
+useful before deletion, but it is not a database backup: only D1 Time Travel or
+`npm run db:backup` can restore the whole instance and its shared Steam/catalogue
+caches.
+
+### Migration 023: Complete our history
+
+Apply `migrations/023-history-nudges.sql` before deploying the history route. It
+adds the shared fact-provenance table and per-member dismiss/snooze state, then
+labels the 17 release-date fallbacks installed by migration 022. It is additive
+and idempotent, so the normal migration command can safely be retried:
+
+```bash
+npx wrangler d1 execute g4m1ng --remote --file=migrations/023-history-nudges.sql
+```
+
+The application reads these tables while loading every group library; deploying
+the code first would make that request fail until the migration is applied.
 
 ---
 

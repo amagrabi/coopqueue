@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 139 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 145 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -376,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-139/139 assertions pass. `npm run test:ui` does **not** run on macOS: it
+145/145 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -447,7 +447,7 @@ Build order agreed with the owner: coverage (**done**) → `coop_apps` + browse/
 UI (**done**) → crawl cron (**done**, hourly) → Steam playtime/ownership (**done**) →
 per-game achievement relay (**done**) → Play Night + exports (**done**) →
 recent-releases button (**done** — the crawler's second discovery pass) → comments
-(**done**). Note the Steam stats step depends on every member
+(**done**) → Complete our history (**done**). Note the Steam stats step depends on every member
 setting Steam privacy → *Game details* to Public, **and** unticking the separate
 "always keep my total playtime private"; `GetOwnedGames` returns an empty list for
 the first and a full list of zeroes for the second.
@@ -491,9 +491,12 @@ the first and a full list of zeroes for the second.
 
 ## Group hours
 
-`games.hours` is a number a human typed and **always wins**. `hours_estimated` is
-shown only in its absence, prefixed "≈", with `hours_participants` so a 2-of-4
-estimate is visibly weaker than a 4-of-4 one.
+`games.hours` is either a human answer or an explicitly accepted estimate snapshot,
+and **always wins**. Provenance keeps the latter visibly approximate. The live
+`hours_estimated` is shown only in its absence, prefixed "≈", with
+`hours_participants` so a 2-of-4 estimate is visibly weaker than a 4-of-4 one. Once
+accepted, it no longer borrows a later sync's participant count: it is labelled as
+a snapshot instead.
 
 The estimate is `min(minutes)` over members who played the game for at least an
 hour, and 0 below two of them. Steam exposes lifetime minutes per person and
@@ -540,7 +543,9 @@ evidence. No session state is persisted.
 ## Exports and achievements
 
 Only an owner can read `/api/g/:slug/export`. JSON is the lossless, versioned bundle
-of group, games, ratings, comments and members; CSV is one relation per download.
+of group, games, ratings, comments, members and shared-history provenance; CSV is
+one relation per download. Version 2 adds the `history` relation. Personal dismiss
+and snooze choices are deliberately not exported: they are UI state, not group data.
 CSV text beginning with a spreadsheet formula character is prefixed with an
 apostrophe, while JSON keeps the exact source text. Response serialization streams
 each row so a large group does not allocate a second group-sized output string.
@@ -735,16 +740,20 @@ own rows.
 
 ## Play dates
 
-`games.started` and `games.finished` are ISO dates typed by a human and, like `hours`,
-they always win. `games.finished_estimated` is derived.
+`games.started` and `games.finished` are stored as ISO dates. A member's edit is
+authoritative and records `source = manual`; accepting a suggestion stores its
+source separately so the UI keeps rendering it as an approximation. The same rule
+applies to `hours`. `games.finished_estimated` is derived and remains a suggestion.
 
 **Steam cannot tell you when a group started a game.** `GetOwnedGames` returns
 `playtime_forever` and `rtime_last_played` and nothing else time-shaped — checked
 against the live API, whose per-row keys are exactly `appid, name, playtime_forever,
 img_icon_url, playtime_windows/mac/linux/deck_forever, rtime_last_played,
 content_descriptorids, playtime_disconnected`. No first-played, no acquired, no
-purchase date. So a start date is manual, always, and the UI says so rather than
-leaving people hunting for a sync button that cannot exist.
+purchase date. There is therefore no automatic *exact* start date. The history card
+can offer the earliest synced achievement as proof the group had played by that day,
+or the Steam release date as a low-confidence fallback. Both render with `≈` and
+their source; the UI never calls either one the group's actual first session.
 
 The **end** is partly derivable. `finished_estimated` is the **latest**
 `rtime_last_played` across participants — a `max`, where the hours estimate is a
@@ -761,6 +770,33 @@ permanently null for every group. That means it is *not* "when the group finishe
 it is the latest play date we can see, which is a good prompt for typing the real one,
 and the UI says exactly that rather than dressing one person's timestamp up as the
 group's. Shown only when nobody has typed `finished`.
+
+## Complete our history
+
+The Library asks one missing fact at a time for non-backlog, non-archived games:
+first played, total group hours, and last played. A rating, at least one personal
+Steam hour, or being the person who added the game moves a prompt earlier because
+that member is more likely to remember; it never changes who is allowed to edit.
+Someone who marked **I didn't play this** is not prompted for that game.
+
+Only first played is requested while a game is still `playing`. Group hours and
+last played would become stale after the next session, so those wait until the game
+leaves that status. Automatic suggestions are intentionally bounded:
+
+- first played: earliest synced achievement, otherwise Steam release date;
+- hours: the existing minimum-playtime estimate, only with at least two participants;
+- last played: the later of Steam's visible last-play estimate and the latest synced
+  achievement.
+
+Accepting a suggestion recomputes it on the server and ignores any value supplied by
+the browser. The fact, provenance and stale-nudge cleanup are one transactional D1
+batch. Manual edits replace the provenance with `manual`. **Remind me next week**
+and **I don't know** are per-member states, so one person's dismissal cannot suppress
+a question for the rest of the group; filling the shared fact removes it for all.
+
+`game_fact_sources` and `history_nudges` arrive in migration 023. Migration 022's
+17 owner-approved release-date fallbacks for `g4m1ng` are backfilled as
+`release-date`, so they are not retroactively presented as recalled dates.
 
 ## The Library's default view
 

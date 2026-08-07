@@ -11,6 +11,10 @@ const TABLES = {
     ],
     sql: 'SELECT * FROM games WHERE group_id = ? ORDER BY id',
   },
+  history: {
+    columns: ['group_id', 'game_id', 'field', 'source', 'set_by', 'updated_at'],
+    sql: 'SELECT * FROM game_fact_sources WHERE group_id = ? ORDER BY game_id, field',
+  },
   ratings: {
     columns: ['game_id', 'steam_id', 'score', 'comment', 'updated_at'],
     sql: `SELECT r.* FROM ratings r JOIN games g ON g.id = r.game_id
@@ -62,7 +66,7 @@ export async function onRequestGet({ request, env, data }) {
   ]);
   const dataTables = Object.fromEntries(Object.keys(TABLES).map((name, i) => [name, results[i].results || []]));
   const exported = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     group,
     ...dataTables,

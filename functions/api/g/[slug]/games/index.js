@@ -25,7 +25,7 @@ function cleanGameInput(status, maxPlayers, genre) {
 export async function onRequestGet({ env, data }) {
   const gid = data.group.group_id;
 
-  const [gamesRes, ratingsRes, membersRes, notPlayedRes] = await Promise.all([
+  const [gamesRes, ratingsRes, membersRes, notPlayedRes, factSourcesRes] = await Promise.all([
     // LEFT JOIN the global catalogue for Steam's own review verdict and count.
     // Left, not inner: a hand-added game may have no catalogue row, and it must
     // still appear. The group's own columns win — a group can correct a player
@@ -68,6 +68,15 @@ export async function onRequestGet({ env, data }) {
          JOIN games g ON g.id = s.game_id
         WHERE g.group_id = ?`
     ).bind(gid).all(),
+    env.DB.prepare(
+      `SELECT f.game_id, f.field, f.source, f.set_by, f.updated_at,
+              COALESCE(m.short_name, u.display_name) AS set_by_name
+         FROM game_fact_sources f
+         LEFT JOIN memberships m
+                ON m.group_id = f.group_id AND m.steam_id = f.set_by
+         LEFT JOIN users u ON u.steam_id = f.set_by
+        WHERE f.group_id = ?`
+    ).bind(gid).all(),
   ]);
 
   const ratings = ratingsRes.results || [];
@@ -93,6 +102,17 @@ export async function onRequestGet({ env, data }) {
     }
   }
 
+  const factSources = new Map();
+  for (const source of factSourcesRes.results || []) {
+    if (!factSources.has(source.game_id)) factSources.set(source.game_id, {});
+    factSources.get(source.game_id)[source.field] = {
+      source: source.source,
+      setBy: source.set_by,
+      setByName: source.set_by_name,
+      updatedAt: source.updated_at,
+    };
+  }
+
   const need = data.group.max_players;
   const gameRows = gamesRes.results || [];
   const memberRows = membersRes.results || [];
@@ -106,6 +126,7 @@ export async function onRequestGet({ env, data }) {
       ...scoreGame(votes),
       notPlayed: satOut.get(g.id) || [],
       mySkip: mine.get(g.id) || null,
+      factSources: factSources.get(g.id) || {},
       ownership: ownership.byGame.get(g.id) || {},
       viability: viability(g, need),
     };

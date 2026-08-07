@@ -6,6 +6,7 @@ const EDITABLE = [
   'coop_note', 'hours', 'started', 'finished', 'notes',
 ];
 const STATUSES = ['backlog', 'playing', 'finished', 'unfinished', 'dropped', 'sampled'];
+const HISTORY_FIELDS = new Set(['hours', 'started', 'finished']);
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const validDay = (value) => {
   const day = String(value);
@@ -18,10 +19,17 @@ const validDay = (value) => {
 export async function onRequestPatch({ params, request, env, data }) {
   const id = Number(params.id);
   if (!Number.isInteger(id)) return bad('bad id');
+  const gid = data.group.group_id;
+
+  const prior = await env.DB.prepare(
+    'SELECT hours, started, finished FROM games WHERE id = ? AND group_id = ?'
+  ).bind(id, gid).first();
+  if (!prior) return bad('no such game', 404);
 
   const patch = await body(request);
   const sets = [];
   const vals = [];
+  const historyNext = new Map();
 
   // Archive state is a boolean over the wire and a timestamp in the column, so it
   // cannot ride along in EDITABLE with the plain passthrough fields.
@@ -41,7 +49,7 @@ export async function onRequestPatch({ params, request, env, data }) {
     if (who !== null) {
       const member = await env.DB.prepare(
         'SELECT 1 FROM memberships WHERE group_id = ? AND steam_id = ?'
-      ).bind(data.group.group_id, String(who)).first();
+      ).bind(gid, String(who)).first();
       if (!member) return bad('that person is not in this group', 400);
     }
     sets.push('added_by = ?');
@@ -73,19 +81,44 @@ export async function onRequestPatch({ params, request, env, data }) {
     if (k === 'notes' && patch[k] != null && String(patch[k]).length > 5000) return bad('notes must be under 5000 characters');
     if ((k === 'started' || k === 'finished') && patch[k] != null && patch[k] !== ''
         && !validDay(patch[k])) return bad(`${k} must be a real ISO date`);
+    const value = patch[k] === '' ? null
+      : ['max_players', 'min_session_minutes', 'hours'].includes(k) && patch[k] !== null
+        ? Number(patch[k]) : patch[k];
     sets.push(`${k} = ?`);
-    vals.push(patch[k] === '' ? null : ['max_players', 'min_session_minutes', 'hours'].includes(k) && patch[k] !== null
-      ? Number(patch[k]) : patch[k]);
+    vals.push(value);
+    if (HISTORY_FIELDS.has(k)) historyNext.set(k, value);
   }
   if (!sets.length) return bad('nothing to update');
 
-  vals.push(id, data.group.group_id);
-  const res = await env.DB.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ? AND group_id = ?`)
-    .bind(...vals).run();
-  if (!res.meta.changes) return bad('no such game', 404);
+  vals.push(id, gid);
+  const statements = [
+    env.DB.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ? AND group_id = ?`).bind(...vals),
+  ];
+  for (const [field, value] of historyNext) {
+    // The detail form submits all three history inputs on every save. Preserve an
+    // approximate source when its value did not change, or editing the genre would
+    // silently relabel a release-date fallback as somebody's recollection.
+    if (prior[field] === value) continue;
+    if (value == null) {
+      statements.push(env.DB.prepare(
+        'DELETE FROM game_fact_sources WHERE group_id = ? AND game_id = ? AND field = ?'
+      ).bind(gid, id, field));
+    } else {
+      statements.push(env.DB.prepare(
+        `INSERT INTO game_fact_sources (group_id, game_id, field, source, set_by, updated_at)
+         VALUES (?,?,?,'manual',?,unixepoch())
+         ON CONFLICT(group_id, game_id, field) DO UPDATE SET
+           source = 'manual', set_by = excluded.set_by, updated_at = unixepoch()`
+      ).bind(gid, id, field, data.user.steam_id));
+    }
+    statements.push(env.DB.prepare(
+      'DELETE FROM history_nudges WHERE group_id = ? AND game_id = ? AND field = ?'
+    ).bind(gid, id, field));
+  }
+  await env.DB.batch(statements);
 
   const row = await env.DB.prepare('SELECT * FROM games WHERE id = ? AND group_id = ?')
-    .bind(id, data.group.group_id).first();
+    .bind(id, gid).first();
   return json({ ok: true, game: row });
 }
 

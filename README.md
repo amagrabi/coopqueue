@@ -38,7 +38,11 @@ attendees' ratings.
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
 Filterable by whose votes a game already has, by group score, and by whether
-anyone has logged hours.
+anyone has logged hours. A one-question-at-a-time **Complete our history** card
+finds missing first-played, last-played and group-hours facts for games the group
+has actually played. It asks likely participants first, offers clearly marked
+Steam/release-date approximations when there is honest evidence, and lets each
+person answer, defer or dismiss a prompt without hiding it from everyone else.
 
 **Find games.** The most-reviewed online co-op games on Steam, as a global
 catalogue, defaulting to a **Recommended for us** order built from your group's
@@ -66,8 +70,8 @@ achievement progress one game at a time, then the group sees its combined progre
 fresh unlocks and achievements that are one person short of a clean sweep.
 
 **Group.** Members, invite links you can rotate or disable, the headcount that
-drives the viability check, and owner-only JSON or per-table CSV exports before a
-group is permanently deleted.
+drives the viability check, and owner-only JSON or per-table CSV exports — including
+history provenance — before a group is permanently deleted.
 
 ### The scoring model
 
@@ -229,7 +233,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 139 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 145 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -257,6 +261,7 @@ functions/
       _middleware.js             THE TENANCY BOUNDARY — membership or 404
       games/index.js             GET the group library with scores · POST add
       games/[id].js              PATCH · DELETE · PUT to link a Steam appid
+      history.js                 shared-history cleanup prompts
       play-night.js              session-specific shortlist
       export.js                  owner-only JSON and CSV downloads
       achievements.js            cached per-game Trophy relay
@@ -264,6 +269,7 @@ functions/
 lib/
   auth.js      HMAC-signed cookie sessions, optional signup allowlist
   groups.js    slugs, invite codes, membership lookup
+  history.js   missing-fact prompts and bounded automatic suggestions
   score.js     plain-mean scoring + viability
   ownership.js three-state Steam-library ownership
   steam.js     Steam Web API and store endpoints, cache-first
@@ -356,7 +362,8 @@ account; the existing group, member, and game caps remain the longer-term guardr
 ## What's next
 
 Steam playtime/ownership sync, Play Night, group exports, per-game achievement
-progress, comments, archiving and the recommender are **done**. Still open,
+progress, Complete our history, comments, archiving and the recommender are
+**done**. Still open,
 roughly in value order:
 
 - **Scheduled D1 backups** via a cron trigger running `d1 export`. The free tier

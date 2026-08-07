@@ -18,6 +18,7 @@ const state = {
   qIndex: 0,
   rateMode: 'played',   // 'played' | 'want' — see renderQueue
   playNight: null,      // server-ranked session shortlist, or null for group ranking
+  history: null,        // current member's missing shared-history facts
   view: 'queue',
   cache: {},
 };
@@ -317,6 +318,7 @@ window.addEventListener('hashchange', () => {
 });
 
 let groupLoadSeq = 0;
+let historySeq = 0;
 
 async function loadGroup(expectedSlug = state.group?.slug) {
   if (!expectedSlug) return false;
@@ -336,6 +338,8 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.model = lib.model;
   state.queue = q.queue;
   state.playNight = null;
+  state.history = null;
+  historySeq++;
   invalidateViewCache();
   browseSeq++;
   browse.page = 0;
@@ -461,7 +465,10 @@ function setView(view) {
     }
   });
   $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
-  ({ queue: renderQueue, next: renderNext, library: renderLibrary,
+  ({ queue: renderQueue, next: renderNext, library: () => {
+       renderLibrary();
+       void loadHistory();
+     },
      browse: () => renderBrowse(true), stats: renderStats, members: renderMembers }[view])();
 }
 
@@ -600,15 +607,39 @@ const gameById = (id) => state.games.find((g) => g.id === id);
  */
 /**
  * Which hours figure to show, and whether it is a measurement or a bound.
- * A number a human typed always wins; the estimate is an upper bound on time
- * played together, so it is marked with "≈" and carries how many people it was
- * taken over. Never present the two as the same kind of thing.
+ * A saved number wins; its provenance says whether it was typed or accepted from
+ * an estimate. Live estimates are upper bounds and carry their participant count.
+ * An accepted estimate is a snapshot, so never relabel it with a later sync's count.
  */
+const APPROXIMATE_FACT_SOURCES = new Set([
+  'release-date', 'steam-hours', 'steam-last-played', 'achievement',
+]);
+const FACT_SOURCE_LABEL = {
+  manual: 'Entered by the group',
+  'release-date': 'Steam release-date fallback',
+  'steam-hours': 'Steam group-hours estimate',
+  'steam-last-played': 'Latest play Steam exposes',
+  achievement: 'Steam achievement evidence',
+};
+const factSource = (g, field) => g.factSources?.[field] || null;
+const factIsApproximate = (g, field) =>
+  APPROXIMATE_FACT_SOURCES.has(factSource(g, field)?.source);
+const factSourceHelp = (g, field) => {
+  const fact = factSource(g, field);
+  if (!fact) return '';
+  const label = FACT_SOURCE_LABEL[fact.source] || 'Recorded source';
+  const who = fact.setByName
+    ? ` · ${fact.source === 'manual' ? 'entered' : 'accepted'} by ${esc(fact.setByName)}`
+    : '';
+  return `<p class="field-help fact-source${factIsApproximate(g, field) ? ' is-approx' : ''}">
+    ${factIsApproximate(g, field) ? 'Approximate · ' : ''}${esc(label)}${who}.
+  </p>`;
+};
+
 /* When the group finished, on the same rule as hours: a typed date always wins, an
-   estimate is shown with "≈". Steam has no first-played field of any kind, so
-   `started` has no estimate to fall back on and is manual or nothing. */
+   accepted Steam suggestion keeps its approximate marker and provenance. */
 const endedOn = (g) => {
-  if (g.finished) return { value: g.finished, manual: true };
+  if (g.finished) return { value: g.finished, manual: !factIsApproximate(g, 'finished') };
   if (g.finished_estimated) return { value: g.finished_estimated, manual: false };
   return { value: null, manual: false };
 };
@@ -621,7 +652,15 @@ const shortDate = (iso) => {
 };
 
 const hoursOf = (g) => {
-  if (g.hours != null) return { value: g.hours, manual: true };
+  if (g.hours != null) {
+    const approximate = factIsApproximate(g, 'hours');
+    return {
+      value: g.hours,
+      manual: !approximate,
+      accepted: approximate,
+      participants: approximate ? null : g.hours_participants ?? 0,
+    };
+  }
   if (g.hours_estimated != null) {
     return { value: g.hours_estimated, manual: false, participants: g.hours_participants ?? 0 };
   }
@@ -1254,6 +1293,100 @@ function renderMyCoverage() {
   box.hidden = false;
 }
 
+const HISTORY_FIELD_LABEL = {
+  started: 'First played', finished: 'Last played', hours: 'Hours together',
+};
+
+async function loadHistory(force = false) {
+  const slug = state.group?.slug;
+  if (!slug || state.view !== 'library') return;
+  if (state.history && !force) { renderHistoryCard(); return; }
+  const seq = ++historySeq;
+  try {
+    const history = await gapiFor(slug, '/history');
+    if (seq !== historySeq || state.group?.slug !== slug || state.view !== 'library') return;
+    state.history = history;
+    renderHistoryCard();
+  } catch (e) {
+    if (seq === historySeq && state.group?.slug === slug && state.view === 'library') toast(e.message);
+  }
+}
+
+function renderHistoryCard() {
+  const box = $('#history-card');
+  const item = state.history?.items?.[0];
+  if (!item) { box.hidden = true; return; }
+  box.hidden = false;
+  const total = Number(state.history.total) || 0;
+  $('#history-count').textContent = `${total} gap${total === 1 ? '' : 's'} for you`;
+  const suggestion = item.suggestion;
+  const value = suggestion
+    ? item.field === 'hours'
+      ? `≈${fmt(suggestion.value, 1)} hours`
+      : shortDate(suggestion.value)
+    : null;
+  const acceptLabel = suggestion
+    ? item.field === 'hours' ? `Use ≈${fmt(suggestion.value, 1)} h`
+      : suggestion.source === 'release-date' ? `Use release date · ${shortDate(suggestion.value)}`
+      : `Use as approximate · ${shortDate(suggestion.value)}`
+    : '';
+
+  $('#history-prompt').innerHTML = `
+    <div class="history-item">
+      ${item.image
+        ? `<img class="history-art" src="${esc(item.image)}" alt="" loading="lazy" decoding="async">`
+        : '<span class="history-art history-art-none" aria-hidden="true">?</span>'}
+      <div class="history-copy">
+        <div class="rank-meta">
+          <span class="chip">${esc(HISTORY_FIELD_LABEL[item.field])}</span>
+          ${suggestion ? `<span class="chip chip-warn">Approximate suggestion</span>` : ''}
+        </div>
+        <h4>${esc(item.game)}</h4>
+        <p>${esc(item.prompt)}</p>
+        ${suggestion ? `<div class="history-suggestion">
+          <strong>${esc(value)}</strong>
+          <span>${esc(suggestion.label)} · ${esc(suggestion.detail)}</span>
+        </div>` : `<p class="history-no-suggestion">No trustworthy automatic suggestion is available.</p>`}
+        ${item.likely ? '<p class="history-target">You rated, played, or added this game, so it came to you first.</p>' : ''}
+      </div>
+    </div>
+    <div class="history-actions">
+      ${suggestion ? `<button class="btn btn-primary" id="history-accept">${esc(acceptLabel)}</button>` : ''}
+      <button class="btn${suggestion ? '' : ' btn-primary'}" id="history-edit">Enter a value</button>
+      <button class="btn btn-ghost" id="history-snooze">Remind me next week</button>
+      <button class="btn btn-ghost" id="history-dismiss">I don't know</button>
+    </div>`;
+
+  $('#history-accept')?.addEventListener('click', () => historyAction('accept'));
+  $('#history-edit').addEventListener('click', () => openDetail(item.gameId, item.field));
+  $('#history-snooze').addEventListener('click', () => historyAction('snooze'));
+  $('#history-dismiss').addEventListener('click', () => historyAction('dismiss'));
+}
+
+async function historyAction(action) {
+  const item = state.history?.items?.[0];
+  const slug = state.group?.slug;
+  if (!item || !slug) return;
+  $$('#history-card button').forEach((button) => { button.disabled = true; });
+  try {
+    await gapiFor(slug, '/history', {
+      method: 'POST', body: { gameId: item.gameId, field: item.field, action },
+    });
+    if (state.group?.slug !== slug) return;
+    if (action === 'accept') {
+      if (!await reloadGroupView(slug, 'library')) return;
+      toast(`${HISTORY_FIELD_LABEL[item.field]} saved as an approximate value`);
+      return;
+    }
+    state.history = null;
+    await loadHistory(true);
+    toast(action === 'snooze' ? 'I’ll ask again next week' : 'Left for somebody else to answer');
+  } catch (e) {
+    toast(e.message);
+    renderHistoryCard();
+  }
+}
+
 function renderLibrary() {
   $('#lib-reset').hidden = libIsDefault();
   const q = $('#lib-search').value.trim().toLowerCase();
@@ -1344,14 +1477,18 @@ function renderLibrary() {
       <td class="c-num c-avg cell-strong">${fmt(g.raw, 1)}</td>
       <td class="c-num c-votes">${g.n || '–'}</td>
       <td class="c-date">${g.started
-        ? `<span title="Started ${esc(g.started)}">${esc(shortDate(g.started))}</span>`
+        ? `<span${factIsApproximate(g, 'started') ? ' class="est"' : ''}
+             title="${factIsApproximate(g, 'started') ? 'Approximate · ' : ''}Started ${esc(g.started)}">${
+               factIsApproximate(g, 'started') ? '≈' : ''}${esc(shortDate(g.started))}</span>`
         : '–'}</td>
       <td class="c-num c-hours">${(() => {
         const h = hoursOf(g);
         if (!h.value) return '–';
         return h.manual
           ? fmt(h.value, 0)
-          : `<span class="est" title="Estimated: the smallest playtime among the ${h.participants} of you who played it. An upper bound on time played together, not a measurement.">≈${fmt(h.value, 0)}</span>`;
+          : h.accepted
+            ? `<span class="est" title="Approximate: accepted from an earlier Steam group-hours estimate. A snapshot, not a measurement.">≈${fmt(h.value, 0)}</span>`
+            : `<span class="est" title="Estimated: the smallest playtime among the ${h.participants} of you who played it. An upper bound on time played together, not a measurement.">≈${fmt(h.value, 0)}</span>`;
       })()}</td>
     </tr>`).join('');
 
@@ -1597,7 +1734,7 @@ async function renderMembers() {
       <div class="export-links" aria-label="Download group backup">
         <a class="btn btn-sm" href="/api/g/${encodeURIComponent(slug)}/export?format=json">Download JSON backup</a>
         <span>CSV:</span>
-        ${['games', 'ratings', 'comments', 'members'].map((table) =>
+        ${['games', 'history', 'ratings', 'comments', 'members'].map((table) =>
           `<a href="/api/g/${encodeURIComponent(slug)}/export?format=csv&table=${table}">${table}</a>`).join(' · ')}
       </div>
       <label class="field">
@@ -2018,7 +2155,7 @@ async function addFromCatalogue(btn) {
 /* ══════════════════════════════ DETAIL ════════════════════════════════ */
 let detailGameId = null;
 
-function openDetail(id) {
+function openDetail(id, focusField = null) {
   const g = gameById(id);
   if (!g) return;
   const slug = state.group.slug;
@@ -2079,6 +2216,7 @@ function openDetail(id) {
         <div class="detail-field">
           <label for="d-hours">Hours played</label>
           <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
+          ${factSourceHelp(g, 'hours')}
         </div>
       </div>
       <div class="detail-field">
@@ -2091,6 +2229,7 @@ function openDetail(id) {
         <div class="detail-field">
           <label for="d-started">First played</label>
           <input id="d-started" class="input" type="date" value="${esc(g.started || '')}">
+          ${factSourceHelp(g, 'started')}
         </div>
         <div class="detail-field">
           <label for="d-finished">Last played</label>
@@ -2101,11 +2240,12 @@ function openDetail(id) {
               <b>${esc(shortDate(g.finished_estimated))}</b> — Steam only reports that for
               the account the API key belongs to, so treat it as a prompt rather than
               the group's answer. Typing a date here replaces it.</p>`}
+          ${factSourceHelp(g, 'finished')}
         </div>
       </div>
-      ${g.started ? '' : `<p class="field-help">Steam publishes no first-played date for
-        anything — only how long you have played and when you last did — so a start
-        date has to be typed in.</p>`}
+      ${g.started ? '' : `<p class="field-help">Steam publishes no first-played date.
+        A release date or earliest achievement can only be an approximate prompt;
+        enter what the group remembers when you can.</p>`}
 
       <div class="detail-field">
         <label for="d-addedby">Added by</label>
@@ -2225,6 +2365,7 @@ function openDetail(id) {
   });
 
   $('#detail-dialog').showModal();
+  if (focusField) requestAnimationFrame(() => $(`#d-${focusField}`)?.focus());
 }
 
 async function loadAchievements(gameId, slug = state.group.slug) {

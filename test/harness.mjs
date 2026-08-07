@@ -17,6 +17,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
 import { recommend } from '../lib/recommend.js';
 import { classifyCoop } from '../lib/coop.js';
+import { buildHistoryItems } from '../lib/history.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
@@ -148,6 +149,14 @@ db.exec(`UPDATE games SET started = date('now', '-' || (id % 20) || ' months')
           WHERE group_id=1 AND id % 3 = 0`);
 db.exec(`UPDATE games SET finished_estimated = date('now', '-' || (id % 9) || ' months')
           WHERE group_id=1 AND id % 6 = 0`);
+// A deterministic mix of trustworthy prompts and manual-only gaps for the
+// Complete our history card. The route still computes the queue from real rows.
+db.exec(`UPDATE games SET started=NULL, release_date='2 Feb, 2021'
+          WHERE id = (SELECT id FROM games WHERE group_id=1 AND status='finished' ORDER BY id LIMIT 1)`);
+db.exec(`UPDATE games SET hours=NULL, hours_estimated=21.5, hours_participants=3
+          WHERE id = (SELECT id FROM games WHERE group_id=1 AND status='finished' ORDER BY id LIMIT 1 OFFSET 1)`);
+db.exec(`UPDATE games SET finished=NULL, finished_estimated=date('now','-2 months')
+          WHERE id = (SELECT id FROM games WHERE group_id=1 AND status='finished' ORDER BY id LIMIT 1 OFFSET 2)`);
 
 /* Imported spreadsheet notes now live in the comment thread under an `import:<group>`
    identity with no membership — mirror migration 019 so the local thread shows what
@@ -254,6 +263,20 @@ function libraryFor(gid, need) {
     `SELECT p.steam_id, p.appid FROM playtime p
        JOIN games g ON g.steam_appid=p.appid AND g.group_id=?`, gid)
     .map((row) => `${row.steam_id}:${row.appid}`));
+  const factSources = new Map();
+  for (const source of q(
+    `SELECT f.game_id, f.field, f.source, f.set_by, f.updated_at,
+            COALESCE(m.short_name,u.display_name) AS set_by_name
+       FROM game_fact_sources f
+       LEFT JOIN memberships m ON m.group_id=f.group_id AND m.steam_id=f.set_by
+       LEFT JOIN users u ON u.steam_id=f.set_by
+      WHERE f.group_id=?`, gid)) {
+    if (!factSources.has(source.game_id)) factSources.set(source.game_id, {});
+    factSources.get(source.game_id)[source.field] = {
+      source: source.source, setBy: source.set_by,
+      setByName: source.set_by_name, updatedAt: source.updated_at,
+    };
+  }
   const cal = calibrate(ratings), glob = globalStats(ratings);
   const byGame = new Map();
   for (const r of ratings) { if (!byGame.has(r.game_id)) byGame.set(r.game_id, []); byGame.get(r.game_id).push(r); }
@@ -281,9 +304,41 @@ function libraryFor(gid, need) {
       }));
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
                comments: [], ...scoreGame(votes), notPlayed: satOut.get(g.id) || [],
-               mySkip: mySkips.get(g.id) || null, ownership, viability: viability(g, need) };
+               mySkip: mySkips.get(g.id) || null, factSources: factSources.get(g.id) || {},
+               ownership, viability: viability(g, need) };
     }),
   };
+}
+
+function historyFor(gid, includeNudges = true) {
+  const games = q(
+    `SELECT g.id, g.name, g.status, g.header_image, g.steam_appid, g.release_date,
+            g.started, g.hours, g.hours_estimated, g.hours_participants,
+            g.finished, g.finished_estimated, g.archived_at,
+            r.score AS my_rating, p.minutes AS my_minutes,
+            CASE WHEN g.added_by=?2 THEN 1 ELSE 0 END AS i_added,
+            COALESCE(s.not_played,0) AS sat_out
+       FROM games g
+       LEFT JOIN ratings r ON r.game_id=g.id AND r.steam_id=?2
+       LEFT JOIN playtime p ON p.appid=g.steam_appid AND p.steam_id=?2
+       LEFT JOIN skips s ON s.game_id=g.id AND s.steam_id=?2
+      WHERE g.group_id=?1 AND g.archived_at IS NULL AND g.status<>'backlog'`, gid, ME);
+  const achievements = q(
+    `WITH accounts(steam_id) AS (
+       SELECT steam_id FROM memberships WHERE group_id=?1 AND is_seed=0
+       UNION
+       SELECT a.steam_id FROM seed_assignments a JOIN memberships m
+         ON m.group_id=a.group_id AND m.steam_id=a.seed_steam_id WHERE a.group_id=?1
+     )
+     SELECT p.appid,p.unlocked FROM achievement_progress p
+       JOIN accounts a ON a.steam_id=p.steam_id
+       JOIN games g ON g.steam_appid=p.appid AND g.group_id=?1
+      WHERE g.archived_at IS NULL`, gid);
+  const nudges = includeNudges ? q(
+    'SELECT game_id,field,state,snoozed_until FROM history_nudges WHERE group_id=? AND steam_id=?',
+    gid, ME) : [];
+  const items = buildHistoryItems(games, achievements, nudges);
+  return { total: items.length, items: items.slice(0, 20) };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -366,6 +421,45 @@ const server = http.createServer(async (req, res) => {
                  blindRating: !!ctx.blind_rating },
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
+    }
+    if (sub === '/history' && req.method === 'GET') {
+      return send(res, 200, historyFor(gid));
+    }
+    if (sub === '/history' && req.method === 'POST') {
+      const b = await readBody(req);
+      const gameId = Number(b.gameId);
+      const field = String(b.field || '');
+      const action = String(b.action || '');
+      const column = { started: 'started', finished: 'finished', hours: 'hours' }[field];
+      if (!Number.isInteger(gameId) || !column) return send(res, 400, { error: 'bad history field' });
+      if (!one('SELECT 1 AS x FROM games WHERE id=? AND group_id=?', gameId, gid)) {
+        return send(res, 404, { error: 'no such game' });
+      }
+      const item = historyFor(gid, false).items
+        .find((candidate) => candidate.gameId === gameId && candidate.field === field);
+      if (!item) return send(res, 409, { error: 'that history field no longer needs a prompt' });
+      if (action === 'dismiss' || action === 'snooze') {
+        const until = action === 'snooze' ? Math.floor(Date.now() / 1000) + 7 * 86400 : null;
+        db.prepare(`INSERT INTO history_nudges
+          (group_id,game_id,field,steam_id,state,snoozed_until,updated_at)
+          VALUES (?,?,?,?,?,?,unixepoch())
+          ON CONFLICT(group_id,game_id,field,steam_id) DO UPDATE SET
+            state=excluded.state,snoozed_until=excluded.snoozed_until,updated_at=unixepoch()`)
+          .run(gid, gameId, field, ME, action === 'snooze' ? 'snoozed' : 'dismissed', until);
+        return send(res, 200, { ok: true, action });
+      }
+      if (action !== 'accept') return send(res, 400, { error: 'bad history action' });
+      if (!item.suggestion) return send(res, 409, { error: 'there is no automatic suggestion' });
+      db.prepare(`UPDATE games SET ${column}=? WHERE id=? AND group_id=? AND ${column} IS NULL`)
+        .run(item.suggestion.value, gameId, gid);
+      db.prepare(`INSERT INTO game_fact_sources (group_id,game_id,field,source,set_by,updated_at)
+                  VALUES (?,?,?,?,?,unixepoch())
+                  ON CONFLICT(group_id,game_id,field) DO UPDATE SET
+                    source=excluded.source,set_by=excluded.set_by,updated_at=unixepoch()`)
+        .run(gid, gameId, field, item.suggestion.source, ME);
+      db.prepare('DELETE FROM history_nudges WHERE group_id=? AND game_id=? AND field=?')
+        .run(gid, gameId, field);
+      return send(res, 200, { ok: true, action: 'accept' });
     }
     if (sub === '/playtime' && req.method === 'GET') {
       const rows = q(`SELECT m.steam_id, m.short_name, m.is_seed,
@@ -538,6 +632,8 @@ const server = http.createServer(async (req, res) => {
     if (gm2 && req.method === 'PATCH') {
       const id = Number(gm2[1]);
       const b = await readBody(req);
+      const prior = one('SELECT hours,started,finished FROM games WHERE id=? AND group_id=?', id, gid);
+      if (!prior) return send(res, 404, { error: 'no such game' });
       if ('archived' in b) {
         db.prepare('UPDATE games SET archived_at=? WHERE id=? AND group_id=?')
           .run(b.archived ? Math.floor(Date.now() / 1000) : null, id, gid);
@@ -551,10 +647,24 @@ const server = http.createServer(async (req, res) => {
         }
         db.prepare('UPDATE games SET added_by=? WHERE id=? AND group_id=?').run(who, id, gid);
       }
-      for (const k of ['status', 'genre', 'hours', 'max_players', 'min_session_minutes', 'name']) {
+      for (const k of ['status', 'genre', 'hours', 'started', 'finished',
+                       'max_players', 'min_session_minutes', 'name']) {
         if (!(k in b)) continue;
-        db.prepare(`UPDATE games SET ${k}=? WHERE id=? AND group_id=?`)
-          .run(b[k] === '' ? null : b[k], id, gid);
+        const value = b[k] === '' ? null : b[k];
+        db.prepare(`UPDATE games SET ${k}=? WHERE id=? AND group_id=?`).run(value, id, gid);
+        if (!['hours', 'started', 'finished'].includes(k) || prior[k] === value) continue;
+        if (value == null) {
+          db.prepare('DELETE FROM game_fact_sources WHERE group_id=? AND game_id=? AND field=?')
+            .run(gid, id, k);
+        } else {
+          db.prepare(`INSERT INTO game_fact_sources (group_id,game_id,field,source,set_by,updated_at)
+                      VALUES (?,?,?,'manual',?,unixepoch())
+                      ON CONFLICT(group_id,game_id,field) DO UPDATE SET
+                        source='manual',set_by=excluded.set_by,updated_at=unixepoch()`)
+            .run(gid, id, k, ME);
+        }
+        db.prepare('DELETE FROM history_nudges WHERE group_id=? AND game_id=? AND field=?')
+          .run(gid, id, k);
       }
       return send(res, 200, { ok: true });
     }

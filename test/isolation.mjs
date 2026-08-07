@@ -46,7 +46,8 @@ const DB = makeDB(sqlite);
 const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
-       commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute] = await Promise.all([
+       commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute,
+       historyRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -61,9 +62,11 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/export.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/play-night.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/achievements.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/history.js')),
 ]);
 const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
 const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
+const { buildHistoryItems } = await import(path.join(SITE, 'lib/history.js'));
 
 const user = (id) => sqlite.prepare('SELECT * FROM users WHERE steam_id=?').get(id);
 const ctxFor = async (steamId, slug) => {
@@ -680,6 +683,103 @@ await check('session length accepts a real range and rejects invented values', a
     || `bad ${badPatch.status}, good ${goodPatch.status}, value ${value}`;
 });
 
+sqlite.exec(`INSERT INTO games
+  (id,group_id,name,status,release_date,hours_estimated,hours_participants,finished_estimated)
+  VALUES
+  (8300,1,'AAA History Fixture','finished','2 Feb, 2021',12.5,3,'2024-05-01'),
+  (8301,2,'Foreign History','finished','3 Mar, 2022',8,2,'2024-06-01')`);
+sqlite.exec(`INSERT OR REPLACE INTO ratings (game_id,steam_id,score) VALUES (8300,'${ALICE}',8)`);
+
+await check('history suggestions use bounded evidence and leave moving facts alone', async () => {
+  const epoch = (day) => Date.parse(`${day}T12:00:00Z`) / 1000;
+  const games = [{
+    id: 1, name: 'Finished', status: 'finished', steam_appid: 42,
+    release_date: '2 Feb, 2021', hours_estimated: 12.5, hours_participants: 3,
+    finished_estimated: '2024-03-01', my_rating: 8,
+  }, {
+    id: 2, name: 'Still playing', status: 'playing', steam_appid: 43,
+    release_date: '3 Mar, 2022', hours_estimated: 20, hours_participants: 4,
+    finished_estimated: '2024-04-01', my_rating: 7,
+  }];
+  const achievements = [{
+    appid: 42,
+    unlocked: JSON.stringify([
+      { unlocktime: epoch('2021-03-01') }, { unlocktime: epoch('2024-04-01') },
+    ]),
+  }];
+  const items = buildHistoryItems(games, achievements, [], Date.parse('2025-01-01T00:00:00Z'));
+  const finished = Object.fromEntries(items.filter((item) => item.gameId === 1)
+    .map((item) => [item.field, item.suggestion]));
+  const moving = items.filter((item) => item.gameId === 2).map((item) => item.field);
+  return (finished.started?.source === 'achievement' && finished.started.value === '2021-03-01'
+      && finished.hours?.source === 'steam-hours'
+      && finished.finished?.source === 'achievement' && finished.finished.value === '2024-04-01'
+      && moving.length === 1 && moving[0] === 'started')
+    || JSON.stringify({ finished, moving });
+});
+
+await check('history prompts are targeted and never leak another group', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const view = await (await historyRoute.onRequestGet({ env, data })).json();
+  const own = view.items.filter((item) => item.gameId === 8300);
+  return (own.length >= 1 && own[0].likely && !view.items.some((item) => item.gameId === 8301))
+    || `own ${own.length}, foreign ${view.items.some((item) => item.gameId === 8301)}`;
+});
+
+await check('a history suggestion cannot update a foreign game id', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await historyRoute.onRequestPost({
+    request: req({ gameId: 8301, field: 'started', action: 'accept' }), env, data,
+  });
+  const row = sqlite.prepare('SELECT started FROM games WHERE id=8301').get();
+  return (r.status === 404 && row.started == null) || `status ${r.status}, started ${row.started}`;
+});
+
+await check("'I don't know' is personal, not a group-wide dismissal", async () => {
+  const alice = await ctxFor(ALICE, 'g4m1ng');
+  const mallory = await ctxFor(MALLORY, 'g4m1ng');
+  const r = await historyRoute.onRequestPost({
+    request: req({ gameId: 8300, field: 'hours', action: 'dismiss' }), env, data: alice.data,
+  });
+  const mine = sqlite.prepare(
+    'SELECT state FROM history_nudges WHERE group_id=1 AND game_id=8300 AND field=\'hours\' AND steam_id=?'
+  ).get(ALICE);
+  const theirs = sqlite.prepare(
+    'SELECT state FROM history_nudges WHERE group_id=1 AND game_id=8300 AND field=\'hours\' AND steam_id=?'
+  ).get(MALLORY);
+  const r2 = await historyRoute.onRequestPost({
+    request: req({ gameId: 8300, field: 'hours', action: 'dismiss' }), env, data: mallory.data,
+  });
+  return (r.status === 200 && mine?.state === 'dismissed' && !theirs && r2.status === 200)
+    || `alice ${JSON.stringify(mine)}, mallory ${JSON.stringify(theirs)}, second ${r2.status}`;
+});
+
+await check('accepting history records the authoritative value and its provenance', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await historyRoute.onRequestPost({
+    request: req({ gameId: 8300, field: 'started', action: 'accept', value: '2099-01-01' }), env, data,
+  });
+  const game = sqlite.prepare('SELECT started FROM games WHERE id=8300').get();
+  const source = sqlite.prepare(
+    'SELECT source,set_by FROM game_fact_sources WHERE group_id=1 AND game_id=8300 AND field=\'started\''
+  ).get();
+  return (r.status === 200 && game.started === '2021-02-02'
+      && source.source === 'release-date' && source.set_by === ALICE)
+    || `status ${r.status}, value ${game.started}, source ${JSON.stringify(source)}`;
+});
+
+await check('editing an approximate fact turns it into a human-entered fact', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: '8300' }, request: req({ started: '2021-02-03' }), env, data,
+  });
+  const source = sqlite.prepare(
+    'SELECT source,set_by FROM game_fact_sources WHERE group_id=1 AND game_id=8300 AND field=\'started\''
+  ).get();
+  return (r.status === 200 && source.source === 'manual' && source.set_by === ALICE)
+    || `status ${r.status}, source ${JSON.stringify(source)}`;
+});
+
 await check('only an owner can export group data', async () => {
   const { data } = await ctxFor(MALLORY, 'g4m1ng');
   const r = await exportRoute.onRequestGet({
@@ -698,7 +798,8 @@ await check('JSON export is complete and never crosses the group boundary', asyn
   if (!backup.games.some((game) => game.id === 8200)) return 'own game missing';
   if (backup.games.some((game) => game.group_id !== 1)) return 'foreign game exported';
   if (backup.comments.some((comment) => comment.group_id !== 1)) return 'foreign comment exported';
-  return (Array.isArray(backup.ratings) && Array.isArray(backup.members) && backup.version === 1)
+  return (Array.isArray(backup.history) && Array.isArray(backup.ratings)
+      && Array.isArray(backup.members) && backup.version === 2)
     || 'missing a relation';
 });
 

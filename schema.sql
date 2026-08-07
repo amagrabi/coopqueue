@@ -7,6 +7,8 @@
 -- groups; their display name and role are per-group, held on memberships.
 
 DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS history_nudges;
+DROP TABLE IF EXISTS game_fact_sources;
 DROP TABLE IF EXISTS achievement_progress;
 DROP TABLE IF EXISTS playtime;
 DROP TABLE IF EXISTS group_library_sync;
@@ -153,12 +155,12 @@ CREATE TABLE games (
   price             TEXT,
   release_date      TEXT,
   metacritic        INTEGER,
-  hours             REAL,             -- typed by a human; always wins over the estimate
+  hours             REAL,             -- manual or accepted snapshot; always wins over live estimate
   hours_estimated   REAL,             -- min across participants; an upper bound, not a measurement
   hours_participants INTEGER,         -- how many people that minimum was taken over
-  started           TEXT,             -- ISO date, typed by a human. Steam has no
-                                      -- first-played field, so this is manual, always.
-  finished          TEXT,             -- ditto; always wins over the estimate below
+  started           TEXT,             -- ISO date; exact when manual, approximate when
+                                      -- provenance records release/achievement evidence
+  finished          TEXT,             -- manual or accepted snapshot; wins over live estimate
   finished_estimated TEXT,            -- latest rtime_last_played across participants
   notes             TEXT,
   added_by          TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
@@ -237,6 +239,40 @@ CREATE TABLE achievement_progress (
   PRIMARY KEY (steam_id, appid)
 );
 CREATE INDEX idx_achievement_app ON achievement_progress(appid);
+
+-- Provenance for shared history fields. The values stay on games because they
+-- are read everywhere; this small side table explains whether a value was typed
+-- by a person or accepted from a deliberately approximate Steam suggestion.
+-- group_id is denormalised for the same tenancy reason as comments.
+CREATE TABLE game_fact_sources (
+  group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  game_id    INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  field      TEXT    NOT NULL CHECK (field IN ('started','finished','hours')),
+  source     TEXT    NOT NULL CHECK (source IN (
+               'manual','release-date','steam-hours','steam-last-played','achievement'
+             )),
+  set_by     TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (group_id, game_id, field)
+);
+
+-- "Don't know" and "later" are personal answers: one friend drawing a blank
+-- must not hide the prompt from somebody else who may remember. Filled facts
+-- disappear automatically because the queue only selects missing values.
+CREATE TABLE history_nudges (
+  group_id      INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  game_id       INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  field         TEXT    NOT NULL CHECK (field IN ('started','finished','hours')),
+  steam_id      TEXT    NOT NULL,
+  state         TEXT    NOT NULL CHECK (state IN ('dismissed','snoozed')),
+  snoozed_until INTEGER,
+  updated_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (group_id, game_id, field, steam_id),
+  FOREIGN KEY (group_id, steam_id)
+    REFERENCES memberships(group_id, steam_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_history_nudges_member
+  ON history_nudges(group_id, steam_id, snoozed_until);
 
 -- One comment thread per game. group_id is denormalised on purpose: invariant 2
 -- wants every statement below the tenancy boundary to filter on group_id, and a

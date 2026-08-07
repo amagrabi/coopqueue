@@ -19,8 +19,8 @@ import { ownedGames } from '../../../../lib/steam.js';
  *   - three of four played -> the fourth is not a participant, so their zero
  *     cannot drag the number down
  *
- * `games.hours` — a number a human typed — always wins. The estimate is only ever
- * shown in its absence.
+ * `games.hours` — a human answer or an explicitly accepted estimate snapshot —
+ * always wins. The live estimate is only ever shown in its absence.
  */
 
 /** Below this, "playing" is a launch and a look around rather than a session. */
