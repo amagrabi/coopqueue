@@ -592,6 +592,22 @@ purpose, not a backlog. The skip buttons are hidden there — "no opinion" on a 
 have scored is not an action, and `rate.js` has always been an upsert, so nothing
 server-side needed to change.
 
+## Early Access
+
+`early_access` is computed in the library query from `coop_apps.tags` containing
+`"Early Access"` — a single bit rather than shipping the whole tag array for every
+game, since the library payload is fetched on every load. It renders as a warning
+chip on the rating card and detail panel, an `EA` marker in the Library table, and a
+line on catalogue cards.
+
+Checked against real data before shipping: it flags 8 of group 1's games and all 8
+are genuinely in Early Access, including four where the tag sits outside the top six
+(Subnautica 2, Abiotic Factor, Grounded 2, RuneScape: Dragonwilds) — so the match is
+against the whole stored array, not the ranked window `classifyCoop` uses.
+
+The tag is deliberately still in `NON_TASTE` for the recommender: "this ships
+unfinished" is worth *warning* about and worthless as a *taste*.
+
 ## Imported notes
 
 `games.notes` held text from the original spreadsheet and used to render in a bespoke

@@ -31,6 +31,14 @@ There is **no type-checking and no build**, so an unresolved import surfaces onl
 deploy time — `npm test` does not import every route. `docs/OPERATIONS.md` has a
 one-liner import guard; run it after adding or renaming a module.
 
+**`npm test` does not execute `public/app.js` at all.** Nothing does, outside a
+browser, so a renamed variable that leaves a stale reference in a render function is
+invisible to the suite — it throws at runtime and silently kills every panel drawn
+after it. That has now happened twice, both times only caught by a screenshot. After
+touching `app.js`, open the harness and click through **all six views** (`queue`,
+`next`, `library`, `browse`, `stats`, `members`) with the console open; anything
+logged is a regression, and a half-empty panel is the signature.
+
 `npm run dev` works but Steam OpenID cannot redirect to `localhost`, so use the
 harness for anything UI. `npm run test:ui` does **not** run on macOS (imports
 `playwright`, which is not in `package.json`, and hardcodes a Linux Chrome path).

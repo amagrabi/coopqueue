@@ -16,7 +16,12 @@ export async function onRequestGet({ env, data }) {
     // still appear. The group's own columns win — a group can correct a player
     // count locally without the catalogue overwriting it.
     env.DB.prepare(
-      `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count
+      /* early_access is computed rather than shipped as raw tags: the flag is one
+         bit per game and the tag array is a few hundred bytes, across a library
+         fetched on every load. Exact-string LIKE against the JSON array, which is
+         safe because tags are stored as Steam's own names. */
+      `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count,
+              CASE WHEN c.tags LIKE '%"Early Access"%' THEN 1 ELSE 0 END AS early_access
          FROM games g LEFT JOIN coop_apps c ON c.appid = g.steam_appid
         WHERE g.group_id = ? ORDER BY g.name COLLATE NOCASE`
     ).bind(gid).all(),

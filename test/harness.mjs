@@ -94,6 +94,20 @@ db.exec(`UPDATE games SET steam_appid = 105600
                        ORDER BY CASE status WHEN 'backlog' THEN 0 ELSE 1 END,
                                 name COLLATE NOCASE LIMIT 1)`);
 
+/* Two library titles are spelled differently from their catalogue rows ("Dark &
+   Darker" vs "Dark and Darker"), so the name-matching link above misses them. Join
+   them by appid instead — otherwise the Early Access label has nothing to mark
+   locally, since it comes from the catalogue's tags through that join. */
+for (const [lib, cat] of [['Dark & Darker', 'Dark and Darker'],
+                          ['No Rest For The Wicked', 'No Rest for the Wicked']]) {
+  // db.prepare directly: the `one` helper is declared further down and is still in
+  // its temporal dead zone up here.
+  const row = db.prepare('SELECT appid FROM coop_apps WHERE name=?').get(cat);
+  if (!row) continue;
+  const taken = db.prepare('SELECT 1 AS x FROM games WHERE group_id=1 AND steam_appid=?').get(row.appid);
+  if (!taken) db.prepare('UPDATE games SET steam_appid=? WHERE group_id=1 AND name=?').run(row.appid, lib);
+}
+
 /* Real tag lists for catalogue rows the crawl has not tagged yet, so the taste
    ranking has something to match on locally. Copied from production rather than
    made up — invented tags would make the local ordering meaningless, which is the
@@ -114,6 +128,9 @@ const FIXTURE_TAGS = [
   ['Age of Empires IV: Anniversary Edition', ['Strategy', 'RTS', 'Base-Building', 'Multiplayer', 'War', 'Singleplayer']],
   ['Sea of Thieves: 2026 Edition', ['Multiplayer', 'Open World', 'Adventure', 'Pirates', 'Co-op', 'Online Co-Op']],
   ['Marvel Rivals', ['Free to Play', 'Multiplayer', 'Hero Shooter', 'Third-Person Shooter', 'Action', 'Shooter']],
+  // Genuinely Early Access, so the "Early access" label has something to mark.
+  ['Dark and Darker', ['Early Access', 'Dungeon Crawler', 'Multiplayer', 'Loot', 'Medieval', 'Extraction Shooter']],
+  ['No Rest for the Wicked', ['Early Access', 'Souls-like', 'Online Co-Op', 'Action RPG', 'Hack and Slash', 'Open World']],
 ];
 {
   const stmt = db.prepare('UPDATE coop_apps SET tags = ?, is_coop = ?, tags_at = 1 WHERE name = ? AND tags IS NULL');
@@ -207,7 +224,8 @@ function groupCtx(slug) {
 function libraryFor(gid, need) {
   // Mirrors the real handler's LEFT JOIN onto the catalogue for Steam's verdict.
   const games = q(
-    `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count
+    `SELECT g.*, c.review_hint AS steam_review_hint, c.review_count AS steam_review_count,
+            CASE WHEN c.tags LIKE '%"Early Access"%' THEN 1 ELSE 0 END AS early_access
        FROM games g LEFT JOIN coop_apps c ON c.appid = g.steam_appid
       WHERE g.group_id=? ORDER BY g.name COLLATE NOCASE`, gid);
   const ratings = q(

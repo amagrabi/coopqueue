@@ -372,6 +372,14 @@ const VIEWS = ['queue', 'next', 'library', 'browse', 'stats', 'members'];
 
 function setView(view) {
   if (!VIEWS.includes(view)) view = 'queue';
+  /* Leaving the queue stops the trailer. Hiding the section does not: a <video> in
+     a display:none subtree keeps playing, so you walk to the Library and the audio
+     follows you. detach, not just pause — otherwise hls.js carries on pulling
+     segments for a card nobody is looking at. */
+  if (state.view === 'queue' && view !== 'queue') {
+    const v = $('#rate-video');
+    if (v) { v.pause(); detachTrailer(v); }
+  }
   /* Arriving at the Library resets it to the default. Deliberately only when
      coming from ANOTHER view — the detail dialog re-renders the current one on
      save, and having that silently undo your sort would be maddening. */
@@ -409,6 +417,8 @@ function wireOnce() {
     state.qIndex = 0;
     renderQueue();
   }));
+  // The logo is the way back to the thing you came here to do.
+  $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView('queue'); });
   $('#btn-skip').addEventListener('click', () => skipGame(false));
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   // Unmuting one trailer means you want sound for the rest of the sitting.
@@ -695,6 +705,12 @@ function metaChips(g) {
   if (g.steam_review_hint) {
     chips.push(`<span class="chip">${esc(g.steam_review_hint)}${
       g.steam_review_count ? ` · ${compact(g.steam_review_count)} reviews` : ''}</span>`);
+  }
+  /* Still in development. Worth flagging even when everyone wants to play it: the
+     content is unfinished and a group that starts now may find the ending missing. */
+  if (g.early_access) {
+    chips.push('<span class="chip chip-warn" title="Still in Early Access on Steam — '
+             + 'the game is unfinished, so it may be worth waiting">Early access</span>');
   }
   if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
   /* Who put this on the list. Only when we can name them — most of an imported
@@ -1022,7 +1038,8 @@ function renderLibrary() {
         <span class="lib-game">${g.header_image
           ? `<img class="lib-art" src="${esc(g.header_image)}" alt="" loading="lazy" decoding="async">`
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
-        g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}</span></td>
+        g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
+        g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span></td>
       <td>${esc(g.genre || '—')}</td>
       <td>${g.archived_at
         ? '<span class="status-tag status-archived">Archived</span>'
@@ -1189,7 +1206,10 @@ async function renderMembers() {
   // Name the gap rather than just drawing it — "Dave is 47 behind" is actionable
   // in a way that four bars of different lengths is not.
   const note = $('#coverage-note');
-  if (ranked.length < 2 || !total) {
+  // active.length, not `total` — that was a group-wide count before denominators
+  // went per person, and referencing it after the rename threw here, killing every
+  // panel rendered further down this function (Members, Settings, Invite).
+  if (ranked.length < 2 || !active.length) {
     note.textContent = '';
   } else {
     const lead = ranked[0];
@@ -1587,6 +1607,9 @@ async function renderBrowse(reset) {
             ${g.price ? `<span class="chip">${esc(g.price)}</span>` : ''}
             ${g.review_hint ? `<span class="chip">${esc(g.review_hint)}</span>` : ''}
           </div>
+          ${(() => { try { return JSON.parse(g.tags || '[]').includes('Early Access'); }
+                     catch { return false; } })()
+            ? '<p class="browse-ea">Early access — still unfinished</p>' : ''}
           ${g.why?.length
             ? `<p class="browse-fit">Matches your taste for ${g.why.map(esc).join(' and ')}</p>`
             : ''}
