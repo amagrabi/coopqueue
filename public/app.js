@@ -1657,7 +1657,7 @@ function renderScatterStats(s) {
             const tone = point.rating >= 8 ? 'good' : point.rating < 6.5 ? 'bad' : '';
             const edge = left > 75 ? 'right' : left < 25 ? 'left' : '';
             return `<button type="button" class="scatter-point" data-id="${point.id}"
-              data-tone="${tone}" data-edge="${edge}" data-label="${esc(label)}" title="${esc(label)}"
+              data-tone="${tone}" data-edge="${edge}" data-label="${esc(label)}"
               aria-label="${esc(label)}" style="left:${left}%;bottom:${bottom}%"></button>`;
           }).join('')}
         </div>

@@ -456,13 +456,15 @@ td.miss { color: #4a4a47; }
 }
 .scatter-point[data-tone="good"] { background: var(--good); }
 .scatter-point[data-tone="bad"] { background: var(--critical); }
-.scatter-point:focus-visible { outline: 2px solid #fff; outline-offset: 2px; z-index: 3; }
+.scatter-point:hover, .scatter-point:focus-visible { z-index: 5; }
+.scatter-point:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .scatter-point::after {
   content: attr(data-label); display: none; position: absolute; z-index: 4;
   left: 50%; bottom: 18px; width: max-content; max-width: min(220px,70vw);
   transform: translateX(-50%); padding: 6px 8px; border-radius: 5px;
   background: var(--plane); border: 1px solid var(--border); box-shadow: var(--shadow);
   color: var(--text-primary); font: 500 11px/1.35 var(--font); text-align: left; white-space: normal;
+  pointer-events: none;
 }
 .scatter-point[data-edge="left"]::after { left: -4px; transform: none; }
 .scatter-point[data-edge="right"]::after { left: auto; right: -4px; transform: none; }

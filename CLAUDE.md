@@ -623,8 +623,11 @@ the genre chart reports `hoursGames / games` coverage rather than adding zeroes.
 recorded finish dates only for games whose status is `finished`. It reports both
 coverage denominators because sparse history is still useful but must not look
 complete. **Time versus enjoyment** needs six played games with both hours and a
-rating before it appears. `lib/stats.js` owns these aggregations and is shared with
-the harness so the local UI cannot drift from the deployed route.
+rating before it appears. Its hovered or keyboard-focused point must lift its whole
+stacking context above the neighboring points; raising only the tooltip pseudo-element
+cannot escape the point's own stacking layer. The custom tooltip uses `aria-label`
+without a duplicate native `title` tooltip. `lib/stats.js` owns these aggregations and
+is shared with the harness so the local UI cannot drift from the deployed route.
 
 ## Comments
 
