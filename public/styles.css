@@ -166,6 +166,19 @@ kbd {
 .view-head h2 { font-size: 22px; }
 .view-sub { color: var(--text-secondary); font-size: 13.5px; margin: 6px 0 0; max-width: 62ch; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* The Library carries seven filters — far more than any other view. Beside the
+   heading they wrap onto a second line at every realistic width, so here they get
+   the full width and slightly tighter controls. Still allowed to wrap: this buys a
+   single row on a desktop, it does not force one on a phone. */
+[data-view="library"] .view-head { flex-direction: column; align-items: stretch; gap: 14px; }
+[data-view="library"] .filters { gap: 6px; }
+[data-view="library"] .filters .input { font-size: 13px; padding: 6px 9px; }
+[data-view="library"] .filters #lib-search { flex: 1 1 140px; max-width: 240px; }
+/* Icon-only, because as a labelled button it was the one control that pushed the
+   row onto a second line — and it is a secondary action that only ever appears
+   once you have already changed something. */
+[data-view="library"] .filters #lib-reset { flex: none; align-self: stretch; padding: 0 10px; font-size: 15px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-secondary); cursor: pointer; }
 
 .empty { text-align: center; padding: 80px 20px; color: var(--text-secondary); }

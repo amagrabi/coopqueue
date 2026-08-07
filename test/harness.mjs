@@ -132,6 +132,16 @@ db.exec(`UPDATE games SET started = date('now', '-' || (id % 20) || ' months')
 db.exec(`UPDATE games SET finished_estimated = date('now', '-' || (id % 9) || ' months')
           WHERE group_id=1 AND id % 6 = 0`);
 
+/* Imported spreadsheet notes now live in the comment thread under an `import:<group>`
+   identity with no membership — mirror migration 019 so the local thread shows what
+   production shows, including the display-name fallback for a non-member author. */
+db.exec(`INSERT OR IGNORE INTO users (steam_id, display_name)
+         SELECT DISTINCT 'import:' || group_id, 'Imported from the spreadsheet'
+           FROM games WHERE notes IS NOT NULL AND TRIM(notes) <> ''`);
+db.exec(`INSERT INTO comments (group_id, game_id, steam_id, body, created_at)
+         SELECT group_id, id, 'import:' || group_id, TRIM(notes), COALESCE(created_at, unixepoch())
+           FROM games WHERE notes IS NOT NULL AND TRIM(notes) <> ''`);
+
 // Attribution and the "failed to finish" status need a row each to be visible.
 db.exec(`UPDATE games SET added_by='${ME}'
           WHERE id IN (SELECT id FROM games WHERE group_id=1 ORDER BY id LIMIT 3)`);
@@ -375,14 +385,17 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'GET') {
         const id = Number(url.searchParams.get('gameId'));
         if (!inGroup(id)) return send(res, 404, { error: 'no such game' });
-        const rows = q(`SELECT c.id, c.steam_id, c.body, c.created_at, m.short_name, u.avatar
+        const rows = q(`SELECT c.id, c.steam_id, c.body, c.created_at, m.short_name, u.avatar, u.display_name
                           FROM comments c
                           LEFT JOIN memberships m ON m.group_id=c.group_id AND m.steam_id=c.steam_id
                           LEFT JOIN users u ON u.steam_id=c.steam_id
                          WHERE c.game_id=? AND c.group_id=? ORDER BY c.created_at, c.id`, id, gid);
         return send(res, 200, {
           comments: rows.map((c) => ({
-            id: c.id, steamId: c.steam_id, name: c.short_name || 'Someone who left',
+            id: c.id, steamId: c.steam_id,
+            // Mirrors the real handler: a comment can outlive its author's
+            // membership, or belong to the import identity, which has none.
+            name: c.short_name || c.display_name || 'Someone who left',
             avatar: c.avatar, body: c.body, createdAt: c.created_at, mine: c.steam_id === ME,
           })),
         });

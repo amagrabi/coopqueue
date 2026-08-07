@@ -638,7 +638,8 @@ function renderQueue() {
 
   $('#rate-meta').innerHTML = metaChips(g);
 
-  const caveat = [g.coop_note, g.notes].filter(Boolean).join(' · ');
+  // coop_note only: imported spreadsheet text now lives in the comment thread.
+  const caveat = g.coop_note || '';
   $('#rate-notes').hidden = !caveat;
   $('#rate-notes').textContent = caveat;
 
@@ -762,6 +763,9 @@ function renderQueueList(queue) {
 
   $$('#rate-list-items .rate-jump').forEach((b) => b.addEventListener('click', () => {
     state.qIndex = Number(b.dataset.i);
+    // Collapse on the way out: you picked a game, so the list has done its job and
+    // leaving it open just buries the card you asked for.
+    box.open = false;
     renderQueue();
   }));
 }
@@ -834,7 +838,12 @@ function renderNext() {
    looking shuffled. */
 const LIB_DEFAULTS = {
   'lib-search': '', 'lib-status': '', 'lib-sort': 'started',
-  'lib-mine': '', 'lib-score': '', 'lib-played': '', 'lib-archived': '',
+  'lib-mine': '', 'lib-score': '', 'lib-played': '',
+  // 'active', not '': that select has no empty option, and setting a value no
+  // option carries leaves selectedIndex at -1 — the control renders blank AND the
+  // archived filter matches neither branch, so archived games leak into the
+  // default view. Both symptoms of the same typo.
+  'lib-archived': 'active',
 };
 
 /** Put every Library control back to its default. Returns true if anything moved. */
@@ -843,7 +852,12 @@ function resetLibControls() {
   libSort = null;
   for (const [id, v] of Object.entries(LIB_DEFAULTS)) {
     const el = $('#' + id);
-    if (el && el.value !== v) { el.value = v; changed = true; }
+    if (!el || el.value === v) continue;
+    el.value = v;
+    // A default naming an option that does not exist would silently blank the
+    // control and disable its filter; fall back rather than ship a dead select.
+    if (el.tagName === 'SELECT' && el.selectedIndex < 0) el.selectedIndex = 0;
+    changed = true;
   }
   return changed;
 }
@@ -1626,7 +1640,6 @@ function openDetail(id) {
       ${g.header_image ? `<img src="${esc(g.header_image)}" alt="" style="width:100%;border-radius:8px">` : ''}
       <div class="rank-meta">${metaChips(g)}</div>
       ${g.short_description ? `<p class="panel-sub" style="margin:0">${esc(g.short_description)}</p>` : ''}
-      ${g.notes ? `<div class="callout">${esc(g.notes)}</div>` : ''}
 
       <div class="detail-votes">
         ${state.members.map((m) => {
@@ -1692,11 +1705,6 @@ function openDetail(id) {
         <p class="field-help">Filled in automatically for games added here. Imported
           games predate that, so you can set it yourself.</p>
       </div>
-      ${g.notes ? `
-      <div class="detail-field">
-        <label>Note from the spreadsheet</label>
-        <p class="imported-note">${esc(g.notes)}</p>
-      </div>` : ''}
       ${g.steam_appid ? '' : `
         <div class="detail-field">
           <label for="d-link">Link to Steam (paste a store URL or appid)</label>

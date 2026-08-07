@@ -271,11 +271,11 @@
         <div class="filters">
           <input id="lib-search" class="input" type="search" placeholder="Search…" autocomplete="off">
           <select id="lib-status" class="input">
-            <option value="">All statuses</option>
+            <option value="">Any status</option>
             <option value="backlog">Backlog</option>
             <option value="playing">Playing</option>
             <option value="finished">Finished</option>
-            <option value="unfinished">Failed to finish</option>
+            <option value="unfinished">Unfinished</option>
             <option value="dropped">Dropped</option>
             <option value="sampled">Sampled</option>
           </select>
@@ -283,15 +283,15 @@
             <option value="started">Recently started</option>
             <option value="best">Best first</option>
             <option value="name">A–Z</option>
-            <option value="spread">Most disagreement</option>
-            <option value="hours">Most hours</option>
+            <option value="spread">Disagreement</option>
+            <option value="hours">Hours</option>
             <option value="votes">Fewest votes</option>
           </select>
           <select id="lib-mine" class="input">
             <option value="">Anyone's votes</option>
             <option value="unrated">I haven't rated</option>
             <option value="rated">I have rated</option>
-            <option value="incomplete">Missing someone's vote</option>
+            <option value="incomplete">Missing a vote</option>
           </select>
           <!-- 9+ is worth offering now. These filter the plain group average, which
                reaches the top of the scale — group 1's best game sits at 9.5. It was
@@ -306,18 +306,19 @@
             <option value="6">6+</option>
           </select>
           <select id="lib-played" class="input">
-            <option value="">Played or not</option>
-            <option value="yes">Hours logged</option>
+            <option value="">Played?</option>
+            <option value="yes">Has hours</option>
             <option value="no">Never played</option>
           </select>
           <select id="lib-archived" class="input">
-            <option value="active">Active games</option>
-            <option value="archived">Archived only</option>
-            <option value="all">Active + archived</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="all">Both</option>
           </select>
           <!-- Only shown once something deviates from the default, so it is a way
                back rather than a permanently lit button that usually does nothing. -->
-          <button class="btn btn-ghost btn-sm" id="lib-reset" hidden>Reset to default</button>
+          <button class="btn btn-icon" id="lib-reset" hidden
+                  title="Reset filters and sorting to the default" aria-label="Reset to default">↺</button>
         </div>
       </div>
       <div class="table-wrap">

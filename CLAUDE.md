@@ -592,6 +592,25 @@ purpose, not a backlog. The skip buttons are hidden there — "no opinion" on a 
 have scored is not an action, and `rate.js` has always been an upsert, so nothing
 server-side needed to change.
 
+## Imported notes
+
+`games.notes` held text from the original spreadsheet and used to render in a bespoke
+read-only box labelled "Note from the spreadsheet" — a field only this group would
+ever see, which is exactly how a UI teaches people it is inconsistent.
+
+Migration 019 moves it into the normal comment thread. Authorship was the wrinkle:
+`comments.steam_id` is NOT NULL and references `users`, and crediting a real person
+with imported text is the thing the old label was avoiding. So each group gets an
+`import:<group_id>` row in `users`, following the existing `seed:<group_id>:<name>`
+convention for identities that are real rows but can never log in. It gets **no
+membership**, so it is not a member, takes no colour slot and never appears in the
+group list — and the comments query now falls back to `users.display_name` when there
+is no membership, which also improves the genuine "member left the group" case.
+
+`games.notes` is deliberately still populated. Nothing reads it, but keeping it makes
+019 reversible. A fresh install that imports `seed.sql` gets notes with no UI, so run
+019 after seeding.
+
 ## Blind rating
 
 `groups.blind_rating` (migration 013) hides everyone else's scores in the rating

@@ -32,7 +32,7 @@ export async function onRequestGet({ request, env, data }) {
   if (!await gameInGroup(env, gid, gameId)) return bad('no such game', 404);
 
   const rows = await env.DB.prepare(
-    `SELECT c.id, c.steam_id, c.body, c.created_at, m.short_name, u.avatar
+    `SELECT c.id, c.steam_id, c.body, c.created_at, m.short_name, u.avatar, u.display_name
        FROM comments c
        LEFT JOIN memberships m ON m.group_id = c.group_id AND m.steam_id = c.steam_id
        LEFT JOIN users u ON u.steam_id = c.steam_id
@@ -44,9 +44,11 @@ export async function onRequestGet({ request, env, data }) {
     comments: (rows.results || []).map((c) => ({
       id: c.id,
       steamId: c.steam_id,
-      // A member who has since left keeps their comment but loses their group
-      // nickname, so fall back rather than rendering "undefined said".
-      name: c.short_name || 'Someone who left',
+      /* A comment can outlive its author's membership — someone left, or it was
+         written by the `import:<group>` identity that carries text migrated out of
+         games.notes and deliberately holds no membership. The users row still has a
+         display name in both cases, which beats "Someone who left". */
+      name: c.short_name || c.display_name || 'Someone who left',
       avatar: c.avatar,
       body: c.body,
       createdAt: c.created_at,

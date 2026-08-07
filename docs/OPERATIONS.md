@@ -165,6 +165,20 @@ its 30-day window:
 npm run db:backup      # writes backup.sql (gitignored)
 ```
 
+**Restoring that dump needs `PRAGMA foreign_keys = OFF` first**, and this is not
+optional. `d1 export` emits tables in `sqlite_master` order, and migration 017
+rebuilt `games`, which moved it to the *end* — after `ratings`, `comments` and
+`skips`, which reference it and are populated first. Replaying the file as-is dies on
+the first `INSERT INTO "ratings"` with `no such table: main.games`. With foreign keys
+off it restores completely and `PRAGMA foreign_key_check` comes back clean:
+
+```bash
+sqlite3 restored.db "PRAGMA foreign_keys=OFF;" ".read backup.sql" "PRAGMA foreign_key_check;"
+```
+
+A backup you have never restored is a guess. Rehearse it after any migration that
+recreates a table.
+
 ---
 
 ## Catalogue maintenance
