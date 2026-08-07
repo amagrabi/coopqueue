@@ -2402,7 +2402,7 @@ function openDetail(id, focusField = null) {
         ${state.members.map((m) => {
           const score = g.votes[m.steam_id];
           return `<div class="detail-vote">
-            <span style="color:${colorOf(m.steam_id)};font-weight:600">${esc(m.short_name)}</span>
+            <span class="detail-vote-name" title="${esc(m.short_name)}" style="color:${colorOf(m.steam_id)}">${esc(m.short_name)}</span>
             <div class="bar-track"><div class="bar-fill" style="width:${score ? (score / 10) * 100 : 0}%;background:${colorOf(m.steam_id)}"></div></div>
             <span class="bar-val">${score == null ? '–' : fmt(score, 1)}</span>
           </div>`;

@@ -613,7 +613,16 @@ td.miss { color: #4a4a47; }
 
 .detail-grid { display: grid; gap: 18px; }
 .detail-votes { display: grid; gap: 8px; }
-.detail-vote { display: grid; grid-template-columns: 70px 1fr 40px; gap: 10px; align-items: center; font-size: 13.5px; }
+.detail-vote {
+  display: grid; grid-template-columns: clamp(112px, 16%, 180px) minmax(0,1fr) 40px;
+  gap: 10px; align-items: center; font-size: 13.5px;
+}
+/* Group names can be 16 characters. Keep every bar aligned on wide dialogs,
+   then truncate instead of painting through the bar on a narrow phone. */
+.detail-vote-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600;
+}
 .detail-field { display: grid; gap: 5px; }
 .detail-field label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); font-weight: 600; }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--border); }
