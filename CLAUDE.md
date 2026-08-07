@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 151 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 152 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -376,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-151/151 assertions pass. `npm run test:ui` does **not** run on macOS: it
+152/152 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -591,6 +591,26 @@ coverage leaderboards, member comparisons, blind-rating controls and empty Stats
 panels. Stats and Complete our history use that account's Steam playtime directly.
 A one-member co-op group can be converted in Settings; a multi-member group must
 remove the others first, and conversion is a transactional D1 batch.
+
+## History-shaped stats
+
+The Stats page's **Library shape** counts every active game by the six stored
+statuses. Its **Genres** panel is one view with Games / Hours / Rating controls,
+not three near-identical permanent charts. "Played" there means a settled outcome:
+`finished | unfinished | dropped | sampled`, matching the existing genre track
+record rather than quietly adding the still-moving `playing` rows.
+
+Hours use the same trustworthy value as the other Stats totals: saved group hours,
+or the signed-in account's synced Steam time in a personal workspace. Live group
+estimates are suggestions until somebody accepts one, and missing hours stay NULL;
+the genre chart reports `hoursGames / games` coverage rather than adding zeroes.
+
+**Gaming over time** counts recorded ISO start dates for every non-backlog game and
+recorded finish dates only for games whose status is `finished`. It reports both
+coverage denominators because sparse history is still useful but must not look
+complete. **Time versus enjoyment** needs six played games with both hours and a
+rating before it appears. `lib/stats.js` owns these aggregations and is shared with
+the harness so the local UI cannot drift from the deployed route.
 
 ## Comments
 

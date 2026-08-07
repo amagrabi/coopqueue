@@ -364,11 +364,88 @@ td.miss { color: #4a4a47; }
 .tile-alert .tile-val { color: var(--serious); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(340px,1fr)); gap: 16px; margin-bottom: 16px; }
+.stats-grid { align-items: start; }
+.stats-grid > .panel { min-width: 0; }
 .grid-2.single { grid-template-columns: 1fr; }
 .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; }
 .panel-title { font-size: 15.5px; margin-bottom: 14px; }
 .panel-title + .panel-sub { margin-top: -9px; }
 .panel-sub { font-size: 12.5px; color: var(--text-muted); margin: 5px 0 18px; max-width: 60ch; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.panel-head .panel-title { margin: 0; }
+
+.metric-tabs {
+  display: inline-flex; padding: 2px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--plane);
+}
+.metric-tabs button {
+  font: inherit; font-size: 11.5px; font-weight: 600; line-height: 1;
+  padding: 7px 9px; border: 0; border-radius: 5px; cursor: pointer;
+  color: var(--text-muted); background: transparent;
+}
+.metric-tabs button[aria-pressed="true"] { color: var(--text-primary); background: var(--surface-2); }
+.metric-tabs button:disabled { opacity: .35; cursor: default; }
+.metric-tabs button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+
+/* Status colours are semantic rather than another categorical series. Failed to
+   finish and dropped deliberately share the red treatment used by their chips. */
+.shape-bar {
+  display: flex; height: 22px; overflow: hidden; border-radius: 6px;
+  background: var(--gridline); border: 1px solid var(--border);
+}
+.shape-bar > i { display: block; min-width: 3px; height: 100%; }
+.shape-bar > i + i { border-left: 2px solid var(--surface-1); }
+.shape-legend { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px 14px; margin-top: 15px; }
+.shape-legend span { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.shape-legend span > i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.shape-legend b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.shape-backlog { background: var(--text-muted); }
+.shape-playing { background: var(--series-1); }
+.shape-finished { background: var(--good); }
+.shape-sampled { background: var(--warning); }
+.shape-unfinished, .shape-dropped { background: var(--critical); }
+
+.timeline-legend { display: flex; gap: 16px; margin-bottom: 9px; font-size: 11.5px; color: var(--text-muted); }
+.timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.timeline-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--series-1); }
+.timeline-legend span + span i { background: var(--good); }
+.timeline-scroll { overflow-x: auto; padding: 4px 0 2px; }
+.timeline-bars {
+  display: grid; grid-template-columns: repeat(var(--timeline-years),minmax(52px,1fr));
+  min-width: calc(var(--timeline-years) * 52px); border-bottom: 1px solid var(--baseline);
+}
+.timeline-year { display: grid; grid-template-rows: 132px 24px; min-width: 0; }
+.timeline-columns { display: flex; align-items: stretch; justify-content: center; gap: 4px; padding: 0 4px; }
+.timeline-columns span { width: 14px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.timeline-columns b { font-size: 10px; line-height: 16px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.timeline-columns i { display: block; width: 100%; min-height: 0; border-radius: 3px 3px 0 0; background: var(--series-1); }
+.timeline-columns span + span i { background: var(--good); }
+.timeline-year > strong { align-self: end; text-align: center; font-size: 10.5px; font-weight: 500; color: var(--text-muted); }
+
+.scatter-layout { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 8px; }
+.scatter-y { height: 210px; display: flex; flex-direction: column; justify-content: space-between; text-align: right; font-size: 10px; color: var(--text-muted); }
+.scatter-main { min-width: 0; }
+.scatter-plot { position: relative; height: 210px; border-left: 1px solid var(--baseline); }
+.scatter-plot > i { position: absolute; left: 0; right: 0; height: 1px; background: var(--gridline); }
+.scatter-point {
+  position: absolute; z-index: 1; width: 13px; height: 13px; padding: 0;
+  transform: translate(-50%,50%); border: 2px solid var(--surface-1); border-radius: 50%;
+  background: var(--series-1); cursor: pointer; box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+}
+.scatter-point[data-tone="good"] { background: var(--good); }
+.scatter-point[data-tone="bad"] { background: var(--critical); }
+.scatter-point:focus-visible { outline: 2px solid #fff; outline-offset: 2px; z-index: 3; }
+.scatter-point::after {
+  content: attr(data-label); display: none; position: absolute; z-index: 4;
+  left: 50%; bottom: 18px; width: max-content; max-width: min(220px,70vw);
+  transform: translateX(-50%); padding: 6px 8px; border-radius: 5px;
+  background: var(--plane); border: 1px solid var(--border); box-shadow: var(--shadow);
+  color: var(--text-primary); font: 500 11px/1.35 var(--font); text-align: left; white-space: normal;
+}
+.scatter-point[data-edge="left"]::after { left: -4px; transform: none; }
+.scatter-point[data-edge="right"]::after { left: auto; right: -4px; transform: none; }
+.scatter-point:hover::after, .scatter-point:focus-visible::after { display: block; }
+.scatter-x { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 10px; color: var(--text-muted); }
 
 .people { display: grid; gap: 14px; }
 .person { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
@@ -587,6 +664,8 @@ td.miss { color: #4a4a47; }
   .topbar-right { gap: 8px; }
   .who span { display: none; }
   .main { padding: 18px 14px 60px; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .panel-head { align-items: flex-start; flex-direction: column; }
   .rate-body { padding: 18px; }
   .rate-head h2 { font-size: 21px; }
   .bar-row { grid-template-columns: minmax(92px, 50%) 1fr 40px; }

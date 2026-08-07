@@ -1508,6 +1508,143 @@ function renderLibrary() {
 
 /* ══════════════════════════════ STATS ═════════════════════════════════ */
 let statsSeq = 0;
+let statsGenreMetric = 'games';
+
+const STATUS_STAT_ORDER = ['backlog', 'playing', 'finished', 'sampled', 'unfinished', 'dropped'];
+
+function renderStatusStats(s) {
+  const items = STATUS_STAT_ORDER
+    .map((status) => ({ status, count: s.statusCounts?.[status] || 0 }))
+    .filter((item) => item.count > 0);
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  $('#status-shape').innerHTML = total ? `
+    <div class="shape-bar" role="img" aria-label="${esc(items.map((item) =>
+      `${STATUS_LABEL[item.status]} ${item.count}`).join(', '))}">
+      ${items.map((item) => `<i class="shape-${item.status}"
+        style="width:${(item.count / total) * 100}%"
+        title="${esc(STATUS_LABEL[item.status])}: ${item.count}"></i>`).join('')}
+    </div>
+    <div class="shape-legend">
+      ${items.map((item) => `<span><i class="shape-${item.status}"></i>
+        <b>${item.count}</b> ${esc(STATUS_LABEL[item.status])}</span>`).join('')}
+    </div>` : '';
+}
+
+function renderGenreStats(s) {
+  const genres = s.genres || [];
+  const coverage = s.genreCoverage || { games: 0, hoursGames: 0, ratedGames: 0 };
+  const hasMetric = {
+    games: genres.some((genre) => genre.games > 0),
+    hours: genres.some((genre) => genre.hoursGames > 0),
+    rating: genres.some((genre) => genre.ratedGames > 0),
+  };
+  if (!hasMetric[statsGenreMetric]) statsGenreMetric = 'games';
+
+  let items, max, decimals, note;
+  if (statsGenreMetric === 'hours') {
+    items = genres.filter((genre) => genre.hoursGames > 0)
+      .map((genre) => ({ label: genre.genre, value: genre.hours, display: `${fmt(genre.hours, 0)}h` }))
+      .sort((a, b) => b.value - a.value);
+    max = Math.max(1, ...items.map((item) => item.value));
+    decimals = 0;
+    note = `Recorded hours for ${coverage.hoursGames} of ${coverage.games} played games with a genre. Missing time stays unknown.`;
+  } else if (statsGenreMetric === 'rating') {
+    items = genres.filter((genre) => genre.ratedGames > 0)
+      .map((genre) => ({
+        label: `${genre.genre} (${genre.ratedGames})`, value: genre.avg,
+      })).sort((a, b) => b.value - a.value);
+    max = 10;
+    decimals = 2;
+    note = 'Average score by genre. The number in brackets is how many played games had a rating.';
+  } else {
+    items = genres.filter((genre) => genre.games > 0)
+      .map((genre) => ({ label: genre.genre, value: genre.games }))
+      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+    max = Math.max(1, ...items.map((item) => item.value));
+    decimals = 0;
+    note = 'Games with a played outcome: finished, failed to finish, dropped or sampled.';
+  }
+
+  $('#genre-note').textContent = note;
+  $('#genre-chart').innerHTML = barChart(
+    items, max,
+    statsGenreMetric === 'rating' ? (value) => (value >= 8 ? 'good' : value < 6.5 ? 'bad' : '') : () => '',
+    decimals
+  );
+  $$('#genre-metrics button').forEach((button) => {
+    const active = button.dataset.metric === statsGenreMetric;
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = !hasMetric[button.dataset.metric];
+    button.onclick = () => {
+      statsGenreMetric = button.dataset.metric;
+      renderGenreStats(s);
+    };
+  });
+}
+
+function compactTimeline(items) {
+  if (items.length <= 10) return items;
+  const recent = items.slice(-9);
+  const earlier = items.slice(0, -9).reduce((sum, item) => ({
+    year: 'Earlier', started: sum.started + item.started, finished: sum.finished + item.finished,
+  }), { started: 0, finished: 0 });
+  return [earlier, ...recent];
+}
+
+function renderTimelineStats(s) {
+  const timeline = compactTimeline(s.timeline || []);
+  const coverage = s.timelineCoverage || {};
+  $('#timeline-note').textContent = `Recorded ${coverage.started || 0} of ${coverage.startEligible || 0} starts and ${coverage.finished || 0} of ${coverage.finishEligible || 0} finishes.`;
+  const max = Math.max(1, ...timeline.flatMap((year) => [year.started, year.finished]));
+  $('#timeline-chart').innerHTML = timeline.length ? `
+    <div class="timeline-legend"><span><i></i>Started</span><span><i></i>Finished</span></div>
+    <div class="timeline-scroll">
+      <div class="timeline-bars" style="--timeline-years:${timeline.length}">
+        ${timeline.map((year) => `<div class="timeline-year" aria-label="${esc(String(year.year))}: ${year.started} started, ${year.finished} finished">
+          <div class="timeline-columns">
+            <span><b>${year.started || ''}</b><i style="height:${(year.started / max) * 100}%"></i></span>
+            <span><b>${year.finished || ''}</b><i style="height:${(year.finished / max) * 100}%"></i></span>
+          </div>
+          <strong>${esc(String(year.year))}</strong>
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+}
+
+function renderScatterStats(s) {
+  const points = s.timeVsRating || [];
+  if (points.length < 6) {
+    $('#scatter-chart').innerHTML = '';
+    return;
+  }
+  const highest = Math.max(...points.map((point) => point.hours));
+  const maxHours = Math.max(10, Math.ceil(highest / 10) * 10);
+  $('#scatter-chart').innerHTML = `
+    <div class="scatter-layout">
+      <div class="scatter-y"><span>10</span><span>7</span><span>4</span><span>1</span></div>
+      <div class="scatter-main">
+        <div class="scatter-plot">
+          <i style="bottom:0%"></i><i style="bottom:33.33%"></i>
+          <i style="bottom:66.66%"></i><i style="bottom:100%"></i>
+          ${points.map((point) => {
+            const left = Math.max(2, Math.min(98, (point.hours / maxHours) * 100));
+            const bottom = Math.max(2, Math.min(98, ((point.rating - 1) / 9) * 100));
+            const roundedHours = Math.round(point.hours);
+            const label = `${point.name} · ${fmt(point.rating, 1)} rating · ${fmt(point.hours, 0)} hour${roundedHours === 1 ? '' : 's'}`;
+            const tone = point.rating >= 8 ? 'good' : point.rating < 6.5 ? 'bad' : '';
+            const edge = left > 75 ? 'right' : left < 25 ? 'left' : '';
+            return `<button type="button" class="scatter-point" data-id="${point.id}"
+              data-tone="${tone}" data-edge="${edge}" data-label="${esc(label)}" title="${esc(label)}"
+              aria-label="${esc(label)}" style="left:${left}%;bottom:${bottom}%"></button>`;
+          }).join('')}
+        </div>
+        <div class="scatter-x"><span>0h</span><span>Hours played</span><span>${fmt(maxHours, 0)}h</span></div>
+      </div>
+    </div>`;
+  $$('#scatter-chart .scatter-point').forEach((point) => {
+    point.onclick = () => openDetail(Number(point.dataset.id));
+  });
+}
 
 async function renderStats() {
   const slug = state.group.slug;
@@ -1529,12 +1666,12 @@ async function renderStats() {
     ${tile(s.totals.games, 'games tracked')}
     ${tile(s.totals.finished, 'finished')}
     ${tile(s.totals.backlog, 'in the backlog')}
-    ${tile(s.totals.hours.toLocaleString(), 'hours played', 'Steam sync or a manual entry')}
+    ${tile(s.totals.hours.toLocaleString(), 'hours played', 'Steam sync or saved history')}
     ${tile(s.totals.ratings, 'ratings given')}
     ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'average rating')}` : `
     ${tile(s.totals.games, 'games tracked')}
     ${tile(s.totals.finished, 'finished together')}
-    ${tile(s.totals.hours.toLocaleString(), 'hours logged', 'only where someone filled it in')}
+    ${tile(s.totals.hours.toLocaleString(), 'hours logged', 'manual or accepted history entries')}
     ${tile(s.totals.ratings, 'ratings given')}
     ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'group average', 'across every score anyone has given')}
     ${tile(s.totals.unviableBacklog, 'backlog games we cannot play', `fewer than ${s.totals.maxPlayers} co-op slots`, true)}`;
@@ -1550,9 +1687,10 @@ async function renderStats() {
       <div class="person-mean"><b>${fmt(p.mean, 2)}</b><span>avg · ±${fmt(p.sd, 2)}</span></div>
     </div>`).join('');
 
-  $('#genre-chart').innerHTML = barChart(
-    s.genres.map((g) => ({ label: `${g.genre} (${g.n})`, value: g.avg })),
-    10, (v) => (v >= 8 ? 'good' : v < 6.5 ? 'bad' : ''));
+  renderStatusStats(s);
+  renderGenreStats(s);
+  renderTimelineStats(s);
+  renderScatterStats(s);
 
   $('#arg-legend').innerHTML = state.members.map((m) =>
     `<span><i class="dot" style="background:${colorOf(m.steam_id)}"></i>${esc(m.short_name)}</span>`).join('');
@@ -1624,8 +1762,11 @@ async function renderStats() {
   // comparison that needs another person, while retaining their own history,
   // genres, ratings and playtime.
   const panelData = {
+    'stats-shape': s.totals.games > 0,
+    'stats-timeline': s.timeline.length > 0,
+    'stats-scatter': s.timeVsRating.length >= 6,
     'stats-people': !personal && s.people.some((person) => person.count > 0),
-    'stats-genres': s.genres.length > 0,
+    'stats-genres': s.genres.some((genre) => genre.games > 0),
     'stats-pairs': !personal && s.pairs.length > 0,
     'stats-outliers': !personal && (s.contrarian.length > 0 || s.offbeat.length > 0),
     'stats-top': s.topRated.length > 0,
@@ -1653,7 +1794,7 @@ function barChart(items, max, tone = () => '', decimals = 2) {
     <div class="bar-row"${tone(it.value) ? ` data-tone="${tone(it.value)}"` : ''}>
       <span class="bar-label" title="${esc(it.label)}">${esc(it.label)}</span>
       <div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, (it.value / max) * 100)}%"></div></div>
-      <span class="bar-val">${fmt(it.value, decimals)}</span>
+      <span class="bar-val">${it.display ?? fmt(it.value, decimals)}</span>
     </div>`).join('');
 }
 

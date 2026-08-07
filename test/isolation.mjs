@@ -761,6 +761,31 @@ await check('Biggest arguments includes a real two-person disagreement', async (
 });
 
 sqlite.exec(`INSERT INTO games
+  (id,group_id,name,genre,status,hours,started,finished)
+  VALUES
+  (8260,1,'Stats Fixture','Stats Fixture','finished',12,'2023-01-02','2023-02-03'),
+  (8261,2,'Foreign Stats','Stats Fixture','finished',999,'2023-01-02','2023-02-03')`);
+sqlite.exec(`INSERT INTO ratings (game_id,steam_id,score) VALUES
+  (8260,'${ALICE}',7),(8261,'${MALLORY}',10)`);
+
+await check('library-shape stats aggregate recorded data without crossing groups', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const response = await statsRoute.onRequestGet({ env, data });
+  const result = await response.json();
+  const genre = result.genres.find((item) => item.genre === 'Stats Fixture');
+  const point = result.timeVsRating.find((item) => item.id === 8260);
+  const statusTotal = Object.values(result.statusCounts).reduce((sum, count) => sum + count, 0);
+  const year = result.timeline.find((item) => item.year === 2023);
+  return (response.status === 200 && statusTotal === result.totals.games
+      && genre?.games === 1 && genre.hours === 12 && genre.hoursGames === 1
+      && genre.ratedGames === 1 && genre.avg === 7
+      && point?.hours === 12 && point.rating === 7
+      && !result.timeVsRating.some((item) => item.id === 8261)
+      && year?.started >= 1 && year.finished >= 1)
+    || JSON.stringify({ status: response.status, statusTotal, totals: result.totals, genre, point, year });
+});
+
+sqlite.exec(`INSERT INTO games
   (id,group_id,name,status,release_date,hours_estimated,hours_participants,finished_estimated)
   VALUES
   (8300,1,'AAA History Fixture','finished','2 Feb, 2021',12.5,3,'2024-05-01'),

@@ -61,10 +61,12 @@ tab ranks everyone by how much of the library they have scored. Rating coverage
 is the thing that decides whether any of the scoring means anything, so it is
 not hidden in a stats page.
 
-**Stats.** Per-person baselines, genre track record, and a dot plot of your
-biggest arguments. Panels with no underlying data stay hidden. Personal
-workspaces keep the useful history, rating and playtime views while omitting
-comparisons that require another person.
+**Stats.** Library status, genres by games / recorded hours / average rating,
+yearly starts and finishes, time-versus-rating, per-person baselines, and a dot
+plot of your biggest arguments. Missing hours remain unknown and every history
+chart shows its date coverage. Panels with no underlying data stay hidden.
+Personal workspaces keep the useful history, rating and playtime views while
+omitting comparisons that require another person.
 
 **Steam ownership and trophies.** A three-state ownership badge uses the public
 libraries already synced from the Group tab: owned, absent from a sufficiently
@@ -247,7 +249,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 151 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 152 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -284,6 +286,7 @@ lib/
   auth.js      HMAC-signed cookie sessions, optional signup allowlist
   groups.js    slugs, invite codes, membership lookup
   history.js   missing-fact prompts and bounded automatic suggestions
+  stats.js     shared library-shape, genre, timeline and playtime aggregations
   score.js     plain-mean scoring + viability
   ownership.js three-state Steam-library ownership
   steam.js     Steam Web API and store endpoints, cache-first

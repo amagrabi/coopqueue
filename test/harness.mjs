@@ -18,6 +18,7 @@ import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
 import { recommend } from '../lib/recommend.js';
 import { classifyCoop } from '../lib/coop.js';
 import { buildHistoryItems } from '../lib/history.js';
+import { buildLibraryStats, PLAYED_OUTCOMES } from '../lib/stats.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
@@ -835,11 +836,14 @@ const server = http.createServer(async (req, res) => {
     if (sub === '/stats') {
       const L = libraryFor(gid, need);
       const personal = ctx.workspace_mode === 'personal';
-      const PLAYED = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
-      const played = L.games.filter((g) => PLAYED.has(g.status) && g.n > 0);
+      const statsGames = L.games.map((g) => {
+        const minutes = personal && g.steam_appid
+          ? one('SELECT minutes FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)?.minutes
+          : null;
+        return { ...g, effectiveHours: g.hours ?? (minutes != null ? minutes / 60 : null) };
+      });
+      const played = statsGames.filter((g) => PLAYED_OUTCOMES.has(g.status) && g.n > 0);
       const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
-      const gmap = new Map();
-      for (const g of played) { if (!g.genre) continue; if (!gmap.has(g.genre)) gmap.set(g.genre, []); gmap.get(g.genre).push(g.raw); }
       return send(res, 200, {
         mode: ctx.workspace_mode,
         totals: {
@@ -867,6 +871,7 @@ const server = http.createServer(async (req, res) => {
             min: mine.length ? Math.min(...mine.map((m) => m.score)) : null,
             max: mine.length ? Math.max(...mine.map((m) => m.score)) : null };
         }),
+        ...buildLibraryStats(statsGames),
         ...(() => {
           // Mirrors the real handler's extra statistics closely enough to render.
           const MIN_OVERLAP = 5, MIN_GENRE = 3;
@@ -935,17 +940,13 @@ const server = http.createServer(async (req, res) => {
             tasteOpposites: pairs.length > 1 ? pairs[pairs.length - 1] : null,
           };
         })(),
-        genres: [...gmap.entries()].map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) })).sort((a, b) => b.avg - a.avg),
         arguments: played.filter((g) => g.n >= 2 && g.spread >= 2).sort((a, b) => b.spread - a.spread).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, spread: g.spread, votes: g.votes })),
         topRated: played.slice().sort((a, b) => b.raw - a.raw).slice(0, 10)
           .map((g) => ({ id: g.id, name: g.name, raw: g.raw, n: g.n })),
-        mostHours: L.games.map((g) => {
-          const minutes = personal && g.steam_appid
-            ? one('SELECT minutes FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)?.minutes
-            : null;
-          return { id: g.id, name: g.name, hours: g.hours ?? (minutes != null ? minutes / 60 : 0) };
-        }).filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8),
+        mostHours: statsGames.map((g) => ({
+          id: g.id, name: g.name, hours: g.effectiveHours,
+        })).filter((g) => g.hours).sort((a, b) => b.hours - a.hours).slice(0, 8),
       });
     }
     return send(res, 200, { ok: true });

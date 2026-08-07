@@ -1,7 +1,7 @@
 import { json } from '../../../../lib/http.js';
 import { calibrate, globalStats, scoreGame } from '../../../../lib/score.js';
+import { buildLibraryStats, PLAYED_OUTCOMES } from '../../../../lib/stats.js';
 
-const PLAYED = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
 const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 
 export async function onRequestGet({ env, data }) {
@@ -14,7 +14,7 @@ export async function onRequestGet({ env, data }) {
     // the group is choosing between, and leaving them in would quietly inflate
     // coverage denominators and genre averages.
     env.DB.prepare(
-      `SELECT g.id, g.name, g.genre, g.status, g.hours, g.max_players,
+      `SELECT g.id, g.name, g.genre, g.status, g.hours, g.started, g.finished, g.max_players,
               p.minutes AS personal_minutes
          FROM games g
          LEFT JOIN playtime p ON p.appid = g.steam_appid AND p.steam_id = ?2
@@ -63,7 +63,8 @@ export async function onRequestGet({ env, data }) {
   }
 
   const scored = games.map((g) => ({ ...g, ...scoreGame(byGame.get(g.id) || []) }));
-  const played = scored.filter((g) => PLAYED.has(g.status) && g.n > 0);
+  const played = scored.filter((g) => PLAYED_OUTCOMES.has(g.status) && g.n > 0);
+  const libraryStats = buildLibraryStats(scored);
 
   /* Coverage is per person, and so is the denominator. A game somebody sat out is
      one they cannot rate, so it comes out of THEIR total rather than counting
@@ -173,13 +174,6 @@ export async function onRequestGet({ env, data }) {
     .sort((a, b) => b.skips - a.skips)
     .slice(0, 8);
 
-  const genreMap = new Map();
-  for (const g of played) {
-    if (!g.genre) continue;
-    if (!genreMap.has(g.genre)) genreMap.set(g.genre, []);
-    genreMap.get(g.genre).push(g.raw);
-  }
-
   return json({
     mode: data.group.workspace_mode,
     totals: {
@@ -194,10 +188,8 @@ export async function onRequestGet({ env, data }) {
       groupMean: ratings.length ? r2(glob.mean) : null,
       maxPlayers: need,
     },
+    ...libraryStats,
     people,
-    genres: [...genreMap.entries()]
-      .map(([genre, xs]) => ({ genre, n: xs.length, avg: r2(xs.reduce((a, b) => a + b, 0) / xs.length) }))
-      .sort((a, b) => b.avg - a.avg),
     arguments: played
       .filter((g) => g.n >= 2 && g.spread >= 2)
       .sort((a, b) => b.spread - a.spread)
