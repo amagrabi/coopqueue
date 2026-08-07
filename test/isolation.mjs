@@ -961,6 +961,63 @@ await check('"no opinion" does NOT change the denominator', async () => {
   return after.coverage === before.coverage || `coverage moved ${before.coverage}->${after.coverage}`;
 });
 
+await check('a skipped game stays reachable — it reports MY skip back to me', async () => {
+  /* The bug this exists to stop: skipping took a game out of the queue, and with no
+     rating it was in no other list either, so it became unreachable and the skip
+     could never be undone. Subnautica 2 sat like that in production. */
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 13').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id }), env, data });
+
+  const q = await (await skipRoute.onRequestGet({ env, data })).json();
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const row = lib.games.find((x) => x.id === g.id);
+  return (!q.queue.includes(g.id) && row.mySkip === 'no-opinion')
+    || `inQueue ${q.queue.includes(g.id)}, mySkip ${row.mySkip}`;
+});
+
+await check('the two kinds of skip are distinguishable to the person who made them', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 14').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id, notPlayed: true }), env, data });
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  return lib.games.find((x) => x.id === g.id).mySkip === 'not-played'
+    || `got ${lib.games.find((x) => x.id === g.id).mySkip}`;
+});
+
+await check('un-skipping puts it back in the queue', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 15').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id }), env, data });
+  await skipRoute.onRequestDelete({ request: req({ gameId: g.id }), env, data });
+  const q = await (await skipRoute.onRequestGet({ env, data })).json();
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  return (q.queue.includes(g.id) && lib.games.find((x) => x.id === g.id).mySkip === null)
+    || 'still skipped';
+});
+
+await check('rating a skipped game clears the skip, so it cannot be in both lists', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 16').get();
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id }), env, data });
+  await rateRoute.onRequestPost({ request: req({ gameId: g.id, score: 7 }), env, data });
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const row = lib.games.find((x) => x.id === g.id);
+  sqlite.prepare('DELETE FROM ratings WHERE game_id=? AND steam_id=?').run(g.id, ALICE);
+  return (row.mySkip === null && row.votes[ALICE] === 7) || `mySkip ${row.mySkip}, vote ${row.votes[ALICE]}`;
+});
+
+await check('one person\'s skip is never reported as another\'s', async () => {
+  // mySkip is answered for the caller only; MALLORY must not see ALICE's skips.
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 17').get();
+  const a = await ctxFor(ALICE, 'g4m1ng');
+  await skipRoute.onRequestPost({ request: req({ gameId: g.id }), env, data: a.data });
+  const m = await ctxFor(MALLORY, 'g4m1ng');
+  const lib = await (await gamesRoute.onRequestGet({ env, data: m.data })).json();
+  return lib.games.find((x) => x.id === g.id).mySkip === null
+    || 'leaked another member\'s skip';
+});
+
 await check('cannot mark a game in another group as not played', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const r = await skipRoute.onRequestPost({ request: req({ gameId: 5000, notPlayed: true }), env, data });

@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 114 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 119 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -367,7 +367,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-114/114 assertions pass. `npm run test:ui` does **not** run on macOS: it
+119/119 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -577,6 +577,28 @@ them, which is correct whether the cascade fires or not. **Test any future rebui
 the same way**: restore `npm run db:backup` output into a local SQLite file with
 `PRAGMA foreign_keys = ON`, replay the migration, and compare row counts *and* a
 checksum of the ratings before and after.
+
+## Skipping is not a one-way door
+
+Reported as a bug and it was one: Subnautica 2 showed on Play next with one rating,
+and the person who had skipped it could not find it anywhere in Rate. The queue
+excludes what you skipped — that is the point of skipping — but with no score of your
+own it was in no other list either, so the game was **unreachable and the skip could
+never be undone**. `DELETE /skip` had existed since the beginning and nothing in the
+UI ever called it.
+
+The Rate tab now has a **Skipped** mode, hidden unless you actually have skips, which
+lists them with which kind each was and offers "Put back in my queue". Rating one
+works too — `rate.js` has always deleted the skip on rating, so scoring it from there
+resolves both at once.
+
+The library payload carries `mySkip` (`'no-opinion' | 'not-played' | null`) for the
+**caller only**, alongside the group-visible `notPlayed` list. `skipGame()` sets it
+locally as well as posting, or the tab does not appear until a reload and the game
+you just skipped is unreachable in the meantime — which is the original bug in
+miniature.
+
+Five assertions, including that one member's skip is never reported as another's.
 
 ## Changing a rating
 

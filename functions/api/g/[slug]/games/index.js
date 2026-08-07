@@ -36,13 +36,16 @@ export async function onRequestGet({ env, data }) {
         WHERE m.group_id = ?
         ORDER BY m.short_name COLLATE NOCASE`
     ).bind(gid).all(),
-    // Who sat a game out. Needed client-side for coverage — a game you did not
-    // play is not one you failed to rate — so it travels with the library rather
-    // than costing a second round trip.
+    /* Every skip in the group, for two different jobs. `not_played = 1` rows are
+       group-visible — a game you did not play is not one you failed to rate, so
+       coverage needs them. The caller's own rows, of either kind, are what makes a
+       skipped game reachable again: without them the Rate tab cannot show you what
+       you skipped, and a skip becomes a one-way door. Few rows either way, so this
+       travels with the library rather than costing a second round trip. */
     env.DB.prepare(
-      `SELECT s.game_id, s.steam_id FROM skips s
+      `SELECT s.game_id, s.steam_id, s.not_played FROM skips s
          JOIN games g ON g.id = s.game_id
-        WHERE g.group_id = ? AND s.not_played = 1`
+        WHERE g.group_id = ?`
     ).bind(gid).all(),
   ]);
 
@@ -58,9 +61,15 @@ export async function onRequestGet({ env, data }) {
   }
 
   const satOut = new Map();
+  const mine = new Map();
   for (const s of notPlayedRes.results || []) {
-    if (!satOut.has(s.game_id)) satOut.set(s.game_id, []);
-    satOut.get(s.game_id).push(s.steam_id);
+    if (s.not_played) {
+      if (!satOut.has(s.game_id)) satOut.set(s.game_id, []);
+      satOut.get(s.game_id).push(s.steam_id);
+    }
+    if (s.steam_id === data.user.steam_id) {
+      mine.set(s.game_id, s.not_played ? 'not-played' : 'no-opinion');
+    }
   }
 
   const need = data.group.max_players;
@@ -72,6 +81,7 @@ export async function onRequestGet({ env, data }) {
       comments: votes.filter((v) => v.comment).map((v) => ({ steamId: v.steam_id, comment: v.comment })),
       ...scoreGame(votes),
       notPlayed: satOut.get(g.id) || [],
+      mySkip: mine.get(g.id) || null,
       viability: viability(g, need),
     };
   });

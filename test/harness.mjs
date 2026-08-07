@@ -238,10 +238,14 @@ function libraryFor(gid, need) {
   const byGame = new Map();
   for (const r of ratings) { if (!byGame.has(r.game_id)) byGame.set(r.game_id, []); byGame.get(r.game_id).push(r); }
   const satOut = new Map();
-  for (const s2 of q(`SELECT s.game_id, s.steam_id FROM skips s JOIN games g ON g.id=s.game_id
-                       WHERE g.group_id=? AND s.not_played=1`, gid)) {
-    if (!satOut.has(s2.game_id)) satOut.set(s2.game_id, []);
-    satOut.get(s2.game_id).push(s2.steam_id);
+  const mySkips = new Map();
+  for (const s2 of q(`SELECT s.game_id, s.steam_id, s.not_played FROM skips s
+                        JOIN games g ON g.id=s.game_id WHERE g.group_id=?`, gid)) {
+    if (s2.not_played) {
+      if (!satOut.has(s2.game_id)) satOut.set(s2.game_id, []);
+      satOut.get(s2.game_id).push(s2.steam_id);
+    }
+    if (s2.steam_id === ME) mySkips.set(s2.game_id, s2.not_played ? 'not-played' : 'no-opinion');
   }
   return {
     ratings, cal, glob, members, byGame,
@@ -249,7 +253,7 @@ function libraryFor(gid, need) {
       const votes = byGame.get(g.id) || [];
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
                comments: [], ...scoreGame(votes), notPlayed: satOut.get(g.id) || [],
-               viability: viability(g, need) };
+               mySkip: mySkips.get(g.id) || null, viability: viability(g, need) };
     }),
   };
 }
@@ -530,6 +534,12 @@ const server = http.createServer(async (req, res) => {
       if (!one('SELECT 1 AS x FROM games WHERE id=? AND group_id=?', gameId, gid)) return send(res, 404, { error: 'no such game' });
       db.prepare(`INSERT INTO ratings (game_id, steam_id, score) VALUES (?,?,?)
                   ON CONFLICT(game_id, steam_id) DO UPDATE SET score=excluded.score`).run(gameId, ME, score);
+      return send(res, 200, { ok: true });
+    }
+    if (sub === '/skip' && req.method === 'DELETE') {
+      const { gameId } = await readBody(req);
+      db.prepare(`DELETE FROM skips WHERE game_id=? AND steam_id=?
+                   AND game_id IN (SELECT id FROM games WHERE group_id=?)`).run(gameId, ME, gid);
       return send(res, 200, { ok: true });
     }
     if (sub === '/skip' && req.method === 'POST') {

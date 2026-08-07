@@ -421,6 +421,7 @@ function wireOnce() {
   $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView('queue'); });
   $('#btn-skip').addEventListener('click', () => skipGame(false));
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
+  $('#btn-unskip').addEventListener('click', unskipGame);
   // Unmuting one trailer means you want sound for the rest of the sitting.
   $('#rate-video').addEventListener('volumechange', (e) => { trailerMuted = e.target.muted; });
 
@@ -549,13 +550,16 @@ const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
  * working through a pile.
  */
 function queuesByMode() {
-  const out = { played: [], want: [], rated: [] };
+  const out = { played: [], want: [], rated: [], skipped: [] };
   for (const id of state.queue) {
     const g = gameById(id);
     if (g && isActive(g)) out[modeOf(g)].push(id);
   }
   for (const g of activeGames()) {
     if (g.votes[state.me.steamId] != null) out.rated.push(g.id);
+    // Skipped AND unrated. Rating one clears the skip server-side, so a game can
+    // never be in both lists — but check anyway rather than rely on that.
+    else if (g.mySkip) out.skipped.push(g.id);
   }
   return out;
 }
@@ -573,10 +577,14 @@ function renderQueue() {
   const queue = byMode[state.rateMode];
 
   const modes = $('#rate-modes');
-  modes.hidden = !(byMode.played.length || byMode.want.length || byMode.rated.length);
+  modes.hidden = !(byMode.played.length || byMode.want.length
+                   || byMode.rated.length || byMode.skipped.length);
   $('#mode-played-n').textContent = byMode.played.length || '';
   $('#mode-want-n').textContent = byMode.want.length || '';
   $('#mode-rated-n').textContent = byMode.rated.length || '';
+  $('#mode-skipped-n').textContent = byMode.skipped.length || '';
+  // Most people never skip anything; no reason to show them an empty tab.
+  $('#rate-modes .seg[data-mode="skipped"]').hidden = !byMode.skipped.length;
   $$('#rate-modes .seg').forEach((b) => {
     const on = b.dataset.mode === state.rateMode;
     b.setAttribute('aria-selected', String(on));
@@ -587,13 +595,15 @@ function renderQueue() {
     played: 'How good was it? Rate what you have already played, while you still remember.',
     want:   'How much do you want to play this? These are the ones that decide what comes next.',
     rated:  'Everything you have already scored. Move the slider and save to change your mind.',
+    skipped: 'Games you passed on. Score one to add it, or put it back in the queue for later.',
   }[state.rateMode];
   // Only meaningful for games the group has finished: you cannot "not have played"
   // something nobody has played yet, where the question is interest, not memory.
   $('#btn-notplayed').hidden = state.rateMode !== 'played';
+  $('#btn-unskip').hidden = state.rateMode !== 'skipped';
   // Skipping something you have already scored is not an action — the score is the
   // opinion, and clearing it is what the queue would call unrated again.
-  $('#btn-skip').hidden = state.rateMode === 'rated';
+  $('#btn-skip').hidden = state.rateMode === 'rated' || state.rateMode === 'skipped';
 
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
@@ -606,7 +616,7 @@ function renderQueue() {
   if (!g) { state.queue = state.queue.filter((id) => id !== queue[state.qIndex]); return renderQueue(); }
 
   $('#rate-title').textContent = g.name;
-  $('#rate-pos').textContent = state.rateMode === 'rated'
+  $('#rate-pos').textContent = (state.rateMode === 'rated' || state.rateMode === 'skipped')
     ? `${state.qIndex + 1} of ${queue.length}`
     : `${state.qIndex + 1} of ${queue.length} left`;
   $('#rate-desc').textContent = g.short_description || '';
@@ -736,6 +746,9 @@ async function saveRating() {
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     g.votes[state.me.steamId] = score;
+    // rate.js deletes any skip on the same game, so the local copy has to agree or
+    // the card lingers in the Skipped list until the next reload.
+    g.mySkip = null;
     /* Revising does not shrink the list it came from, so nothing moves you along —
        step forward by hand, or the card sits there looking like it did not save. */
     if (state.rateMode === 'rated') state.qIndex++;
@@ -772,6 +785,8 @@ function renderQueueList(queue) {
               <span class="rate-jump-name">${esc(g.name)}</span>
               ${state.rateMode === 'rated'
                 ? `<span class="rate-jump-meta">you: ${fmt(g.votes[state.me.steamId], 1)}</span>`
+                : state.rateMode === 'skipped'
+                ? `<span class="rate-jump-meta">${g.mySkip === 'not-played' ? "didn't play" : 'no opinion'}</span>`
                 : g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
                       : '<span class="rate-jump-meta">no votes yet</span>'}
             </button></li>`;
@@ -786,6 +801,21 @@ function renderQueueList(queue) {
   }));
 }
 
+/** Undo a skip: back into the queue, where it can be rated like anything else. */
+async function unskipGame() {
+  const g = currentCard();
+  if (!g) return;
+  try {
+    await gapi('/skip', { method: 'DELETE', body: { gameId: g.id } });
+    g.mySkip = null;
+    if (!state.queue.includes(g.id)) state.queue.push(g.id);
+    $('#queue-count').textContent = state.queue.length || '';
+    renderMyCoverage();
+    toast(`${g.name} is back in your queue`);
+    renderQueue();
+  } catch (e) { toast(e.message); }
+}
+
 async function skipGame(notPlayed = false) {
   const g = currentCard();
   if (!g) return;
@@ -794,6 +824,9 @@ async function skipGame(notPlayed = false) {
     if (notPlayed && !(g.notPlayed || []).includes(state.me.steamId)) {
       g.notPlayed = [...(g.notPlayed || []), state.me.steamId];
     }
+    // Keep the local copy in step, or the Skipped tab does not appear until a
+    // reload — and the game you just skipped is unreachable until then.
+    g.mySkip = notPlayed ? 'not-played' : 'no-opinion';
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     renderMyCoverage();

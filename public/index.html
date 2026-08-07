@@ -190,6 +190,12 @@
           <button class="seg" data-mode="rated" role="tab">
             Already rated <span class="pill" id="mode-rated-n"></span>
           </button>
+          <!-- Skipping used to be a one-way door: the queue excludes what you
+               skipped and "Already rated" has no score to list, so the game became
+               unreachable. Hidden unless you actually have skips. -->
+          <button class="seg" data-mode="skipped" role="tab" hidden>
+            Skipped <span class="pill" id="mode-skipped-n"></span>
+          </button>
         </div>
         <p class="rate-ask" id="rate-ask"></p>
 
@@ -240,6 +246,7 @@
               <button class="btn btn-primary btn-lg" id="btn-save">Save &amp; next</button>
               <button class="btn btn-ghost" id="btn-skip">No opinion</button>
               <button class="btn btn-ghost" id="btn-notplayed" hidden>I didn't play this</button>
+              <button class="btn btn-ghost" id="btn-unskip" hidden>Put back in my queue</button>
               <a class="btn btn-ghost" id="btn-store" target="_blank" rel="noopener" hidden>Steam page ↗</a>
             </div>
             <p class="kbd-hint"><kbd>1</kbd>–<kbd>9</kbd> <kbd>0</kbd>=10 to rate · <kbd>←</kbd><kbd>→</kbd> nudge · <kbd>Enter</kbd> save · <kbd>S</kbd> skip · <kbd>N</kbd> didn't play</p>
