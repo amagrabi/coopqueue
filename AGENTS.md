@@ -22,7 +22,7 @@ Live at <https://coopqueue.pages.dev>.
 ## Before you finish
 
 ```bash
-npm test                 # 103 assertions — MUST pass before any deploy
+npm test                 # 109 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -68,7 +68,14 @@ invariants plus the evidence.
    caps render as "player count unverified" and the fit filter **excludes** them
    rather than claiming they fit. That is the claim that costs someone money.
 
-7. **Never hard-delete a game.** Removing sets `games.archived_at`; a real DELETE
+7. **Rebuilding a table drops its children.** `DROP TABLE games` fires
+   `ON DELETE CASCADE` on ratings, comments and skips, and `PRAGMA
+   defer_foreign_keys` does **not** prevent it — only the violation check is
+   deferred, the cascade still runs. Any migration that recreates a table must stash
+   and restore the children, and must be replayed over a real `db:backup` first with
+   row counts compared. See migration 017.
+
+8. **Never hard-delete a game.** Removing sets `games.archived_at`; a real DELETE
    cascades away every rating, and ratings are the one thing here that cannot be
    recreated. Anything counting the library filters on `archived_at IS NULL`.
 

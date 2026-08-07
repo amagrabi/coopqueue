@@ -723,6 +723,78 @@ await check('deleting one group leaves the other untouched', async () => {
   return g1 > 0 || 'group 1 lost its games when group 2 was deleted';
 });
 
+console.log('\nAdded-by attribution');
+
+await check('an adder can be set, and it is reported with the library', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ added_by: ALICE }), env, data });
+  const body = await (await gamesRoute.onRequestGet({ env, data })).json();
+  return (r.status === 200 && body.games.find((x) => x.id === g.id).added_by === ALICE)
+    || `status ${r.status}`;
+});
+
+await check('it can be cleared back to unknown', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ added_by: null }), env, data });
+  const row = sqlite.prepare('SELECT added_by FROM games WHERE id=?').get(g.id);
+  return row.added_by === null || `still ${row.added_by}`;
+});
+
+await check('an account outside the group cannot be written in as the adder', async () => {
+  /* added_by is rendered as a name, so an unchecked value would let a member paint
+     an arbitrary SteamID64 — or another group's member — onto their own rows. */
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ added_by: '76561190000000999' }), env, data });
+  const row = sqlite.prepare('SELECT added_by FROM games WHERE id=?').get(g.id);
+  return (r.status === 400 && row.added_by === null) || `status ${r.status}, stored ${row.added_by}`;
+});
+
+console.log('\nStatuses');
+
+await check('"unfinished" is accepted as a status', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 7').get();
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ status: 'unfinished' }), env, data });
+  const row = sqlite.prepare('SELECT status FROM games WHERE id=?').get(g.id);
+  return (r.status === 200 && row.status === 'unfinished') || `status ${r.status}, stored ${row.status}`;
+});
+
+await check('a status outside the list is still refused', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 8').get();
+  const before = sqlite.prepare('SELECT status FROM games WHERE id=?').get(g.id).status;
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ status: 'nearly-done' }), env, data });
+  const after = sqlite.prepare('SELECT status FROM games WHERE id=?').get(g.id).status;
+  return (r.status === 400 && after === before) || `status ${r.status}, ${before} -> ${after}`;
+});
+
+await check('a game you failed to finish counts as played, not as backlog', async () => {
+  /* It belongs in the "how good was it?" queue and in the played-games stats — you
+     have an opinion on a game you got most of the way through. The stats module's
+     PLAYED set is the server-side half of that; PLAYED_STATUS in app.js is the half
+     that decides which rating queue the card lands in. */
+  const stats = await import(path.join(SITE, 'functions/api/g/[slug]/stats.js'));
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare(
+    "SELECT id, name FROM games WHERE group_id=1 AND id IN (SELECT game_id FROM ratings) LIMIT 1").get();
+
+  sqlite.prepare("UPDATE games SET status='backlog' WHERE id=?").run(g.id);
+  const asBacklog = (await (await stats.onRequestGet({ env, data })).json()).totals.backlog;
+  sqlite.prepare("UPDATE games SET status='unfinished' WHERE id=?").run(g.id);
+  const asUnfinished = (await (await stats.onRequestGet({ env, data })).json()).totals.backlog;
+
+  return asUnfinished === asBacklog - 1
+    || `backlog count ${asBacklog} -> ${asUnfinished}, expected one fewer`;
+});
+
 console.log('\n"I didn\'t play this"');
 
 const skipRoute = await import(path.join(SITE, 'functions/api/g/[slug]/skip.js'));

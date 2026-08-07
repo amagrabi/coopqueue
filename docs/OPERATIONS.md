@@ -53,7 +53,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 103 assertions — ALWAYS before a deploy
+npm test          # 109 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -117,6 +117,12 @@ npm run db:migrate -- --file=./migrations/0NN-what-it-does.sql
 A new table or column must be added to **both** `schema.sql` (fresh installs and
 tests) and a migration (production). They are kept in sync by hand, and the harness
 refuses to start when they drift, which is the check that catches it.
+
+**A migration that rebuilds a table must be rehearsed.** Restore a `npm run db:backup`
+dump into a local SQLite file with `PRAGMA foreign_keys = ON`, replay the migration,
+and compare row counts *and* a checksum of `ratings` either side. Migration 017 is the
+worked example: the first draft passed `PRAGMA foreign_key_check` cleanly while having
+silently deleted every rating.
 
 Migrations are **not tracked** — there is no applied-migrations table. They are
 applied by hand with an explicit `--file`, so renaming or renumbering a file is

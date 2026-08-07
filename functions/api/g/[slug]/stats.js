@@ -1,7 +1,7 @@
 import { json } from '../../../../lib/http.js';
 import { calibrate, globalStats, scoreGame } from '../../../../lib/score.js';
 
-const PLAYED = new Set(['finished', 'dropped', 'sampled']);
+const PLAYED = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
 const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 
 export async function onRequestGet({ env, data }) {

@@ -124,6 +124,13 @@ const FIXTURE_TAGS = [
   }
 }
 
+// Attribution and the "failed to finish" status need a row each to be visible.
+db.exec(`UPDATE games SET added_by='${ME}'
+          WHERE id IN (SELECT id FROM games WHERE group_id=1 ORDER BY id LIMIT 3)`);
+db.exec(`UPDATE games SET status='unfinished'
+          WHERE id IN (SELECT id FROM games WHERE group_id=1 AND status='finished'
+                        ORDER BY id LIMIT 2)`);
+
 // A couple of collectively-shrugged-at games, so the "nobody has an opinion"
 // panel has something to show locally.
 db.exec(`INSERT OR IGNORE INTO skips (game_id, steam_id)
@@ -408,6 +415,20 @@ const server = http.createServer(async (req, res) => {
       if ('archived' in b) {
         db.prepare('UPDATE games SET archived_at=? WHERE id=? AND group_id=?')
           .run(b.archived ? Math.floor(Date.now() / 1000) : null, id, gid);
+      }
+      // Mirrors the real handler, membership check included — otherwise the local
+      // detail panel appears to save an adder that the deployed site would refuse.
+      if ('added_by' in b) {
+        const who = b.added_by === '' ? null : b.added_by;
+        if (who !== null && !one('SELECT 1 AS x FROM memberships WHERE group_id=? AND steam_id=?', gid, String(who))) {
+          return send(res, 400, { error: 'that person is not in this group' });
+        }
+        db.prepare('UPDATE games SET added_by=? WHERE id=? AND group_id=?').run(who, id, gid);
+      }
+      for (const k of ['status', 'genre', 'hours', 'max_players', 'name']) {
+        if (!(k in b)) continue;
+        db.prepare(`UPDATE games SET ${k}=? WHERE id=? AND group_id=?`)
+          .run(b[k] === '' ? null : b[k], id, gid);
       }
       return send(res, 200, { ok: true });
     }

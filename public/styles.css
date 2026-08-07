@@ -323,6 +323,31 @@ td.miss { color: #4a4a47; }
 /* "didn't play" sits beside the scores but is not one — muted and italic so it
    reads as absence rather than as a very low rating. */
 .other-out { color: var(--text-muted); font-style: italic; }
+
+/* The queue, listed. Collapsed by default so the card stays the focus. */
+.rate-list { margin-top: 10px; }
+.rate-list > summary {
+  cursor: pointer; font-size: 13px; color: var(--text-muted);
+  padding: 4px 0; width: fit-content; list-style-position: inside;
+}
+.rate-list > summary:hover { color: var(--text-secondary); }
+.rate-list-items {
+  list-style: none; margin: 8px 0 0; padding: 6px;
+  max-height: 280px; overflow-y: auto;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+}
+.rate-jump {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  padding: 7px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-secondary);
+}
+.rate-jump:hover { background: var(--surface-2); color: var(--text-primary); }
+.rate-jump.is-current { background: var(--surface-2); color: var(--text-primary); font-weight: 600; }
+/* A left edge marks the current card without shifting anything as you move down. */
+.rate-jump.is-current .rate-jump-name { box-shadow: -8px 0 0 -5px var(--series-1); }
+.rate-jump-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rate-jump-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; flex: none; }
 .bar-fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--series-1); transition: width .3s; }
 .bar-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bar-row[data-tone="good"] .bar-fill { background: var(--good); }
@@ -541,6 +566,7 @@ td.miss { color: #4a4a47; }
    colouring it would just add noise. */
 .status-playing  { background: rgba(57,135,229,.14);  border-color: rgba(57,135,229,.45);  color: #a8cbf5; }
 .status-finished { background: rgba(12,163,12,.14);   border-color: rgba(12,163,12,.45);   color: #8fe08f; }
+.status-unfinished { background: rgba(201,133,0,.14); border-color: rgba(201,133,0,.45); color: #e8bf72; }
 .status-dropped  { background: rgba(208,59,59,.13);   border-color: rgba(208,59,59,.42);   color: #f0a3a3; }
 .status-sampled  { background: rgba(250,178,25,.12);  border-color: rgba(250,178,25,.40);  color: #f2d79a; }
 

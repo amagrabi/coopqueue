@@ -2,7 +2,7 @@ import { json, bad, body } from '../../../../../lib/http.js';
 import { getAppDetails } from '../../../../../lib/steam.js';
 
 const EDITABLE = ['name', 'genre', 'status', 'max_players', 'coop_note', 'hours', 'started', 'finished', 'notes'];
-const STATUSES = ['backlog', 'playing', 'finished', 'dropped', 'sampled'];
+const STATUSES = ['backlog', 'playing', 'finished', 'unfinished', 'dropped', 'sampled'];
 
 /** Game ids are global and guessable, so every statement filters on group_id too. */
 export async function onRequestPatch({ params, request, env, data }) {
@@ -18,6 +18,24 @@ export async function onRequestPatch({ params, request, env, data }) {
   if ('archived' in patch) {
     sets.push('archived_at = ?');
     vals.push(patch.archived ? Math.floor(Date.now() / 1000) : null);
+  }
+
+  /* Who added the game. Recorded automatically on new adds, but almost every game
+     in an imported library predates that, so it can be set by hand.
+
+     Not in EDITABLE because it needs a lookup: an arbitrary SteamID64 would let a
+     member write a foreign account into their group's rows, and `added_by` is
+     rendered as a name. Only members of THIS group, or null for "we don't know". */
+  if ('added_by' in patch) {
+    const who = patch.added_by === '' ? null : patch.added_by;
+    if (who !== null) {
+      const member = await env.DB.prepare(
+        'SELECT 1 FROM memberships WHERE group_id = ? AND steam_id = ?'
+      ).bind(data.group.group_id, String(who)).first();
+      if (!member) return bad('that person is not in this group', 400);
+    }
+    sets.push('added_by = ?');
+    vals.push(who);
   }
   for (const k of EDITABLE) {
     if (!(k in patch)) continue;

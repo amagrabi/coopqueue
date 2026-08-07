@@ -52,7 +52,7 @@ const nameOf = (steamId) =>
 
 const STATUS_LABEL = {
   backlog: 'Backlog', playing: 'Playing', finished: 'Finished',
-  dropped: 'Dropped', sampled: 'Sampled',
+  unfinished: 'Failed to finish', dropped: 'Dropped', sampled: 'Sampled',
 };
 
 /* ─────────────────────────────── api ─────────────────────────────────── */
@@ -372,6 +372,10 @@ const VIEWS = ['queue', 'next', 'library', 'browse', 'stats', 'members'];
 
 function setView(view) {
   if (!VIEWS.includes(view)) view = 'queue';
+  /* Arriving at the Library resets it to the default. Deliberately only when
+     coming from ANOTHER view — the detail dialog re-renders the current one on
+     save, and having that silently undo your sort would be maddening. */
+  if (view === 'library' && state.view !== 'library') resetLibControls();
   state.view = view;
   const want = `#/g/${state.group.slug}/${view}`;
   if (location.hash !== want) history.replaceState(null, '', want);
@@ -419,6 +423,11 @@ function wireOnce() {
   });
   $('#lib-mine').addEventListener('change', renderLibrary);
   $('#lib-score').addEventListener('change', renderLibrary);
+  $('#lib-reset').addEventListener('click', () => {
+    resetLibControls();
+    renderLibHead();      // clears the column sort arrow too
+    renderLibrary();
+  });
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
@@ -500,7 +509,8 @@ const hoursOf = (g) => {
 const isActive = (g) => !g.archived_at;
 const activeGames = () => state.games.filter(isActive);
 
-const PLAYED_STATUS = new Set(['finished', 'dropped', 'sampled']);
+// A game you failed to finish is still one you played and can score.
+const PLAYED_STATUS = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
 const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
 
 function queuesByMode() {
@@ -543,6 +553,7 @@ function renderQueue() {
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
   $('#queue-card').hidden = empty;
+  renderQueueList(queue);
   if (empty) return;
 
   if (state.qIndex >= queue.length) state.qIndex = 0;
@@ -642,6 +653,13 @@ function metaChips(g) {
       g.steam_review_count ? ` · ${compact(g.steam_review_count)} reviews` : ''}</span>`);
   }
   if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
+  /* Who put this on the list. Only when we can name them — most of an imported
+     library has no attribution, and "Added by Someone" is worse than silence. */
+  const adder = g.added_by && state.members.find((m) => m.steam_id === g.added_by);
+  if (adder) {
+    chips.push(`<span class="chip"><i class="dot" style="background:${colorOf(g.added_by)}"></i>`
+             + `Added by ${esc(adder.short_name)}</span>`);
+  }
   return chips.join('');
 }
 
@@ -672,6 +690,34 @@ async function saveRating() {
  * denominator, so it has to update the local copy too or the bar above the queue
  * disagrees with the server until the next reload.
  */
+/**
+ * The rest of the queue, so it is a list you can steer rather than a conveyor belt.
+ * Rebuilt on every card because the queue shrinks as you rate, and the current
+ * position has to stay marked.
+ */
+function renderQueueList(queue) {
+  const box = $('#rate-list');
+  box.hidden = queue.length < 2;          // a list of one is just the card again
+  if (box.hidden) return;
+
+  $('#rate-list-n').textContent = `All ${queue.length} in this queue`;
+  $('#rate-list-items').innerHTML = queue.map((id, i) => {
+    const g = gameById(id);
+    if (!g) return '';
+    return `<li><button type="button" class="rate-jump${i === state.qIndex ? ' is-current' : ''}"
+              data-i="${i}"${i === state.qIndex ? ' aria-current="true"' : ''}>
+              <span class="rate-jump-name">${esc(g.name)}</span>
+              ${g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
+                    : '<span class="rate-jump-meta">no votes yet</span>'}
+            </button></li>`;
+  }).join('');
+
+  $$('#rate-list-items .rate-jump').forEach((b) => b.addEventListener('click', () => {
+    state.qIndex = Number(b.dataset.i);
+    renderQueue();
+  }));
+}
+
 async function skipGame(notPlayed = false) {
   const g = currentCard();
   if (!g) return;
@@ -731,6 +777,34 @@ function renderNext() {
  * open A–Z, numeric ones open highest-first, because that is what you want on the
  * first click in each case.
  */
+/* The Library's default view, and the single definition of it.
+
+   "Best first" is the default on purpose: the Library is the reference view — what
+   this group has and what it thinks of it — so the group's own canon belongs at the
+   top. The alternatives all answer narrower questions that another screen already
+   owns: coverage is the Rate tab's job, and what to play next is Play next's. */
+const LIB_DEFAULTS = {
+  'lib-search': '', 'lib-status': '', 'lib-sort': 'best',
+  'lib-mine': '', 'lib-score': '', 'lib-played': '', 'lib-archived': '',
+};
+
+/** Put every Library control back to its default. Returns true if anything moved. */
+function resetLibControls() {
+  let changed = libSort !== null;
+  libSort = null;
+  for (const [id, v] of Object.entries(LIB_DEFAULTS)) {
+    const el = $('#' + id);
+    if (el && el.value !== v) { el.value = v; changed = true; }
+  }
+  return changed;
+}
+
+/** Is the Library showing anything other than the default? Drives the reset button. */
+function libIsDefault() {
+  return libSort === null
+    && Object.entries(LIB_DEFAULTS).every(([id, v]) => ($('#' + id)?.value ?? v) === v);
+}
+
 let libSort = null;   // { key, dir } — null means the dropdown is in charge
 
 const LIB_COLUMNS = () => [
@@ -809,6 +883,7 @@ function renderMyCoverage() {
 }
 
 function renderLibrary() {
+  $('#lib-reset').hidden = libIsDefault();
   const q = $('#lib-search').value.trim().toLowerCase();
   const status = $('#lib-status').value;
   const sort = $('#lib-sort').value;
@@ -1521,6 +1596,16 @@ function openDetail(id) {
           <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
         </div>
       </div>
+      <div class="detail-field">
+        <label for="d-addedby">Added by</label>
+        <select id="d-addedby" class="input">
+          <option value=""${g.added_by ? '' : ' selected'}>Unknown</option>
+          ${state.members.map((m) =>
+            `<option value="${esc(m.steam_id)}"${g.added_by === m.steam_id ? ' selected' : ''}>${esc(m.short_name)}</option>`).join('')}
+        </select>
+        <p class="field-help">Filled in automatically for games added here. Imported
+          games predate that, so you can set it yourself.</p>
+      </div>
       ${g.notes ? `
       <div class="detail-field">
         <label>Note from the spreadsheet</label>
@@ -1565,6 +1650,7 @@ function openDetail(id) {
         max_players: $('#d-players').value === '' ? null : Number($('#d-players').value),
         genre: $('#d-genre').value.trim() || null,
         hours: $('#d-hours').value === '' ? null : Number($('#d-hours').value),
+        added_by: $('#d-addedby').value || null,
       }});
       await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Saved');
     } catch (e) { toast(e.message); }

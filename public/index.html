@@ -187,6 +187,13 @@
           </button>
         </div>
         <p class="rate-ask" id="rate-ask"></p>
+
+        <!-- The queue is otherwise a black box: you get whatever is next and cannot
+             see what is coming or reach for the one you actually remember. -->
+        <details id="rate-list" class="rate-list">
+          <summary><span id="rate-list-n"></span></summary>
+          <ol id="rate-list-items" class="rate-list-items"></ol>
+        </details>
       </div>
 
       <div id="queue-empty" class="empty" hidden>
@@ -263,6 +270,7 @@
             <option value="backlog">Backlog</option>
             <option value="playing">Playing</option>
             <option value="finished">Finished</option>
+            <option value="unfinished">Failed to finish</option>
             <option value="dropped">Dropped</option>
             <option value="sampled">Sampled</option>
           </select>
@@ -301,6 +309,9 @@
             <option value="archived">Archived only</option>
             <option value="all">Active + archived</option>
           </select>
+          <!-- Only shown once something deviates from the default, so it is a way
+               back rather than a permanently lit button that usually does nothing. -->
+          <button class="btn btn-ghost btn-sm" id="lib-reset" hidden>Reset to default</button>
         </div>
       </div>
       <div class="table-wrap">

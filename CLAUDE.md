@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 103 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 109 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -367,7 +367,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-103/103 assertions pass. `npm run test:ui` does **not** run on macOS: it
+109/109 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -550,6 +550,34 @@ a mis-click is fixable by re-posting.
 Only offered in **Played** mode. In Want-to-play mode the question is interest, not
 memory, so "I didn't play it" is not an answer to anything.
 
+## Statuses, and the table rebuild that added one
+
+`games.status` is `backlog | playing | finished | unfinished | dropped | sampled`.
+**`unfinished` means "we tried to finish it and never did"** — not `dropped` (gave up)
+and not `sampled` (barely started). It counts as *played*, so it lands in the "how
+good was it?" queue and in the played-game stats: `PLAYED_STATUS` in `app.js` and
+`PLAYED` in `stats.js` both list it, and they must agree.
+
+**Adding it needed a table rebuild, and the obvious way to do that destroys every
+rating.** `status` carries a CHECK constraint, SQLite cannot ALTER one, so the column
+list has to be recreated. `DROP TABLE games` then runs an implicit DELETE FROM with
+foreign keys enforced, firing `ON DELETE CASCADE` on `ratings`, `comments` and
+`skips`.
+
+`PRAGMA defer_foreign_keys = on` looks like the fix and is not: it defers the
+*violation check*, while cascade *actions* still fire. Replaying that version over a
+real `d1 export` deleted all 242 ratings and then reported **zero** foreign key
+violations, because nothing was left to violate anything. `PRAGMA foreign_keys = OFF`
+is the documented answer but D1 enforces foreign keys as a platform property, and it
+ignoring the pragma would look identical to it working — until the ratings were gone.
+
+`migrations/017-status-unfinished.sql` therefore does not try to stop the cascade. It
+copies `ratings`, `comments` and `skips` into stash tables, rebuilds, and restores
+them, which is correct whether the cascade fires or not. **Test any future rebuild
+the same way**: restore `npm run db:backup` output into a local SQLite file with
+`PRAGMA foreign_keys = ON`, replay the migration, and compare row counts *and* a
+checksum of the ratings before and after.
+
 ## Blind rating
 
 `groups.blind_rating` (migration 013) hides everyone else's scores in the rating
@@ -558,6 +586,33 @@ personal preference — one person rating blind while the others see the numbers
 achieves nothing, so a per-person toggle would be a setting that does not do what
 its name says. Default off. Three assertions: the default, the owner can set it, and
 a plain member gets 403 with the column unchanged.
+
+## Who added a game
+
+`games.added_by` is stamped automatically on anything added through the site, and is
+editable by hand from the game's detail panel — necessary rather than nice, because
+an imported library has it on almost nothing (1 of 115 rows for group 1). It renders
+as a chip on the rating card and in the detail panel, and **only when the id resolves
+to a current member**: "Added by Someone" is worse than saying nothing.
+
+It is validated against `memberships` in the PATCH handler rather than riding along in
+`EDITABLE`, because the value is displayed as a person's name — an unchecked write
+would let a member paint any SteamID64, including another group's member, onto their
+own rows.
+
+## The Library's default view
+
+`LIB_DEFAULTS` in `app.js` is the single definition, and **"Best first" is the default
+on purpose**: the Library is the reference view — what this group has and what it
+thinks of it — so the group's own canon belongs at the top. The alternatives answer
+narrower questions that other screens already own; coverage is the Rate tab's job and
+what-to-play-next is Play next's.
+
+The defaults are re-established when you arrive at the Library **from another view**,
+and deliberately not on a same-view re-render: the detail dialog re-renders the
+current view on save, and having that silently undo your sort would be maddening. The
+Reset button appears only when something deviates, so it is a way back rather than a
+permanently lit control that usually does nothing.
 
 ## Recommendations, and the co-op filter
 

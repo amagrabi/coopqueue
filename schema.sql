@@ -134,7 +134,9 @@ CREATE TABLE games (
   steam_appid       INTEGER,
   genre             TEXT,
   status            TEXT NOT NULL DEFAULT 'backlog'
-                      CHECK (status IN ('backlog','playing','finished','dropped','sampled')),
+                      -- 'unfinished' = we tried to finish it and never did, which is
+                      -- neither 'dropped' (gave up) nor 'sampled' (barely started).
+                      CHECK (status IN ('backlog','playing','finished','unfinished','dropped','sampled')),
   max_players       INTEGER,                  -- max simultaneous ONLINE co-op players
   coop_note         TEXT,                     -- 'Remote Play Together', 'needs a mod', …
   header_image      TEXT,
