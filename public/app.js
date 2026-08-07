@@ -497,6 +497,22 @@ const gameById = (id) => state.games.find((g) => g.id === id);
  * played together, so it is marked with "≈" and carries how many people it was
  * taken over. Never present the two as the same kind of thing.
  */
+/* When the group finished, on the same rule as hours: a typed date always wins, an
+   estimate is shown with "≈". Steam has no first-played field of any kind, so
+   `started` has no estimate to fall back on and is manual or nothing. */
+const endedOn = (g) => {
+  if (g.finished) return { value: g.finished, manual: true };
+  if (g.finished_estimated) return { value: g.finished_estimated, manual: false };
+  return { value: null, manual: false };
+};
+/** ISO day -> "Mar 2026", which is the precision these dates actually carry. */
+const shortDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(+d) ? iso
+    : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+};
+
 const hoursOf = (g) => {
   if (g.hours != null) return { value: g.hours, manual: true };
   if (g.hours_estimated != null) {
@@ -513,11 +529,23 @@ const activeGames = () => state.games.filter(isActive);
 const PLAYED_STATUS = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
 const modeOf = (g) => (PLAYED_STATUS.has(g.status) ? 'played' : 'want');
 
+/**
+ * The three lists behind the Rate tab.
+ *
+ * `played` and `want` come from the queue — games I have not scored. `rated` is the
+ * opposite set and exists so a rating can be changed: the queue by definition never
+ * offers a game back once you have scored it, which left no way to revise one.
+ * Name order, because in that mode you are looking for a specific game rather than
+ * working through a pile.
+ */
 function queuesByMode() {
-  const out = { played: [], want: [] };
+  const out = { played: [], want: [], rated: [] };
   for (const id of state.queue) {
     const g = gameById(id);
     if (g && isActive(g)) out[modeOf(g)].push(id);
+  }
+  for (const g of activeGames()) {
+    if (g.votes[state.me.steamId] != null) out.rated.push(g.id);
   }
   return out;
 }
@@ -528,27 +556,34 @@ function renderQueue() {
   // Default to whichever mode has work, preferring Played. Also auto-advances
   // when the mode you were in empties, so the queue never looks broken.
   if (!byMode[state.rateMode]?.length) {
+    // Never auto-select 'rated': it is a place you go on purpose, not a backlog.
     state.rateMode = byMode.played.length ? 'played' : 'want';
     state.qIndex = 0;
   }
   const queue = byMode[state.rateMode];
 
   const modes = $('#rate-modes');
-  modes.hidden = !(byMode.played.length || byMode.want.length);
+  modes.hidden = !(byMode.played.length || byMode.want.length || byMode.rated.length);
   $('#mode-played-n').textContent = byMode.played.length || '';
   $('#mode-want-n').textContent = byMode.want.length || '';
+  $('#mode-rated-n').textContent = byMode.rated.length || '';
   $$('#rate-modes .seg').forEach((b) => {
     const on = b.dataset.mode === state.rateMode;
     b.setAttribute('aria-selected', String(on));
     b.classList.toggle('is-on', on);
     b.disabled = !byMode[b.dataset.mode].length;
   });
-  $('#rate-ask').textContent = state.rateMode === 'played'
-    ? 'How good was it? Rate what you have already played, while you still remember.'
-    : 'How much do you want to play this? These are the ones that decide what comes next.';
+  $('#rate-ask').textContent = {
+    played: 'How good was it? Rate what you have already played, while you still remember.',
+    want:   'How much do you want to play this? These are the ones that decide what comes next.',
+    rated:  'Everything you have already scored. Move the slider and save to change your mind.',
+  }[state.rateMode];
   // Only meaningful for games the group has finished: you cannot "not have played"
   // something nobody has played yet, where the question is interest, not memory.
   $('#btn-notplayed').hidden = state.rateMode !== 'played';
+  // Skipping something you have already scored is not an action — the score is the
+  // opinion, and clearing it is what the queue would call unrated again.
+  $('#btn-skip').hidden = state.rateMode === 'rated';
 
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
@@ -561,7 +596,9 @@ function renderQueue() {
   if (!g) { state.queue = state.queue.filter((id) => id !== queue[state.qIndex]); return renderQueue(); }
 
   $('#rate-title').textContent = g.name;
-  $('#rate-pos').textContent = `${state.qIndex + 1} of ${queue.length} left`;
+  $('#rate-pos').textContent = state.rateMode === 'rated'
+    ? `${state.qIndex + 1} of ${queue.length}`
+    : `${state.qIndex + 1} of ${queue.length} left`;
   $('#rate-desc').textContent = g.short_description || '';
   $('#score-hint').textContent = state.rateMode === 'played'
     ? 'how good was it?'
@@ -629,7 +666,13 @@ function renderQueue() {
   // The slider normally opens on the group's current average, which is a second
   // and less obvious source of anchoring: hiding the numbers but still starting
   // the handle on them would defeat the point. Neutral 7.5 when hidden.
-  const start = (others.length && !state.group.blindRating) ? Math.round(g.raw * 2) / 2 : 7.5;
+  /* Revising opens on YOUR current score — the number you are there to change.
+     Otherwise the slider starts on the group average, and blind rating starts it
+     neutral, since anchoring the handle on hidden numbers would defeat the point. */
+  const mine = g.votes[state.me.steamId];
+  const start = state.rateMode === 'rated' && mine != null
+    ? mine
+    : (others.length && !state.group.blindRating) ? Math.round(g.raw * 2) / 2 : 7.5;
   $('#score-range').value = start;
   $('#score-out').textContent = fmt(start, 1);
 }
@@ -676,6 +719,9 @@ async function saveRating() {
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
     g.votes[state.me.steamId] = score;
+    /* Revising does not shrink the list it came from, so nothing moves you along —
+       step forward by hand, or the card sits there looking like it did not save. */
+    if (state.rateMode === 'rated') state.qIndex++;
     renderMyCoverage();   // the bar should move on every save, that is the point
     toast(`${g.name}: ${fmt(score, 1)}`);
     renderQueue();
@@ -707,8 +753,10 @@ function renderQueueList(queue) {
     return `<li><button type="button" class="rate-jump${i === state.qIndex ? ' is-current' : ''}"
               data-i="${i}"${i === state.qIndex ? ' aria-current="true"' : ''}>
               <span class="rate-jump-name">${esc(g.name)}</span>
-              ${g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
-                    : '<span class="rate-jump-meta">no votes yet</span>'}
+              ${state.rateMode === 'rated'
+                ? `<span class="rate-jump-meta">you: ${fmt(g.votes[state.me.steamId], 1)}</span>`
+                : g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
+                      : '<span class="rate-jump-meta">no votes yet</span>'}
             </button></li>`;
   }).join('');
 
@@ -779,12 +827,13 @@ function renderNext() {
  */
 /* The Library's default view, and the single definition of it.
 
-   "Best first" is the default on purpose: the Library is the reference view — what
-   this group has and what it thinks of it — so the group's own canon belongs at the
-   top. The alternatives all answer narrower questions that another screen already
-   owns: coverage is the Rate tab's job, and what to play next is Play next's. */
+   "Recently started" is the default: the Library doubles as the group's history, and
+   the thing you most often want is what you have been playing lately. Games with no
+   start date fall to the bottom and keep the old best-first order among themselves,
+   so a library nobody has dated yet still opens on something sensible rather than
+   looking shuffled. */
 const LIB_DEFAULTS = {
-  'lib-search': '', 'lib-status': '', 'lib-sort': 'best',
+  'lib-search': '', 'lib-status': '', 'lib-sort': 'started',
   'lib-mine': '', 'lib-score': '', 'lib-played': '', 'lib-archived': '',
 };
 
@@ -822,12 +871,16 @@ const LIB_COLUMNS = () => [
   { key: 'n',        label: 'Votes',    cls: 'c-num',  type: 'num',
     title: 'How many of you have scored this. A high average from one person is '
          + 'thin evidence; this is the column that tells you so.' },
+  { key: 'started',  label: 'Started',  cls: 'c-date', type: 'text',
+    title: 'When you first played it. Steam publishes no first-played date, so this '
+         + 'is typed by hand in the game\'s details.' },
   { key: 'hours',    label: 'Hrs',      cls: 'c-num',  type: 'num',
     title: 'Hours logged for this game, entered by hand' },
 ];
 
 const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
+  if (key === 'started') return g.started || null;
   if (key === 'hours')   return hoursOf(g).value;
   if (key === 'status')  return STATUS_LABEL[g.status];
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
@@ -931,6 +984,16 @@ function renderLibrary() {
     });
   } else {
     rows.sort({
+      /* Most recently started first. Games with no start date fall to the bottom
+         rather than clumping at the top as equal-nulls, and among themselves keep
+         the old default order — otherwise a library that has not been dated yet
+         (which is every library, at first) looks randomly shuffled. */
+      started:  (a, b) => {
+        if (a.started && b.started) return b.started.localeCompare(a.started);
+        if (a.started) return -1;
+        if (b.started) return 1;
+        return (b.raw ?? -1) - (a.raw ?? -1);
+      },
       best:     (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
       name:     (a, b) => a.name.localeCompare(b.name),
       spread:   (a, b) => (b.spread ?? -1) - (a.spread ?? -1),
@@ -957,6 +1020,9 @@ function renderLibrary() {
       }).join('')}
       <td class="c-num cell-strong">${fmt(g.raw, 1)}</td>
       <td class="c-num">${g.n || '–'}</td>
+      <td class="c-date">${g.started
+        ? `<span title="Started ${esc(g.started)}">${esc(shortDate(g.started))}</span>`
+        : '–'}</td>
       <td class="c-num">${(() => {
         const h = hoursOf(g);
         if (!h.value) return '–';
@@ -1596,6 +1662,25 @@ function openDetail(id) {
           <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
         </div>
       </div>
+      <div class="detail-row2">
+        <div class="detail-field">
+          <label for="d-started">First played</label>
+          <input id="d-started" class="input" type="date" value="${esc(g.started || '')}">
+        </div>
+        <div class="detail-field">
+          <label for="d-finished">Last played</label>
+          <input id="d-finished" class="input" type="date" value="${esc(g.finished || '')}"
+                 placeholder="${esc(g.finished_estimated || '')}">
+          ${g.finished || !g.finished_estimated ? '' :
+            `<p class="field-help">Steam says you last played this around
+              <b>${esc(shortDate(g.finished_estimated))}</b>. Typing a date here replaces
+              that estimate.</p>`}
+        </div>
+      </div>
+      ${g.started ? '' : `<p class="field-help">Steam publishes no first-played date for
+        anything — only how long you have played and when you last did — so a start
+        date has to be typed in.</p>`}
+
       <div class="detail-field">
         <label for="d-addedby">Added by</label>
         <select id="d-addedby" class="input">
@@ -1651,6 +1736,8 @@ function openDetail(id) {
         genre: $('#d-genre').value.trim() || null,
         hours: $('#d-hours').value === '' ? null : Number($('#d-hours').value),
         added_by: $('#d-addedby').value || null,
+        started: $('#d-started').value || null,
+        finished: $('#d-finished').value || null,
       }});
       await loadGroup(); $('#detail-dialog').close(); setView(state.view); toast('Saved');
     } catch (e) { toast(e.message); }

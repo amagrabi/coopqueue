@@ -101,11 +101,12 @@ export async function onRequestPost({ env, data }) {
       // library would otherwise build a batch big enough to be rejected.
       for (let i = 0; i < keep.length; i += 50) {
         await env.DB.batch(keep.slice(i, i + 50).map((g) => env.DB.prepare(
-          `INSERT INTO playtime (steam_id, appid, minutes, fetched_at)
-           VALUES (?,?,?,unixepoch())
+          `INSERT INTO playtime (steam_id, appid, minutes, last_played, fetched_at)
+           VALUES (?,?,?,?,unixepoch())
            ON CONFLICT(steam_id, appid) DO UPDATE SET
-             minutes = excluded.minutes, fetched_at = unixepoch()`
-        ).bind(m.steam_id, g.appid, g.minutes)));
+             minutes = excluded.minutes, last_played = excluded.last_played,
+             fetched_at = unixepoch()`
+        ).bind(m.steam_id, g.appid, g.minutes, g.lastPlayed ?? null)));
       }
     }
 
@@ -154,7 +155,7 @@ export async function recomputeEstimates(env, gid) {
           JOIN memberships m ON m.group_id = a.group_id AND m.steam_id = a.seed_steam_id
          WHERE a.group_id = ?1
      )
-     SELECT g.id, p.minutes
+     SELECT g.id, p.minutes, p.last_played
        FROM games g
        JOIN accounts acc
        JOIN playtime p ON p.steam_id = acc.steam_id AND p.appid = g.steam_appid
@@ -163,21 +164,31 @@ export async function recomputeEstimates(env, gid) {
 
   const byGame = new Map();
   for (const r of rows.results || []) {
-    if (!byGame.has(r.id)) byGame.set(r.id, []);
-    byGame.get(r.id).push(r.minutes);
+    if (!byGame.has(r.id)) byGame.set(r.id, { mins: [], last: [] });
+    const e = byGame.get(r.id);
+    e.mins.push(r.minutes);
+    if (r.last_played) e.last.push(r.last_played);
   }
 
   const stmts = [];
-  for (const [id, mins] of byGame) {
+  for (const [id, { mins, last }] of byGame) {
     // Fewer than two participants is not co-op, whatever the hours say.
     const hours = mins.length >= 2 ? Math.round((Math.min(...mins) / 60) * 10) / 10 : 0;
+    /* The group stopped when the LAST of them stopped, so this is a max where the
+       hours estimate is a min. Same participant filter, so somebody who never
+       really played cannot set the date. Stored as an ISO day — the clock time
+       Steam gives is more precision than "when did we play this" deserves. */
+    const ended = last.length >= 2
+      ? new Date(Math.max(...last) * 1000).toISOString().slice(0, 10)
+      : null;
     stmts.push(env.DB.prepare(
-      'UPDATE games SET hours_estimated = ?, hours_participants = ? WHERE id = ? AND group_id = ?'
-    ).bind(hours, mins.length, id, gid));
+      `UPDATE games SET hours_estimated = ?, hours_participants = ?, finished_estimated = ?
+        WHERE id = ? AND group_id = ?`
+    ).bind(hours, mins.length, ended, id, gid));
   }
   // Games nobody qualifying played get an explicit 0 rather than a stale number.
   stmts.push(env.DB.prepare(
-    `UPDATE games SET hours_estimated = 0, hours_participants = 0
+    `UPDATE games SET hours_estimated = 0, hours_participants = 0, finished_estimated = NULL
       WHERE group_id = ?1 AND steam_appid IS NOT NULL
         AND id NOT IN (
           WITH accounts(steam_id) AS (

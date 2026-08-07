@@ -185,6 +185,11 @@
           <button class="seg" data-mode="want" role="tab">
             Want to play <span class="pill" id="mode-want-n"></span>
           </button>
+          <!-- Changing your mind is a normal thing to do, and the queue only ever
+               offers games you have NOT rated, so there was no way back to one. -->
+          <button class="seg" data-mode="rated" role="tab">
+            Already rated <span class="pill" id="mode-rated-n"></span>
+          </button>
         </div>
         <p class="rate-ask" id="rate-ask"></p>
 
@@ -275,6 +280,7 @@
             <option value="sampled">Sampled</option>
           </select>
           <select id="lib-sort" class="input">
+            <option value="started">Recently started</option>
             <option value="best">Best first</option>
             <option value="name">A–Z</option>
             <option value="spread">Most disagreement</option>

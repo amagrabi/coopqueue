@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 109 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 114 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -367,7 +367,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-109/109 assertions pass. `npm run test:ui` does **not** run on macOS: it
+114/114 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -578,6 +578,20 @@ the same way**: restore `npm run db:backup` output into a local SQLite file with
 `PRAGMA foreign_keys = ON`, replay the migration, and compare row counts *and* a
 checksum of the ratings before and after.
 
+## Changing a rating
+
+The queue only ever offers games you have **not** scored, so once you rated something
+there was no route back to it. The Rate tab has a third mode, **Already rated**, which
+lists them in name order and opens the slider on *your* current score rather than the
+group average — that number is the thing you came to change. Saving advances to the
+next one, because the list does not shrink underneath you and a card that just sits
+there looks like it failed to save.
+
+It is never auto-selected when another mode empties: it is somewhere you go on
+purpose, not a backlog. The skip buttons are hidden there — "no opinion" on a game you
+have scored is not an action, and `rate.js` has always been an upsert, so nothing
+server-side needed to change.
+
 ## Blind rating
 
 `groups.blind_rating` (migration 013) hides everyone else's scores in the rating
@@ -600,13 +614,35 @@ It is validated against `memberships` in the PATCH handler rather than riding al
 would let a member paint any SteamID64, including another group's member, onto their
 own rows.
 
+## Play dates
+
+`games.started` and `games.finished` are ISO dates typed by a human and, like `hours`,
+they always win. `games.finished_estimated` is derived.
+
+**Steam cannot tell you when a group started a game.** `GetOwnedGames` returns
+`playtime_forever` and `rtime_last_played` and nothing else time-shaped — checked
+against the live API, whose per-row keys are exactly `appid, name, playtime_forever,
+img_icon_url, playtime_windows/mac/linux/deck_forever, rtime_last_played,
+content_descriptorids, playtime_disconnected`. No first-played, no acquired, no
+purchase date. So a start date is manual, always, and the UI says so rather than
+leaving people hunting for a sync button that cannot exist.
+
+The **end** is derivable and worth having. `finished_estimated` is the **latest**
+`rtime_last_played` across participants — the group stopped when the last of them
+stopped. Note this is a `max` where the hours estimate is a `min`, and for the same
+reason in mirror image: you cannot all have played together *longer* than whoever
+played least, and the group cannot have stopped *before* its last player did. Same
+`PARTICIPANT_MINUTES` filter and same two-person floor, so one person idling in a
+game cannot date it. Shown with "≈" and only when nobody has typed `finished`.
+
 ## The Library's default view
 
-`LIB_DEFAULTS` in `app.js` is the single definition, and **"Best first" is the default
-on purpose**: the Library is the reference view — what this group has and what it
-thinks of it — so the group's own canon belongs at the top. The alternatives answer
-narrower questions that other screens already own; coverage is the Rate tab's job and
-what-to-play-next is Play next's.
+`LIB_DEFAULTS` in `app.js` is the single definition, and the default sort is
+**Recently started**: the Library doubles as the group's history, and what you most
+often want from it is what you have been playing lately. Games with no start date sort
+to the bottom and keep best-first order among themselves — without that fallback a
+library nobody has dated yet (which is every library, at first) opens looking randomly
+shuffled.
 
 The defaults are re-established when you arrive at the Library **from another view**,
 and deliberately not on a same-view re-render: the detail dialog re-renders the

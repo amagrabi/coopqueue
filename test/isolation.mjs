@@ -723,6 +723,84 @@ await check('deleting one group leaves the other untouched', async () => {
   return g1 > 0 || 'group 1 lost its games when group 2 was deleted';
 });
 
+console.log('\nPlay dates');
+
+await check('start and end dates can be set by hand', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 9').get();
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) },
+    request: req({ started: '2025-03-14', finished: '2025-06-02' }), env, data });
+  const row = sqlite.prepare('SELECT started, finished FROM games WHERE id=?').get(g.id);
+  return (r.status === 200 && row.started === '2025-03-14' && row.finished === '2025-06-02')
+    || `status ${r.status}, got ${JSON.stringify(row)}`;
+});
+
+await check('a typed end date always beats the Steam estimate', async () => {
+  /* Same rule as hours: `finished` is what a human said, `finished_estimated` is
+     derived from rtime_last_played. Recomputing must never clobber the typed one. */
+  const playtime = await import(path.join(SITE, 'functions/api/g/[slug]/playtime.js'));
+  const g = sqlite.prepare(
+    'SELECT id, steam_appid FROM games WHERE group_id=1 AND steam_appid IS NOT NULL LIMIT 1').get();
+  sqlite.prepare("UPDATE games SET finished='2020-01-01' WHERE id=?").run(g.id);
+  await playtime.recomputeEstimates(env, 1);
+  const row = sqlite.prepare('SELECT finished FROM games WHERE id=?').get(g.id);
+  return row.finished === '2020-01-01' || `estimate overwrote the typed date: ${row.finished}`;
+});
+
+await check('the end estimate is the LAST participant to stop, not the first', async () => {
+  /* Hours take a minimum — you cannot all have played together longer than whoever
+     played least. The end date is the opposite: the group stopped when the last of
+     them did. Getting these the same way round would be the bug. */
+  const playtime = await import(path.join(SITE, 'functions/api/g/[slug]/playtime.js'));
+  const g = sqlite.prepare(
+    'SELECT id, steam_appid FROM games WHERE group_id=1 AND steam_appid IS NOT NULL LIMIT 1 OFFSET 1').get();
+  const who = sqlite.prepare(
+    'SELECT steam_id FROM memberships WHERE group_id=1 AND is_seed=0 LIMIT 2').all();
+  if (who.length < 2) return 'fixture: need two real members';
+  const early = Math.floor(Date.UTC(2024, 4, 1) / 1000);   // 2024-05-01
+  const late  = Math.floor(Date.UTC(2024, 8, 9) / 1000);   // 2024-09-09
+  sqlite.prepare("UPDATE games SET finished=NULL WHERE id=?").run(g.id);
+  for (const [i, m] of who.entries()) {
+    sqlite.prepare(`INSERT INTO playtime (steam_id, appid, minutes, last_played)
+                    VALUES (?,?,?,?)
+                    ON CONFLICT(steam_id, appid) DO UPDATE SET
+                      minutes=excluded.minutes, last_played=excluded.last_played`)
+      .run(m.steam_id, g.steam_appid, 600, i === 0 ? early : late);
+  }
+  await playtime.recomputeEstimates(env, 1);
+  const row = sqlite.prepare('SELECT finished_estimated FROM games WHERE id=?').get(g.id);
+  return row.finished_estimated === '2024-09-09'
+    || `expected the later date 2024-09-09, got ${row.finished_estimated}`;
+});
+
+await check('one participant is not a group, so no end date is claimed', async () => {
+  const playtime = await import(path.join(SITE, 'functions/api/g/[slug]/playtime.js'));
+  const g = sqlite.prepare(
+    'SELECT id, steam_appid FROM games WHERE group_id=1 AND steam_appid IS NOT NULL LIMIT 1 OFFSET 2').get();
+  const who = sqlite.prepare(
+    'SELECT steam_id FROM memberships WHERE group_id=1 AND is_seed=0 LIMIT 1').get();
+  sqlite.prepare(`INSERT INTO playtime (steam_id, appid, minutes, last_played) VALUES (?,?,?,?)
+                  ON CONFLICT(steam_id, appid) DO UPDATE SET
+                    minutes=excluded.minutes, last_played=excluded.last_played`)
+    .run(who.steam_id, g.steam_appid, 900, Math.floor(Date.UTC(2024, 1, 2) / 1000));
+  await playtime.recomputeEstimates(env, 1);
+  const row = sqlite.prepare('SELECT finished_estimated FROM games WHERE id=?').get(g.id);
+  return row.finished_estimated === null || `claimed ${row.finished_estimated} off one player`;
+});
+
+console.log('\nRe-rating');
+
+await check('rating the same game twice replaces the score, it does not duplicate', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1 OFFSET 11').get();
+  await rateRoute.onRequestPost({ request: req({ gameId: g.id, score: 4 }), env, data });
+  await rateRoute.onRequestPost({ request: req({ gameId: g.id, score: 9 }), env, data });
+  const rows = sqlite.prepare('SELECT score FROM ratings WHERE game_id=? AND steam_id=?').all(g.id, ALICE);
+  sqlite.prepare('DELETE FROM ratings WHERE game_id=? AND steam_id=?').run(g.id, ALICE);
+  return (rows.length === 1 && rows[0].score === 9) || `got ${JSON.stringify(rows)}`;
+});
+
 console.log('\nAdded-by attribution');
 
 await check('an adder can be set, and it is reported with the library', async () => {

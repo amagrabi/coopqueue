@@ -148,8 +148,10 @@ CREATE TABLE games (
   hours             REAL,             -- typed by a human; always wins over the estimate
   hours_estimated   REAL,             -- min across participants; an upper bound, not a measurement
   hours_participants INTEGER,         -- how many people that minimum was taken over
-  started           TEXT,
-  finished          TEXT,
+  started           TEXT,             -- ISO date, typed by a human. Steam has no
+                                      -- first-played field, so this is manual, always.
+  finished          TEXT,             -- ditto; always wins over the estimate below
+  finished_estimated TEXT,            -- latest rtime_last_played across participants
   notes             TEXT,
   added_by          TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
   enriched_at       INTEGER,
@@ -174,10 +176,13 @@ CREATE TABLE ratings (
 -- in a game are the same fact in every group they belong to. Mirrors
 -- migrations/011-playtime.sql, which explains why the group estimate is a MINIMUM.
 CREATE TABLE playtime (
-  steam_id   TEXT    NOT NULL,
-  appid      INTEGER NOT NULL,
-  minutes    INTEGER NOT NULL,
-  fetched_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  steam_id    TEXT    NOT NULL,
+  appid       INTEGER NOT NULL,
+  minutes     INTEGER NOT NULL,
+  -- Steam's rtime_last_played. The only time-shaped field GetOwnedGames returns;
+  -- there is no first-played date, which is why games.started is manual.
+  last_played INTEGER,
+  fetched_at  INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (steam_id, appid)
 );
 CREATE INDEX idx_playtime_app ON playtime(appid);
