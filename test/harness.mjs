@@ -8,6 +8,7 @@
  *   SCENARIO=fresh node ...          # signed in, no groups (onboarding)
  *   SCENARIO=claim node ...          # in the group, nothing claimed yet
  *   SCENARIO=anon  node ...          # signed out (landing page)
+ *   MARKETING=1 node ...             # member fixture with publishable identities
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -24,6 +25,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
 const PUBLIC = path.join(SITE, 'public');
 const SCENARIO = process.env.SCENARIO || 'member';
+const MARKETING = process.env.MARKETING === '1';
 const ME = '76561198000000001';
 const OTHER = '76561198000000009'; // a second account, in a different group only
 
@@ -108,6 +110,49 @@ for (const [lib, cat] of [['Dark & Darker', 'Dark and Darker'],
   if (!row) continue;
   const taken = db.prepare('SELECT 1 AS x FROM games WHERE group_id=1 AND steam_appid=?').get(row.appid);
   if (!taken) db.prepare('UPDATE games SET steam_appid=? WHERE group_id=1 AND name=?').run(row.appid, lib);
+}
+
+// The legacy spreadsheet predates Steam links for many backlog rows. Keep the
+// normal harness faithful to that fixture, but give the first marketing viewport
+// a small verified mapping so it does not repeat the generic fallback banner.
+// These are public Steam app ids; no production membership or activity data is
+// copied into the repository.
+if (MARKETING) {
+  const marketingApps = [
+    ['Dune Awakening', 1172710],
+    ['Keep Talking and Nobody Explodes', 341800],
+    ['Dark Souls 3', 374320],
+    ['Back 4 Blood', 924970],
+    ['Last Epoch', 899770],
+    ['Pico Park 2', 2644470],
+    ['Lovers in a Dangerous Spacetime', 252110],
+    ['V-Rising', 1604030],
+    ['Overcooked', 448510],
+    ['Tribes of Midgard', 858820],
+    ['Dungeon Defenders', 65800],
+    ['Sea of Thieves', 1172620],
+    ['Sea of Thieves: Monkey Island', 31170],
+    ['Peak', 3527290],
+  ];
+  const link = db.prepare('UPDATE games SET steam_appid=? WHERE group_id=1 AND name=?');
+  for (const [name, appid] of marketingApps) link.run(appid, name);
+}
+
+if (MARKETING) {
+  // The generic Terraria banner keeps every unlinked legacy row visually
+  // testable. For captures, most linked rows can use Steam's legacy public
+  // /apps/<appid>/header.jpg path and show recognisable art without a fixture blob.
+  db.exec(`UPDATE games
+              SET header_image = 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/'
+                               || steam_appid || '/header.jpg'
+            WHERE group_id=1 AND steam_appid IS NOT NULL`);
+  // Newer Steam assets can use a content-hashed directory instead of the legacy
+  // /apps/<appid>/header.jpg shape. Keep the exact cached public URL for the one
+  // such title visible in the Library capture.
+  db.prepare('UPDATE games SET header_image=? WHERE group_id=1 AND name=?').run(
+    'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3527290/31bac6b2eccf09b368f5e95ce510bae2baf3cfcd/header.jpg',
+    'Peak',
+  );
 }
 
 /* Real tag lists for catalogue rows the crawl has not tagged yet, so the taste
@@ -203,6 +248,21 @@ if (SCENARIO === 'member') {
   db.exec(`DELETE FROM users WHERE steam_id='seed:1:ama'`);
 } else if (SCENARIO === 'claim') {
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Amadeus','owner')`);
+}
+
+// Screenshots use the real group's games, statuses and ratings but never publish
+// its member identities. This mode is local-only and changes presentation data,
+// not the fixture's relationships or score calculations.
+if (MARKETING && SCENARIO === 'member') {
+  db.exec(`UPDATE groups SET name='Friday Night Crew' WHERE id=1;
+           UPDATE users SET display_name='Alex' WHERE steam_id='${ME}';
+           UPDATE memberships SET short_name=CASE steam_id
+             WHEN '${ME}' THEN 'Alex'
+             WHEN 'seed:1:dave' THEN 'Jamie'
+             WHEN 'seed:1:leo' THEN 'Robin'
+             WHEN 'seed:1:pat' THEN 'Sam'
+             ELSE short_name END
+           WHERE group_id=1`);
 }
 // A second group the test user also belongs to, to exercise the switcher.
 if (SCENARIO === 'member') {

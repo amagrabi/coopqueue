@@ -542,6 +542,13 @@ labelled unknown rather than being treated as either a fit or a failure. Both th
 ranked and too-small lists use the cached Steam header art already returned with the
 library data; they do not make another metadata request.
 
+For publishable screenshots, run `MARKETING=1 node test/harness.mjs`. It keeps the
+realistic `g4m1ng` game and rating fixture while replacing group/member display
+names with neutral identities. Linked games derive their header image from their
+real Steam appid; unlinked legacy rows retain the generic fallback. Do not capture
+the production group directly or commit its private comments, invite code, account
+identifiers or avatars.
+
 `POST /api/g/:slug/play-night` retains the same attendee-specific semantics for API
 callers and accepts 1–64 group members, which also supports personal workspaces. It
 does not persist session state.

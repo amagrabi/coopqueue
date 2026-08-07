@@ -19,6 +19,28 @@ does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
 
 ---
 
+## See it in action
+
+![Play next ranking with attendee filters, artwork, player caps and group scores](public/screenshots/play-next.webp)
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="public/screenshots/library.webp" alt="Shared library with statuses, member ratings and a missing-history prompt"><br>
+      <strong>One shared history.</strong> Games, votes, outcomes and missing facts stay visible.
+    </td>
+    <td width="50%">
+      <img src="public/screenshots/stats.webp" alt="Group statistics for tracked games, playtime, ratings, statuses and genres"><br>
+      <strong>Statistics backed by real data.</strong> Empty charts simply stay out of the way.
+    </td>
+  </tr>
+</table>
+
+The screenshots use the realistic `g4m1ng` fixture with publishable placeholder
+identities; no member account, avatar, invite code or private comment is shown.
+
+---
+
 ## What it does
 
 **Rate.** A queue of everything you personally haven't scored yet, one card at a
