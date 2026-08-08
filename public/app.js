@@ -1203,9 +1203,10 @@ function renderAttendeeFilter() {
 /* The Library's default view, and the single definition of it.
 
    The default follows the group's play history: current games first, the backlog
-   last, and newest start dates first everywhere in between and inside those two
-   groups. Explicit choices such as Best first still sort the whole filtered library
-   exactly as labelled. */
+   last, and recent activity first everywhere in between and inside those two groups.
+   Last played is the best available chronology; first played is its fallback.
+   Explicit choices such as Best first still sort the whole filtered library exactly
+   as labelled. */
 const LIB_DEFAULTS = {
   'lib-search': '', 'lib-status': '', 'lib-sort': 'started',
   'lib-mine': '', 'lib-score': '', 'lib-played': '',
@@ -1217,6 +1218,9 @@ const LIB_DEFAULTS = {
 };
 
 const libraryStatusBucket = (status) => status === 'playing' ? 0 : status === 'backlog' ? 2 : 1;
+const libraryRecentDate = (game) => game.finished || game.finished_estimated || game.started || null;
+const libraryStatusLabel = (game) => game.completionSuggestion ? 'Likely finished' : STATUS_LABEL[game.status];
+const libraryStatusClass = (game) => game.completionSuggestion ? 'finished' : game.status;
 
 /** Put every Library control back to its default. Returns true if anything moved. */
 function resetLibControls() {
@@ -1268,7 +1272,7 @@ const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
   if (key === 'started') return g.started || null;
   if (key === 'hours')   return hoursOf(g).value;
-  if (key === 'status')  return STATUS_LABEL[g.status];
+  if (key === 'status')  return libraryStatusLabel(g);
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
   return g[key];
 };
@@ -1478,14 +1482,16 @@ function renderLibrary() {
   } else {
     rows.sort({
       /* Keep the active story legible: games in progress lead, settled games share
-         the date-sorted middle, and the backlog waits at the bottom. Missing dates
-         sink within their tier and use the title as a deterministic fallback. */
+         the recent-activity middle, and the backlog waits at the bottom. Steam does
+         publish last played, so it is a more complete default chronology than the
+         often-missing first played date. */
       started:  (a, b) => {
         const byStatusBucket = libraryStatusBucket(a.status) - libraryStatusBucket(b.status);
         if (byStatusBucket) return byStatusBucket;
-        if (a.started && b.started) return b.started.localeCompare(a.started);
-        if (a.started) return -1;
-        if (b.started) return 1;
+        const aDate = libraryRecentDate(a), bDate = libraryRecentDate(b);
+        if (aDate && bDate) return bDate.localeCompare(aDate);
+        if (aDate) return -1;
+        if (bDate) return 1;
         return a.name.localeCompare(b.name);
       },
       best:     (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
@@ -1505,13 +1511,17 @@ function renderLibrary() {
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
         g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span>
-        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : STATUS_LABEL[g.status]} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
+        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : libraryStatusLabel(g)} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
         </button></td>
       <td class="c-genre">${esc(g.genre || '—')}</td>
       <td class="c-status">${g.archived_at
         ? '<span class="status-tag status-archived">Archived</span>'
-        : `<span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span>`}</td>
-      <td class="c-num c-players">${g.max_players ?? '?'}</td>
+        : `<span class="status-tag status-${esc(libraryStatusClass(g))}"${g.completionSuggestion
+          ? ` title="Estimated from the unlocked ending achievement: ${esc(g.completionSuggestion.label)}. Confirm it in game details."`
+          : ''}>${esc(libraryStatusLabel(g))}</span>`}</td>
+      <td class="c-num c-players"${g.max_players == null
+        ? ' title="No verified simultaneous online co-op player cap is available yet"'
+        : ''}>${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
         return v == null ? '<td class="c-p miss">·</td>' : `<td class="c-p">${fmt(v, 1)}</td>`;
@@ -1946,7 +1956,8 @@ async function renderMembers() {
   $('#playtime-title').textContent = personal ? 'Your Steam playtime' : 'Steam playtime';
   $('#playtime-copy').innerHTML = personal
     ? 'Importing games also syncs ownership, exact playtime and recent-played hints. Use the sync button '
-      + 'later to refresh them. Steam never exposes a first-played date, so that remains yours to record.'
+      + 'later to refresh them. Steam never exposes an exact first-played date, but achievement analysis can '
+      + 'save your earliest unlock as an approximate starting point.'
     : 'Group hours are estimated from Steam: the smallest playtime among the people who actually '
       + 'played a game. That is an upper bound on time you played it <em>together</em> — Steam records '
       + 'how long each of you played, never when or with whom. A figure saved in the Library stays put; '
@@ -2476,7 +2487,7 @@ $('#steam-import-select-all').onclick = () => selectSteamImport(() => true);
 $('#steam-import-select-none').onclick = () => selectSteamImport(() => false);
 $('#steam-import-select-owned').onclick = () => void selectSteamImportSource('owned');
 $('#steam-import-select-wishlist').onclick = () => void selectSteamImportSource('wishlist');
-$('#steam-import-submit').onclick = async () => {
+async function submitSteamImport() {
   const appids = [...steamImport.selected];
   if (!appids.length) { $('#steam-import-status').textContent = 'Select at least one game.'; return; }
   const needsZeroConfirmation = steamImport.ambiguousPlaytime && steamImport.items.some((game) =>
@@ -2486,8 +2497,8 @@ $('#steam-import-submit').onclick = async () => {
     : false;
   if (needsZeroConfirmation && !acceptAmbiguousZero) return;
   const slug = state.group.slug;
-  const button = $('#steam-import-submit');
-  button.disabled = true;
+  const buttons = $$('[data-steam-import-submit]');
+  buttons.forEach((button) => { button.disabled = true; });
   let imported = 0;
   let importedPlayed = 0;
   let metadataRemaining = 0;
@@ -2514,8 +2525,12 @@ $('#steam-import-submit').onclick = async () => {
     toast(`Imported ${imported} game${imported === 1 ? '' : 's'} from Steam`);
     void runPostImportMaintenance(slug, { metadataRemaining, scanAchievements: importedPlayed > 0 });
   } catch (error) { $('#steam-import-status').textContent = error.message; }
-  finally { button.disabled = false; }
-};
+  finally { buttons.forEach((button) => { button.disabled = false; }); }
+}
+
+$$('[data-steam-import-submit]').forEach((button) => {
+  button.onclick = () => void submitSteamImport();
+});
 
 async function scanAchievementBatches(slug, onProgress = () => {}) {
   const key = `achievement-scan:${slug}`;
@@ -2837,6 +2852,10 @@ function openDetail(id, focusField = null) {
             ${Object.entries(STATUS_LABEL).map(([v, l]) =>
               `<option value="${v}"${g.status === v ? ' selected' : ''}>${l}</option>`).join('')}
           </select>
+          ${g.completionSuggestion ? `<p class="field-help fact-source is-approx">
+            Likely finished · Steam shows the ending achievement
+            <strong>${esc(g.completionSuggestion.label)}</strong>. Choose Finished to confirm it.
+          </p>` : ''}
         </div>
         <div class="detail-field">
           <label for="d-players">Max online co-op players</label>

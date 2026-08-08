@@ -1882,6 +1882,11 @@ sqlite.exec(`INSERT INTO games (group_id,name,steam_appid,status)
              VALUES (1,'Same app in co-op',700001,'backlog'),
                     (1,'Foreign achievement target',700002,'sampled'),
                     (410,'Already tracked solo game',700003,'backlog')`);
+// Only the cap with explicit provenance may cross from the global catalogue into
+// a personal import. A bare number is deliberately treated as unverified.
+sqlite.exec(`INSERT INTO coop_apps (appid,name,max_players,max_players_src) VALUES
+             (700001,'Imported Solo Game',4,'manual:test'),
+             (700005,'Wishlist Solo Game',3,NULL)`);
 
 const originalFetch = globalThis.fetch;
 const steamCalls = [];
@@ -1934,10 +1939,10 @@ await check('personal import compares and writes only inside the selected worksp
     request: req({ action: 'enrich' }), env, data,
   })).json();
   const own = sqlite.prepare(
-    'SELECT status,hours,finished FROM games WHERE group_id=410 AND steam_appid=700001'
+    'SELECT status,hours,finished,max_players FROM games WHERE group_id=410 AND steam_appid=700001'
   ).get();
   const wishlisted = sqlite.prepare(
-    'SELECT name,status,hours FROM games WHERE group_id=410 AND steam_appid=700005'
+    'SELECT name,status,hours,max_players FROM games WHERE group_id=410 AND steam_appid=700005'
   ).get();
   const foreign = sqlite.prepare(
     'SELECT COUNT(*) AS n FROM games WHERE group_id=1 AND steam_appid=700001'
@@ -1946,8 +1951,9 @@ await check('personal import compares and writes only inside the selected worksp
     'SELECT minutes FROM playtime WHERE steam_id=? AND appid=700003'
   ).get(ALICE)?.minutes;
   return (response.status === 201 && own?.status === 'sampled' && own.hours === 2.1
+      && own.max_players === 4
       && own.finished === '2023-11-14' && wishlisted?.name === 'Wishlist Solo Game'
-      && wishlisted.status === 'backlog' && wishlisted.hours == null
+      && wishlisted.status === 'backlog' && wishlisted.hours == null && wishlisted.max_players == null
       && foreign === 1 && refreshed === 60 && enrichment.enriched === 0
       && enrichment.remaining >= 2)
     || `status ${response.status}, own ${JSON.stringify(own)}, wishlisted ${JSON.stringify(wishlisted)}, foreign ${foreign}, refreshed ${refreshed}, enrichment ${JSON.stringify(enrichment)}`;
@@ -2071,9 +2077,16 @@ await check('achievement scan never selects a game from another workspace', asyn
   const progress = sqlite.prepare(
     'SELECT achieved,total FROM achievement_progress WHERE steam_id=? AND appid=700001'
   ).get(ALICE);
+  const history = sqlite.prepare(
+    `SELECT g.started,f.source FROM games g
+       LEFT JOIN game_fact_sources f
+         ON f.group_id=g.group_id AND f.game_id=g.id AND f.field='started'
+      WHERE g.group_id=410 AND g.steam_appid=700001`
+  ).get();
   return (response.status === 200 && payload.processed === 1 && progress?.achieved === 1
-      && progress.total === 1 && !fetchedForeign)
-    || `status ${response.status}, payload ${JSON.stringify(payload)}, foreign ${fetchedForeign}`;
+      && progress.total === 1 && history?.started === '2023-07-22'
+      && history.source === 'achievement' && !fetchedForeign)
+    || `status ${response.status}, payload ${JSON.stringify(payload)}, history ${JSON.stringify(history)}, foreign ${fetchedForeign}`;
 });
 
 const { completionEvidence } = await import(path.join(SITE, 'lib/completion.js'));
@@ -2081,7 +2094,23 @@ const { buildPersonalStats } = await import(path.join(SITE, 'lib/stats.js'));
 await check('completion suggestions require an exact curated terminal achievement', async () => {
   const yes = completionEvidence(264710, [{ key: 'launchrocket' }]);
   const no = completionEvidence(264710, [{ key: 'buildbase' }]);
-  return (yes?.label === 'Go Among the Stars' && no == null) || `${JSON.stringify({ yes, no })}`;
+  const inserted = sqlite.prepare(
+    `INSERT INTO games (group_id,name,steam_appid,status)
+     VALUES (410,'Subnautica completion test',264710,'sampled')`
+  ).run();
+  sqlite.prepare(
+    `INSERT INTO achievement_progress (steam_id,appid,achieved,total,unlocked)
+     VALUES (?,?,?,?,?)`
+  ).run(ALICE, 264710, 1, 17, '[{"key":"launchrocket"}]');
+  const { data } = await ctxFor(ALICE, 'alice-solo');
+  const library = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const suggestion = library.games.find((game) => game.id === Number(inserted.lastInsertRowid))
+    ?.completionSuggestion;
+  sqlite.prepare('DELETE FROM achievement_progress WHERE steam_id=? AND appid=?').run(ALICE, 264710);
+  sqlite.prepare('DELETE FROM games WHERE id=? AND group_id=?').run(Number(inserted.lastInsertRowid), 410);
+  return (yes?.label === 'Go Among the Stars' && no == null
+      && suggestion?.label === 'Go Among the Stars')
+    || `${JSON.stringify({ yes, no, suggestion })}`;
 });
 
 await check('personal stats keep completion, time, ratings and achievements honest', async () => {

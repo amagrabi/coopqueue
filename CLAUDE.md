@@ -588,7 +588,11 @@ a resumable cursor. A click makes at most three such requests. Failures advance 
 cursor rather than trapping every later game behind one private title; no negative
 row is cached as a confident zero. The Stats completion suggestions come from the
 exact `(appid, achievement key)` allowlist in `lib/completion.js` and always require
-a human click before changing `sampled` to `finished`.
+a human click before changing `sampled` to `finished`. The same suggestion is shown
+as **Likely finished** in the Library and game details, while the stored status stays
+`sampled` until confirmed. The scan also saves the earliest unlocked achievement as
+an approximate first-played boundary, with `achievement` provenance, after rejecting
+future dates and dates outside a known release/end interval.
 
 Do not diagnose every `GetPlayerAchievements` 403 as a dead site key. Measured on
 production, the same key successfully completed all four `GetOwnedGames` library
@@ -641,10 +645,13 @@ browser cannot use the bulk endpoint to inject arbitrary Steam apps or another
 group's rows. Archived games count as already tracked, so the unique
 `(group_id, steam_appid)` row is preserved. Wishlist-only imports do not advance
 the owned-library watermark or manufacture ownership negatives. The import stores
-`steam-hours` and `steam-last-played` provenance when Steam provides them but never
-invents a first-played date. It already refreshes playtime and ownership, so the
-browser does not repeat that call. After an import it automatically runs at most
-three eight-game metadata passes and three four-game achievement passes; the manual
+`steam-hours` and `steam-last-played` provenance when Steam provides them. It copies
+a player cap only when the global catalogue already carries a non-NULL verified
+source; unknown caps stay unknown rather than being inferred from unreliable store
+categories. It already refreshes playtime and ownership, so the browser does not
+repeat that call. After an import it automatically runs at most three eight-game
+metadata passes and three four-game achievement passes; those achievement passes can
+add approximate first-played boundaries and completion suggestions. The manual
 Settings controls resume or retry anything left over.
 
 ## History-shaped stats
@@ -929,11 +936,12 @@ not evidence of hours played together.
 
 `LIB_DEFAULTS` in `app.js` is the single definition, and the default sort is
 **Playing first, Backlog last**. Finished, Sampled, Unfinished and Dropped share the
-middle tier and sort together by newest start date; the same date order applies
-inside Playing and Backlog. Missing dates sink within their tier and fall back to
-A–Z. This keeps the games currently in motion visible without breaking the settled
-history into arbitrary status blocks. Explicit choices such as Best first still sort
-the whole filtered library exactly as labelled.
+middle tier and sort together by most recent activity; the same date order applies
+inside Playing and Backlog. The date is last played when available, falling back to
+first played. Missing dates sink within their tier and fall back to A–Z. This keeps
+the games currently in motion visible and makes fresh Steam imports chronological
+even though Steam publishes no true first-played field. Explicit choices such as
+Best first still sort the whole filtered library exactly as labelled.
 
 The defaults are re-established when you arrive at the Library **from another view**,
 and deliberately not on a same-view re-render: the detail dialog re-renders the

@@ -392,7 +392,7 @@
             <option value="sampled">Sampled</option>
           </select>
           <select id="lib-sort" class="input" aria-label="Sort library">
-            <option value="started">Playing first, backlog last</option>
+            <option value="started">Playing first, recent activity, backlog last</option>
             <option value="best">Best first</option>
             <option value="name">A–Z</option>
             <option value="spread">Disagreement</option>
@@ -694,7 +694,8 @@
   <div class="dialog-body">
     <p class="panel-sub">Review your owned games and wishlist before anything is added. Played games start as
       <strong>Sampled</strong>; unplayed and wishlisted games start in <strong>Backlog</strong>. Steam supplies
-      hours and last-played dates when available, but not first-played dates.</p>
+      hours and last-played dates when available. Achievement analysis can add an approximate first-played date
+      and flag games with verified ending evidence as <strong>Likely finished</strong>.</p>
     <div class="steam-import-filters">
       <label>
         <span>Show</span>
@@ -714,12 +715,15 @@
       <button class="btn btn-sm" id="steam-import-select-none" type="button">Deselect all</button>
       <button class="btn btn-sm" id="steam-import-select-owned" type="button">Show owned only</button>
       <button class="btn btn-sm" id="steam-import-select-wishlist" type="button">Show wishlist only</button>
+      <button class="btn btn-primary btn-sm steam-import-submit steam-import-submit-top"
+              id="steam-import-submit-top" data-steam-import-submit type="button">Import selected</button>
       <span id="steam-import-selected">0 selected</span>
     </div>
     <div id="steam-import-list" class="steam-import-list"></div>
     <div class="steam-import-foot">
       <button class="btn" id="steam-import-more" type="button" hidden>Load more</button>
-      <button class="btn btn-primary steam-import-submit" id="steam-import-submit" type="button">Import selected</button>
+      <button class="btn btn-primary steam-import-submit" id="steam-import-submit"
+              data-steam-import-submit type="button">Import selected</button>
     </div>
     <p class="add-status" id="steam-import-status"></p>
   </div>

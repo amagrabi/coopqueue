@@ -39,6 +39,20 @@ async function cachedApps(db, appids) {
   return rows;
 }
 
+async function verifiedCatalogueApps(db, appids) {
+  const rows = [];
+  for (const batch of chunks(appids)) {
+    const placeholders = batch.map(() => '?').join(',');
+    const result = await db.prepare(
+      `SELECT appid,max_players,coop_note FROM coop_apps
+        WHERE appid IN (${placeholders}) AND max_players IS NOT NULL
+          AND max_players_src IS NOT NULL`
+    ).bind(...batch).all();
+    rows.push(...(result.results || []));
+  }
+  return rows;
+}
+
 function personalOnly(data) {
   return data.group.workspace_mode === 'personal'
     ? null
@@ -186,19 +200,23 @@ async function importSelected(env, data, steam, input) {
     .map((summary) => [summary.appid, summary]));
   const cached = new Map((await cachedApps(db, selectedAppids))
     .map((row) => [Number(row.appid), row]));
+  const catalogue = new Map((await verifiedCatalogueApps(db, selectedAppids))
+    .map((row) => [Number(row.appid), row]));
 
   const inserts = selected.map((game) => {
     const meta = cached.get(Number(game.appid));
     const summary = summaries.get(Number(game.appid));
+    const verified = catalogue.get(Number(game.appid));
     const played = Number(game.minutes) > 0;
     return db.prepare(
       `INSERT OR IGNORE INTO games
-         (group_id,name,steam_appid,genre,status,header_image,trailer_url,short_description,
-          price,release_date,metacritic,hours,finished,added_by,enriched_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         (group_id,name,steam_appid,genre,status,max_players,coop_note,header_image,trailer_url,
+          short_description,price,release_date,metacritic,hours,finished,added_by,enriched_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       gid, meta?.name || game.name || summary?.name || `Steam app ${game.appid}`, Number(game.appid),
       meta?.genre || null, played ? 'sampled' : 'backlog',
+      verified?.max_players ?? null, verified?.coop_note || null,
       meta?.header_image || summary?.headerImage || null,
       meta?.trailer_url || null, meta?.short_description || null, meta?.price || null,
       meta?.release_date || null, meta?.metacritic ?? null, played ? hours(game.minutes) : null,
@@ -280,8 +298,34 @@ async function pendingMetadata(db, groupId) {
   return row?.n ?? 0;
 }
 
+async function backfillVerifiedCaps(db, groupId) {
+  const result = await db.prepare(
+    `SELECT id,steam_appid FROM games
+      WHERE group_id=? AND archived_at IS NULL AND steam_appid IS NOT NULL
+        AND max_players IS NULL`
+  ).bind(groupId).all();
+  const games = result.results || [];
+  const catalogue = new Map((await verifiedCatalogueApps(db, games.map((game) => game.steam_appid)))
+    .map((row) => [Number(row.appid), row]));
+  const updates = games.flatMap((game) => {
+    const verified = catalogue.get(Number(game.steam_appid));
+    return verified ? [db.prepare(
+      `UPDATE games SET max_players=?,coop_note=COALESCE(coop_note,?)
+        WHERE id=? AND group_id=? AND max_players IS NULL`
+    ).bind(verified.max_players, verified.coop_note || null, game.id, groupId)] : [];
+  });
+  let added = 0;
+  for (const batch of chunks(updates)) {
+    const responses = await db.batch(batch);
+    added += responses.reduce((sum, response) =>
+      sum + Number(response?.meta?.changes ?? response?.changes ?? 0), 0);
+  }
+  return added;
+}
+
 async function enrichImported(env, data) {
   const gid = data.group.group_id;
+  const playerCapsAdded = await backfillVerifiedCaps(env.DB, gid);
   const rows = await env.DB.prepare(
     `SELECT id,steam_appid FROM games
       WHERE group_id = ? AND archived_at IS NULL AND steam_appid IS NOT NULL AND enriched_at IS NULL
@@ -302,5 +346,8 @@ async function enrichImported(env, data) {
       meta.price, meta.release_date, meta.metacritic, game.id, gid).run();
     enriched++;
   }
-  return json({ processed: games.length, enriched, remaining: await pendingMetadata(env.DB, gid) });
+  return json({
+    processed: games.length, enriched, playerCapsAdded,
+    remaining: await pendingMetadata(env.DB, gid),
+  });
 }

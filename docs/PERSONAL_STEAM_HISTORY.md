@@ -17,7 +17,9 @@ view loads 250 candidates at a time; changing to one source loads every page for
 that source and selects each new row by default. A reviewed selection has no
 browser-side cap. It is sent in batches of at most 250 games, and the server
 re-fetches both sources before every write, so a crafted request cannot inject an
-arbitrary appid.
+arbitrary appid. The same **Import selected** action appears above and below the
+candidate list so a large reviewed library does not require a final scroll to the
+bottom.
 
 If Steam reports zero minutes for every owned game, the UI warns that the separate
 "Always keep my total playtime private" setting may be masking the data and asks
@@ -30,16 +32,22 @@ advancing that watermark or pretending the owned library was checked.
 Played titles start as `sampled`; unplayed titles start as `backlog`. Lifetime
 minutes and last-played timestamps are saved with provenance. The import itself
 refreshes playtime for the whole readable library, so no duplicate sync is needed.
+If the shared catalogue already has a player cap with explicit verification
+provenance, that cap and its note are copied into the new workspace. Steam's store
+categories are not a trustworthy cap, so every other game remains unknown.
 Afterwards the browser automatically attempts up to three eight-game metadata
 batches and up to twelve played games through four-game achievement batches.
 **Fill missing game details** and **Analyze achievements** remain as resumable retry
 controls, with a session cursor so private or unsupported games do not block later
-titles. Achievement evidence never changes a status automatically.
+titles. The earliest unlocked achievement is saved as an approximate first-played
+boundary when it does not contradict the release or last-played date. Achievement
+evidence never changes a status automatically.
 
 The curated terminal-achievement allowlist lives in `lib/completion.js`. Matches
-appear as **Likely finished** suggestions in personal Stats, never as automatic
-status changes. The manual migration procedure below remains useful for Steam
-Replay evidence and one-off historical reconstruction that the Web API cannot do.
+appear as **Likely finished** in the personal Library, game details and Stats, never
+as automatic status changes. The manual migration procedure below remains useful
+for Steam Replay evidence and one-off historical reconstruction that the Web API
+cannot do.
 
 ## Evidence and what it means
 

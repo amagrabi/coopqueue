@@ -1,6 +1,7 @@
 import { bad, body, json } from '../../../../lib/http.js';
 import { playerAchievements } from '../../../../lib/steam.js';
 import { completionEvidence } from '../../../../lib/completion.js';
+import { achievementStartDate } from '../../../../lib/history.js';
 
 const BATCH = 4;
 const STALE_AFTER = 30 * 86400;
@@ -16,7 +17,8 @@ export async function onRequestPost({ request, env, data }) {
   const gid = data.group.group_id;
 
   const pending = await env.DB.prepare(
-    `SELECT g.id,g.name,g.steam_appid,g.status,p.fetched_at
+    `SELECT g.id,g.name,g.steam_appid,g.status,g.started,g.finished,g.finished_estimated,
+            g.release_date,p.fetched_at
        FROM games g
        LEFT JOIN achievement_progress p
          ON p.steam_id=?2 AND p.appid=g.steam_appid
@@ -43,17 +45,38 @@ export async function onRequestPost({ request, env, data }) {
     }
     const unlocked = result.achievements.filter((achievement) => achievement.achieved)
       .map(({ key, name, unlocktime }) => ({ key, name, unlocktime }));
-    await env.DB.prepare(
+    const approximateStart = game.started ? null : achievementStartDate(game, unlocked);
+    const statements = [env.DB.prepare(
       `INSERT INTO achievement_progress (steam_id,appid,achieved,total,unlocked,fetched_at)
        VALUES (?,?,?,?,?,unixepoch())
        ON CONFLICT(steam_id,appid) DO UPDATE SET achieved=excluded.achieved,total=excluded.total,
          unlocked=excluded.unlocked,fetched_at=unixepoch()`
     ).bind(data.user.steam_id, game.steam_appid, unlocked.length,
-      result.achievements.length, JSON.stringify(unlocked)).run();
+      result.achievements.length, JSON.stringify(unlocked))];
+    if (approximateStart) statements.push(
+      env.DB.prepare(
+        'UPDATE games SET started=? WHERE id=? AND group_id=? AND started IS NULL'
+      ).bind(approximateStart, game.id, gid),
+      // `changes()` refers to the preceding UPDATE inside this transactional D1
+      // batch, so a concurrent/manual first-played value never gets approximate
+      // provenance painted over it.
+      env.DB.prepare(
+        `INSERT INTO game_fact_sources (group_id,game_id,field,source,set_by,updated_at)
+         SELECT ?,?,'started','achievement',?,unixepoch() WHERE changes()>0
+         ON CONFLICT(group_id,game_id,field) DO UPDATE SET source='achievement',
+           set_by=excluded.set_by,updated_at=unixepoch()`
+      ).bind(gid, game.id, data.user.steam_id),
+      env.DB.prepare(
+        `DELETE FROM history_nudges
+          WHERE group_id=? AND game_id=? AND field='started' AND changes()>0`
+      ).bind(gid, game.id),
+    );
+    await env.DB.batch(statements);
     const evidence = game.status === 'sampled' ? completionEvidence(game.steam_appid, unlocked) : null;
     report.push({
       id: game.id, name: game.name, ok: true, achieved: unlocked.length,
       total: result.achievements.length, completion: evidence?.label || null,
+      started: approximateStart,
     });
   }
 

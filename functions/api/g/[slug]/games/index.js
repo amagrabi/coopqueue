@@ -2,6 +2,7 @@ import { json, bad, body } from '../../../../../lib/http.js';
 import { globalStats, scoreGame, viability } from '../../../../../lib/score.js';
 import { getAppDetails, parseAppId, searchStore } from '../../../../../lib/steam.js';
 import { ownershipForGames } from '../../../../../lib/ownership.js';
+import { completionEvidence } from '../../../../../lib/completion.js';
 
 const STATUSES = new Set(['backlog', 'playing', 'finished', 'unfinished', 'dropped', 'sampled']);
 
@@ -25,7 +26,7 @@ function cleanGameInput(status, maxPlayers, genre) {
 export async function onRequestGet({ env, data }) {
   const gid = data.group.group_id;
 
-  const [gamesRes, ratingsRes, membersRes, notPlayedRes, factSourcesRes] = await Promise.all([
+  const [gamesRes, ratingsRes, membersRes, notPlayedRes, factSourcesRes, achievementsRes] = await Promise.all([
     // LEFT JOIN the global catalogue for Steam's own review verdict and count.
     // Left, not inner: a hand-added game may have no catalogue row, and it must
     // still appear. The group's own columns win — a group can correct a player
@@ -77,6 +78,13 @@ export async function onRequestGet({ env, data }) {
          LEFT JOIN users u ON u.steam_id = f.set_by
         WHERE f.group_id = ?`
     ).bind(gid).all(),
+    // Personal completion is an estimate belonging to the signed-in account.
+    // Keep the join group-scoped and never expose another member's unlock list.
+    env.DB.prepare(
+      `SELECT p.appid,p.unlocked FROM achievement_progress p
+         JOIN games g ON g.steam_appid=p.appid
+        WHERE g.group_id=? AND g.archived_at IS NULL AND p.steam_id=?`
+    ).bind(gid, data.user.steam_id).all(),
   ]);
 
   const ratings = ratingsRes.results || [];
@@ -116,9 +124,21 @@ export async function onRequestGet({ env, data }) {
   const need = data.group.max_players;
   const gameRows = gamesRes.results || [];
   const memberRows = membersRes.results || [];
+  const completionByApp = new Map();
+  if (data.group.workspace_mode === 'personal') {
+    for (const row of achievementsRes.results || []) {
+      let unlocked;
+      try { unlocked = JSON.parse(row.unlocked || '[]'); } catch { unlocked = []; }
+      const evidence = completionEvidence(row.appid, unlocked);
+      if (evidence) completionByApp.set(Number(row.appid), evidence);
+    }
+  }
   const ownership = await ownershipForGames(env.DB, gid, gameRows, memberRows);
   const games = gameRows.map((g) => {
     const votes = byGame.get(g.id) || [];
+    const completionSuggestion = g.status === 'sampled'
+      ? completionByApp.get(Number(g.steam_appid)) || null
+      : null;
     return {
       ...g,
       votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
@@ -128,6 +148,7 @@ export async function onRequestGet({ env, data }) {
       mySkip: mine.get(g.id) || null,
       factSources: factSources.get(g.id) || {},
       ownership: ownership.byGame.get(g.id) || {},
+      completionSuggestion,
       viability: viability(g, need),
     };
   });
