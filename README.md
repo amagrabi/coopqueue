@@ -91,7 +91,8 @@ not hidden in a stats page.
 rating profiles, yearly starts and finishes, time-versus-rating, and a dot
 plot of your biggest arguments. Missing hours remain unknown and every history
 chart shows its date coverage. Panels with no underlying data stay hidden.
-Personal workspaces keep the useful history, rating and playtime views while
+Personal workspaces add a completion track record, rating distribution, playtime
+buckets, backlog check-in, personal records and an achievement cabinet while
 omitting comparisons that require another person.
 
 **Steam ownership and trophies.** A three-state ownership badge uses the public
@@ -107,6 +108,12 @@ with playful progress ranks. A refresh button remains for retries.
 existing one-person group from Settings without losing games, ratings or history.
 They have no invite link or group-only comparisons, use your Steam playtime in
 history and Stats, and retain the co-op-first catalogue and verified-cap metadata.
+Settings includes a selective Steam import: played games begin as **Sampled**,
+unplayed games as **Backlog**, and exact lifetime minutes are rounded to one decimal
+hour. Store art is filled in through the shared metadata cache in small resumable
+batches. Achievement analysis is resumable too; it can suggest **Finished** only
+for a small curated set of explicit ending achievements, and the player must
+confirm every status change.
 
 **Group / Settings.** Members, invite links you can rotate or disable, the headcount that
 drives the viability check, and owner-only JSON or per-table CSV exports — including
@@ -275,7 +282,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 153 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 158 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 

@@ -19,7 +19,7 @@ import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
 import { recommend } from '../lib/recommend.js';
 import { classifyCoop } from '../lib/coop.js';
 import { buildHistoryItems } from '../lib/history.js';
-import { buildLibraryStats, PLAYED_OUTCOMES } from '../lib/stats.js';
+import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../lib/stats.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
@@ -303,6 +303,10 @@ if (SCENARIO === 'member') {
            ('${ME}',413150,7200,1673740800,unixepoch()),
            ('${ME}',620,840,1492646400,unixepoch()),
            ('${ME}',892970,0,NULL,unixepoch())`);
+  db.exec(`INSERT OR REPLACE INTO achievement_progress
+           (steam_id,appid,achieved,total,unlocked,fetched_at) VALUES
+           ('${ME}',413150,28,40,'[{"key":"farm","name":"A Complete Collection","unlocktime":1673654400}]',unixepoch()),
+           ('${ME}',620,31,51,'[{"key":"wake","name":"Wake Up Call","unlocktime":1492560000}]',unixepoch())`);
 }
 
 const q = (sql, ...a) => db.prepare(sql).all(...a);
@@ -592,6 +596,37 @@ const server = http.createServer(async (req, res) => {
     }
     if (sub === '/playtime' && req.method === 'POST') {
       return send(res, 200, { ok: true, members: [], gamesEstimated: 0 });
+    }
+    if (sub === '/steam-import' && req.method === 'POST') {
+      if (ctx.workspace_mode !== 'personal') return send(res, 409, { error: 'personal workspaces only' });
+      const b = await readBody(req);
+      if (b.action === 'enrich') return send(res, 200, { processed: 0, enriched: 0, remaining: 0 });
+      const samples = [
+        { appid: 1145360, name: 'Hades', hours: 42.3, lastPlayed: '2024-06-18', played: true, image: null },
+        { appid: 504230, name: 'Celeste', hours: 8.7, lastPlayed: '2021-02-11', played: true, image: null },
+        { appid: 2379780, name: 'Balatro', hours: 0, lastPlayed: null, played: false, image: null },
+      ].filter((game) => b.includeUnplayed || game.played)
+        .filter((game) => !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
+      if (b.action === 'preview') return send(res, 200, {
+        items: samples, offset: 0, nextOffset: samples.length, hasMore: false,
+        counts: { owned: 6, tracked: q('SELECT id FROM games WHERE group_id=?', gid).length,
+          missingPlayed: samples.filter((game) => game.played).length, missingUnplayed: 1,
+          playtimeReadable: true },
+      });
+      const appids = new Set((b.appids || []).map(Number));
+      const selected = samples.filter((game) => appids.has(game.appid));
+      for (const game of selected) {
+        db.prepare(`INSERT OR IGNORE INTO games
+          (group_id,name,steam_appid,status,hours,finished,added_by,enriched_at)
+          VALUES (?,?,?,?,?,?,?,unixepoch())`)
+          .run(gid, game.name, game.appid, game.played ? 'sampled' : 'backlog',
+            game.played ? game.hours : null, game.played ? game.lastPlayed : null, ME);
+      }
+      return send(res, 201, { imported: selected.length, names: selected.map((game) => game.name), metadataRemaining: 0 });
+    }
+    if (sub === '/achievement-scan' && req.method === 'POST') {
+      if (ctx.workspace_mode !== 'personal') return send(res, 409, { error: 'personal workspaces only' });
+      return send(res, 200, { processed: 0, synced: 0, report: [], nextCursor: 0, hasMore: false });
     }
     if (sub === '/play-night' && req.method === 'POST') {
       const b = await readBody(req);
@@ -909,10 +944,11 @@ const server = http.createServer(async (req, res) => {
       const L = libraryFor(gid, need);
       const personal = ctx.workspace_mode === 'personal';
       const statsGames = L.games.map((g) => {
-        const minutes = personal && g.steam_appid
-          ? one('SELECT minutes FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)?.minutes
+        const playtime = personal && g.steam_appid
+          ? one('SELECT minutes,last_played FROM playtime WHERE steam_id=? AND appid=?', ME, g.steam_appid)
           : null;
-        return { ...g, effectiveHours: g.hours ?? (minutes != null ? minutes / 60 : null) };
+        return { ...g, personal_last_played: playtime?.last_played ?? null,
+          effectiveHours: g.hours ?? (playtime?.minutes != null ? playtime.minutes / 60 : null) };
       });
       const played = statsGames.filter((g) => PLAYED_OUTCOMES.has(g.status) && g.n > 0);
       const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
@@ -944,6 +980,10 @@ const server = http.createServer(async (req, res) => {
             max: mine.length ? Math.max(...mine.map((m) => m.score)) : null };
         }),
         ...buildLibraryStats(statsGames),
+        personalStats: personal ? buildPersonalStats(statsGames, q(
+          `SELECT p.appid,p.achieved,p.total,p.unlocked,p.fetched_at
+             FROM achievement_progress p JOIN games g ON g.steam_appid=p.appid
+            WHERE g.group_id=? AND g.archived_at IS NULL AND p.steam_id=?`, gid, ME)) : null,
         ...(() => {
           // Mirrors the real handler's extra statistics closely enough to render.
           const MIN_OVERLAP = 5, MIN_GENRE = 3;

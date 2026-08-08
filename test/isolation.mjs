@@ -47,7 +47,7 @@ const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
        commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute,
-       historyRoute, statsRoute] = await Promise.all([
+       historyRoute, statsRoute, steamImportRoute, achievementScanRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -64,6 +64,8 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/achievements.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/history.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/stats.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/steam-import.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/achievement-scan.js')),
 ]);
 const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
 const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
@@ -1868,6 +1870,117 @@ await check('the co-op filter is on by default and can be turned off', async () 
   sqlite.exec('DELETE FROM coop_apps WHERE appid=9101');
   return (!has(on) && has(off)) || `default showed it: ${has(on)}; coopOnly=0 hid it: ${!has(off)}`;
 });
+
+console.log('\nPersonal Steam import');
+
+sqlite.exec(`INSERT INTO groups (id,slug,name,max_players,created_by)
+             VALUES (410,'alice-solo','Alice Solo',1,'${ALICE}')`);
+sqlite.exec(`INSERT INTO workspace_settings (group_id,mode) VALUES (410,'personal')`);
+sqlite.exec(`INSERT INTO memberships (group_id,steam_id,short_name,role)
+             VALUES (410,'${ALICE}','Alice','owner')`);
+sqlite.exec(`INSERT INTO games (group_id,name,steam_appid,status)
+             VALUES (1,'Same app in co-op',700001,'backlog'),
+                    (1,'Foreign achievement target',700002,'sampled'),
+                    (410,'Already tracked solo game',700003,'backlog')`);
+
+const originalFetch = globalThis.fetch;
+const steamCalls = [];
+globalThis.fetch = async (url) => {
+  steamCalls.push(String(url));
+  if (String(url).includes('GetOwnedGames')) {
+    return new Response(JSON.stringify({ response: { games: [
+      { appid: 700001, name: 'Imported Solo Game', playtime_forever: 125,
+        rtime_last_played: 1700000000, img_icon_url: 'abcdef1234' },
+      { appid: 700003, name: 'Already tracked solo game', playtime_forever: 60,
+        rtime_last_played: 1690000000, img_icon_url: 'abcdef5678' },
+    ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  if (String(url).includes('GetPlayerAchievements')) {
+    return new Response(JSON.stringify({ playerstats: { success: true, achievements: [{
+      apiname: 'chapter_one', name: 'Chapter One', achieved: 1, unlocktime: 1690000000,
+    }] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  return new Response('{}', { status: 404 });
+};
+env.STEAM_API_KEY = 'test-key';
+
+await check('personal import compares and writes only inside the selected workspace', async () => {
+  const { data } = await ctxFor(ALICE, 'alice-solo');
+  const preview = await (await steamImportRoute.onRequestPost({
+    request: req({ action: 'preview' }), env, data,
+  })).json();
+  if (preview.items?.[0]?.appid !== 700001) return `foreign group suppressed preview: ${JSON.stringify(preview)}`;
+  const response = await steamImportRoute.onRequestPost({
+    request: req({ action: 'import', appids: [700001, 999999] }), env, data,
+  });
+  const own = sqlite.prepare(
+    'SELECT status,hours,finished FROM games WHERE group_id=410 AND steam_appid=700001'
+  ).get();
+  const foreign = sqlite.prepare(
+    'SELECT COUNT(*) AS n FROM games WHERE group_id=1 AND steam_appid=700001'
+  ).get().n;
+  const refreshed = sqlite.prepare(
+    'SELECT minutes FROM playtime WHERE steam_id=? AND appid=700003'
+  ).get(ALICE)?.minutes;
+  return (response.status === 201 && own?.status === 'sampled' && own.hours === 2.1
+      && own.finished === '2023-11-14' && foreign === 1 && refreshed === 60)
+    || `status ${response.status}, own ${JSON.stringify(own)}, foreign ${foreign}, refreshed ${refreshed}`;
+});
+
+await check('an all-zero Steam library is not silently imported as a real backlog', async () => {
+  const visibleFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ response: { games: [{
+      appid: 700004, name: 'Privacy Masked Game', playtime_forever: 0, rtime_last_played: 0,
+    }] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const { data } = await ctxFor(ALICE, 'alice-solo');
+    const response = await steamImportRoute.onRequestPost({
+      request: req({ action: 'import', appids: [700004] }), env, data,
+    });
+    const inserted = sqlite.prepare(
+      'SELECT COUNT(*) AS n FROM games WHERE group_id=410 AND steam_appid=700004'
+    ).get().n;
+    return (response.status === 409 && inserted === 0) || `status ${response.status}, rows ${inserted}`;
+  } finally { globalThis.fetch = visibleFetch; }
+});
+
+await check('achievement scan never selects a game from another workspace', async () => {
+  steamCalls.length = 0;
+  const { data } = await ctxFor(ALICE, 'alice-solo');
+  const response = await achievementScanRoute.onRequestPost({
+    request: req({ afterId: 0 }), env, data,
+  });
+  const payload = await response.json();
+  const fetchedForeign = steamCalls.some((url) => /appid=700002(?:&|$)/.test(url));
+  const progress = sqlite.prepare(
+    'SELECT achieved,total FROM achievement_progress WHERE steam_id=? AND appid=700001'
+  ).get(ALICE);
+  return (response.status === 200 && payload.processed === 1 && progress?.achieved === 1
+      && progress.total === 1 && !fetchedForeign)
+    || `status ${response.status}, payload ${JSON.stringify(payload)}, foreign ${fetchedForeign}`;
+});
+
+const { completionEvidence } = await import(path.join(SITE, 'lib/completion.js'));
+const { buildPersonalStats } = await import(path.join(SITE, 'lib/stats.js'));
+await check('completion suggestions require an exact curated terminal achievement', async () => {
+  const yes = completionEvidence(264710, [{ key: 'launchrocket' }]);
+  const no = completionEvidence(264710, [{ key: 'buildbase' }]);
+  return (yes?.label === 'Go Among the Stars' && no == null) || `${JSON.stringify({ yes, no })}`;
+});
+
+await check('personal stats keep completion, time, ratings and achievements honest', async () => {
+  const stats = buildPersonalStats([
+    { id: 1, name: 'Subnautica', steam_appid: 264710, status: 'sampled', effectiveHours: 10, n: 1, raw: 9 },
+    { id: 2, name: 'Finished Game', steam_appid: 2, status: 'finished', effectiveHours: 20, n: 1, raw: 7 },
+  ], [{ appid: 264710, achieved: 1, total: 5, unlocked: '[{"key":"launchrocket"}]' }]);
+  return (stats.completion.rate === 50 && stats.completion.medianFinishedHours === 20
+      && stats.ratingDistribution.length === 2 && stats.achievements.unlocked === 1
+      && stats.completionSuggestions[0]?.id === 1)
+    || JSON.stringify(stats);
+});
+
+globalThis.fetch = originalFetch;
+env.STEAM_API_KEY = '';
 
 console.log('\nHTTP boundaries');
 

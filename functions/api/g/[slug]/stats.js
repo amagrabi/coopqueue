@@ -1,6 +1,6 @@
 import { json } from '../../../../lib/http.js';
 import { calibrate, globalStats, scoreGame } from '../../../../lib/score.js';
-import { buildLibraryStats, PLAYED_OUTCOMES } from '../../../../lib/stats.js';
+import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../../../../lib/stats.js';
 
 const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 
@@ -9,13 +9,13 @@ export async function onRequestGet({ env, data }) {
   const need = data.group.max_players;
   const personal = data.group.workspace_mode === 'personal';
 
-  const [gamesRes, ratingsRes, membersRes, skipsRes] = await Promise.all([
+  const [gamesRes, ratingsRes, membersRes, skipsRes, achievementRes] = await Promise.all([
     // Archived games are out of the stats too: they are no longer part of what
     // the group is choosing between, and leaving them in would quietly inflate
     // coverage denominators and genre averages.
     env.DB.prepare(
-      `SELECT g.id, g.name, g.genre, g.status, g.hours, g.started, g.finished, g.max_players,
-              p.minutes AS personal_minutes
+      `SELECT g.id, g.name, g.steam_appid, g.genre, g.status, g.hours, g.started, g.finished,
+              g.max_players, p.minutes AS personal_minutes, p.last_played AS personal_last_played
          FROM games g
          LEFT JOIN playtime p ON p.appid = g.steam_appid AND p.steam_id = ?2
         WHERE g.group_id = ?1 AND g.archived_at IS NULL`
@@ -35,6 +35,12 @@ export async function onRequestGet({ env, data }) {
          JOIN games g ON g.id = s.game_id
         WHERE g.group_id = ? AND g.archived_at IS NULL`
     ).bind(gid).all(),
+    env.DB.prepare(
+      `SELECT p.appid,p.achieved,p.total,p.unlocked,p.fetched_at
+         FROM achievement_progress p
+         JOIN games g ON g.steam_appid=p.appid
+        WHERE g.group_id=?1 AND g.archived_at IS NULL AND p.steam_id=?2`
+    ).bind(gid, data.user.steam_id).all(),
   ]);
 
   const games = (gamesRes.results || []).map((game) => ({
@@ -189,6 +195,9 @@ export async function onRequestGet({ env, data }) {
       maxPlayers: need,
     },
     ...libraryStats,
+    personalStats: personal
+      ? buildPersonalStats(scored, achievementRes.results || [])
+      : null,
     people,
     arguments: played
       .filter((g) => g.n >= 2 && g.spread >= 2)

@@ -74,7 +74,7 @@ function rateLimitFor(method, pathname) {
   if (method === 'GET' && pathname === '/api/steam/search') {
     return { bucket: 'steam-search', max: 30, windowSeconds: 60 };
   }
-  const expensive = (method === 'POST' && /\/(games|enrich|playtime|achievements)$/.test(pathname))
+  const expensive = (method === 'POST' && /\/(games|enrich|playtime|achievements|steam-import|achievement-scan)$/.test(pathname))
     || (method === 'PUT' && /\/games\/\d+$/.test(pathname));
   if (expensive) return { bucket: 'steam-write', max: 20, windowSeconds: 300 };
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {

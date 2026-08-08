@@ -997,6 +997,46 @@ tr.is-archived td { opacity: .55; }
 .est { color: var(--text-muted); border-bottom: 1px dotted var(--baseline); cursor: help; }
 .pt-fix { display: block; margin-top: 3px; }
 
+/* ── personal Steam import ─────────────────────────────────────────────── */
+.steam-tools { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.steam-import-dialog { width: min(820px, calc(100vw - 32px)); }
+.steam-import-toggle { margin: 10px 0 14px; }
+.steam-import-summary { color: var(--text-secondary); font-size: 13.5px; }
+.steam-import-actions,
+.steam-import-foot { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
+.steam-import-actions span { color: var(--text-muted); font-size: 12.5px; }
+.steam-import-foot { justify-content: space-between; margin: 14px 0 0; }
+.steam-import-submit { margin-left: auto; }
+.steam-import-list { display: grid; gap: 6px; }
+.steam-import-item {
+  display: grid; grid-template-columns: auto 42px minmax(0,1fr) auto;
+  align-items: center; gap: 11px; padding: 9px 10px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid transparent; cursor: pointer;
+}
+.steam-import-item:hover { border-color: var(--border-strong); }
+.steam-import-item img,
+.steam-import-placeholder { width: 42px; height: 42px; object-fit: cover; border-radius: 7px; background: var(--surface-1); }
+.steam-import-item > span:not(.steam-import-placeholder) { min-width: 0; display: grid; gap: 3px; }
+.steam-import-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.steam-import-item small { color: var(--text-muted); font-size: 11.5px; }
+.steam-import-item a { color: #a8cbf5; font-size: 12.5px; white-space: nowrap; }
+
+/* ── personal statistics ───────────────────────────────────────────────── */
+.personal-stat-callouts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.personal-records { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.completion-suggestions { display: grid; gap: 7px; }
+.completion-suggestion {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 11px; border-radius: var(--radius-sm); background: var(--surface-2);
+}
+.completion-suggestion > span { min-width: 0; display: grid; gap: 2px; }
+.completion-suggestion strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.completion-suggestion small { color: var(--text-muted); font-size: 11.5px; }
+.compact-list { display: grid; gap: 7px; }
+.compact-list > span { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.compact-list b { font-weight: 550; color: var(--text-secondary); }
+.compact-list em { color: var(--text-muted); font-style: normal; text-align: right; }
+
 @media (max-width: 720px) {
   .history-card { padding: 16px; }
   .history-item { grid-template-columns: 112px minmax(0,1fr); gap: 12px; }
@@ -1009,7 +1049,11 @@ tr.is-archived td { opacity: .55; }
   #lib-table .c-name { width: 100%; min-width: 0; padding: 12px; }
   #lib-table .lib-mobile-meta { display: block; }
   #lib-table .lib-game { flex-wrap: wrap; }
+  .steam-import-item { grid-template-columns: auto 36px minmax(0,1fr); }
+  .steam-import-item img, .steam-import-placeholder { width: 36px; height: 36px; }
+  .steam-import-item a { grid-column: 3; }
 }
 @media (max-width: 480px) {
   .pair-callouts { grid-template-columns: 1fr; }
+  .personal-stat-callouts, .personal-records { grid-template-columns: 1fr; }
 }

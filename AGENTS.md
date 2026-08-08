@@ -22,7 +22,7 @@ Live at <https://coopqueue.pages.dev>.
 ## Before you finish
 
 ```bash
-npm test                 # 153 assertions — MUST pass before any deploy
+npm test                 # 158 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -122,7 +122,7 @@ public/                 the entire frontend: index.html, app.js, styles.css, bra
 crawler/                the hourly cron Worker (Pages Functions cannot carry crons)
 migrations/             additive, idempotent, applied by hand
 scripts/                setup, crawl, IGDB measurement, tags, palette validation
-test/isolation.mjs      153 assertions against the REAL route handlers
+test/isolation.mjs      158 assertions against the REAL route handlers
 test/harness.mjs        local server; reimplements routes over real lib/ + schema
 schema.sql              fresh installs and tests ONLY — never production
 ```

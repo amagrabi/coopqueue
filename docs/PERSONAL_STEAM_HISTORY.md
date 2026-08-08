@@ -5,6 +5,33 @@ migrations 026 and 027. It is intentionally conservative: Steam can prove that a
 account owns or launched a game, but it usually cannot prove why somebody stopped
 playing it or whether they consider it complete.
 
+## Built-in import for any player
+
+Personal library Settings now exposes the repeatable parts of this process to every
+signed-in player. **Import games from Steam** previews only titles missing from the
+current personal workspace, selects played games by default, and can optionally
+include owned games with no playtime. Each import is capped at 50 games and the
+server re-fetches the signed-in account's library before writing, so a crafted
+request cannot inject an app the account does not own.
+
+If Steam reports zero minutes for every owned game, the UI warns that the separate
+"Always keep my total playtime private" setting may be masking the data and asks
+for confirmation before treating selected titles as Backlog. A successful import
+also refreshes playtime for every already-tracked owned title before advancing the
+group library watermark, so ownership can never become a false negative.
+
+Played titles start as `sampled`; unplayed titles start as `backlog`. Lifetime
+minutes and last-played timestamps are saved with provenance. Metadata enrichment
+uses `getAppDetails()` in batches of three, and **Fill missing game details** resumes
+the queue. **Analyze achievements** checks up to twelve games per click through
+four-game server batches and keeps a session cursor, so private or unsupported
+games do not block later titles.
+
+The curated terminal-achievement allowlist lives in `lib/completion.js`. Matches
+appear as **Likely finished** suggestions in personal Stats, never as automatic
+status changes. The manual migration procedure below remains useful for Steam
+Replay evidence and one-off historical reconstruction that the Web API cannot do.
+
 ## Evidence and what it means
 
 Use the sources in this order:

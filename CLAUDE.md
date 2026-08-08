@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 153 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 158 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -376,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-153/153 assertions pass. `npm run test:ui` does **not** run on macOS: it
+158/158 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -579,6 +579,14 @@ union unlocked, per-person progress, fresh unlocks and (only when every resolvab
 account has synced) achievements one member short or unanimous. Steam privacy and
 games with no achievements are explicit states, not zero progress.
 
+Personal workspaces also expose `POST /api/g/:slug/achievement-scan`. One request
+checks at most four non-backlog games and the browser persists the last game id as
+a resumable cursor. A click makes at most three such requests. Failures advance the
+cursor rather than trapping every later game behind one private title; no negative
+row is cached as a confident zero. The Stats completion suggestions come from the
+exact `(appid, achievement key)` allowlist in `lib/completion.js` and always require
+a human click before changing `sampled` to `finished`.
+
 Do not diagnose every `GetPlayerAchievements` 403 as a dead site key. Measured on
 production, the same key successfully completed all four `GetOwnedGames` library
 syncs while `ISteamUserStats` refused PEAK; the signed-in profile's public Steam
@@ -615,6 +623,17 @@ stored as hours rounded to one decimal, and achievement dates remain approximate
 first/last-played evidence. The evidence rules and repeatable import procedure live
 in `docs/PERSONAL_STEAM_HISTORY.md`; both migrations are idempotent and preserve
 newer user edits.
+
+`POST /api/g/:slug/steam-import` is personal-only and has three bounded actions.
+`preview` makes one `GetOwnedGames` call with app info and returns 50 untracked
+titles at a time; `import` re-fetches that signed-in account's library, intersects
+at most 50 requested appids with it, and writes only to `data.group.group_id`;
+`enrich` resolves at most three known appids through `getAppDetails()`. That second
+server-side intersection is a security boundary: the browser cannot use the bulk
+endpoint to inject arbitrary Steam apps or another group's rows. Archived games
+count as already tracked, so the unique `(group_id, steam_appid)` row is preserved.
+The import stores `steam-hours` and `steam-last-played` provenance but never invents
+a first-played date.
 
 ## History-shaped stats
 

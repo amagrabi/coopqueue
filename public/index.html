@@ -497,6 +497,33 @@
         </div>
         <div id="status-shape"></div>
       </section>
+      <div class="grid-2 stats-grid" id="personal-progress-row" hidden>
+        <section class="panel" id="stats-personal-progress">
+          <h3 class="panel-title">Your track record</h3>
+          <p class="panel-sub">How your played games turned out, without pretending a sampled game was finished.</p>
+          <div id="personal-progress" class="stat-callouts personal-stat-callouts"></div>
+        </section>
+        <section class="panel" id="stats-personal-ratings">
+          <h3 class="panel-title">Your rating curve</h3>
+          <p class="panel-sub">The scores you actually use, from rough sessions to all-timers.</p>
+          <div id="personal-ratings" class="bars"></div>
+        </section>
+      </div>
+      <div class="grid-2 stats-grid" id="personal-steam-row" hidden>
+        <section class="panel" id="stats-personal-hours">
+          <h3 class="panel-title">Game length</h3>
+          <p class="panel-sub">Where your Steam hours sit, grouped into useful session-size buckets.</p>
+          <div id="personal-hours" class="bars"></div>
+          <div id="personal-records" class="stat-callouts personal-records"></div>
+        </section>
+        <section class="panel" id="stats-personal-achievements">
+          <h3 class="panel-title">Achievement cabinet</h3>
+          <p class="panel-sub" id="personal-achievement-note"></p>
+          <div id="personal-achievement-summary" class="stat-callouts personal-stat-callouts"></div>
+          <div id="personal-completion-suggestions"></div>
+          <div id="personal-near-complete"></div>
+        </section>
+      </div>
       <div class="grid-2 stats-grid">
         <section class="panel" id="stats-genres">
           <div class="panel-head">
@@ -609,7 +636,12 @@
           <em>together</em> — Steam records how long each of you played, never when or with whom. A
           figure saved in the Library stays put; accepted estimates remain visibly approximate.</p>
         <div id="pt-members" class="people"></div>
-        <button class="btn" id="pt-sync" style="margin-top:14px">Sync playtime from Steam</button>
+        <div class="steam-tools">
+          <button class="btn" id="pt-sync">Sync playtime from Steam</button>
+          <button class="btn btn-primary" id="pt-import" hidden>Import games from Steam</button>
+          <button class="btn" id="pt-achievements" hidden>Analyze achievements</button>
+          <button class="btn" id="pt-enrich" hidden>Fill missing game details</button>
+        </div>
         <p id="pt-status" class="add-status"></p>
       </section>
     </section>
@@ -652,6 +684,31 @@
       <button class="btn btn-primary" id="man-add">Add to library</button>
       <p id="man-status" class="add-status"></p>
     </details>
+  </div>
+</dialog>
+
+<dialog id="steam-import-dialog" class="dialog dialog-wide steam-import-dialog">
+  <form method="dialog" class="dialog-head">
+    <h3>Import your Steam library</h3><button class="btn btn-icon" value="cancel" aria-label="Close">✕</button>
+  </form>
+  <div class="dialog-body">
+    <p class="panel-sub">Choose the games you want to track. Played games start as <strong>Sampled</strong> and
+      unplayed games start in <strong>Backlog</strong>. Hours and last-played dates come from Steam;
+      first-played dates remain unknown.</p>
+    <label class="toggle steam-import-toggle" for="steam-import-unplayed">
+      <input type="checkbox" id="steam-import-unplayed"> Also show owned games with no playtime
+    </label>
+    <div class="steam-import-summary" id="steam-import-summary"></div>
+    <div class="steam-import-actions">
+      <button class="btn btn-sm" id="steam-import-select" type="button">Select all shown</button>
+      <span id="steam-import-selected">0 selected</span>
+    </div>
+    <div id="steam-import-list" class="steam-import-list"></div>
+    <div class="steam-import-foot">
+      <button class="btn" id="steam-import-more" type="button" hidden>Load more</button>
+      <button class="btn btn-primary steam-import-submit" id="steam-import-submit" type="button">Import selected</button>
+    </div>
+    <p class="add-status" id="steam-import-status"></p>
   </div>
 </dialog>
 
