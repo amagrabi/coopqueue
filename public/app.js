@@ -300,6 +300,9 @@ function wireLandingShowcase() {
 /* ───────────────────────── onboarding: no groups ─────────────────────── */
 function showOnboard() {
   show('onboard');
+  $('#create-form').reset();
+  $('#join-form').reset();
+  $('#onboard-status').textContent = '';
   $('#onboard-name').textContent = state.me.displayName || 'stranger';
 
   const syncCreateMode = () => {
@@ -321,11 +324,15 @@ function showOnboard() {
     try {
       const r = await api('/api/groups', { method: 'POST', body: { name, maxPlayers, mode } });
       state.groups = (await api('/api/me')).groups;
-      location.hash = `#/g/${r.slug}/queue`;
+      // A new workspace has nothing useful to rate yet. Personal libraries start
+      // with the selective Steam review; co-op groups start in the catalogue.
+      location.hash = `#/g/${r.slug}/${mode === 'personal' ? 'members' : 'browse'}`;
       await openFromHash();
-      toast(mode === 'personal'
-        ? `${r.name} is ready — add the first game`
-        : `${r.name} created — invite the others from the Group tab`);
+      if (mode === 'personal' && state.group?.slug === r.slug) {
+        openSteamImport({ onboarding: true });
+      } else {
+        toast(`${r.name} created — add a few games, then invite the others`);
+      }
     } catch (err) { $('#onboard-status').textContent = err.message; }
   };
 
@@ -1938,8 +1945,8 @@ async function renderMembers() {
   $('#workspace-settings-grid').classList.toggle('single', personal);
   $('#playtime-title').textContent = personal ? 'Your Steam playtime' : 'Steam playtime';
   $('#playtime-copy').innerHTML = personal
-    ? 'Sync your public Steam library to fill ownership, playtime and recent-played hints. '
-      + 'Steam never exposes a first-played date, so that remains yours to record.'
+    ? 'Importing games also syncs ownership, exact playtime and recent-played hints. Use the sync button '
+      + 'later to refresh them. Steam never exposes a first-played date, so that remains yours to record.'
     : 'Group hours are estimated from Steam: the smallest playtime among the people who actually '
       + 'played a game. That is an upper bound on time you played it <em>together</em> — Steam records '
       + 'how long each of you played, never when or with whom. A figure saved in the Library stays put; '
@@ -2097,7 +2104,7 @@ async function renderMembers() {
 
   void renderPlaytime();
   $('#pt-sync').addEventListener('click', syncPlaytime);
-  $('#pt-import').onclick = openSteamImport;
+  $('#pt-import').onclick = () => openSteamImport();
   $('#pt-achievements').onclick = analyzeAchievements;
   $('#pt-enrich').onclick = enrichSteamMetadata;
 
@@ -2322,10 +2329,12 @@ async function syncPlaytime() {
   } finally { btn.disabled = false; }
 }
 
-const STEAM_IMPORT_LIMIT = 50;
+const STEAM_IMPORT_BATCH = 250;
+const AUTO_ENRICH_PASSES = 3;
 const steamImport = {
   items: [], selected: new Set(), nextOffset: 0, hasMore: false,
-  ambiguousPlaytime: false, counts: null,
+  ambiguousPlaytime: false, counts: null, loading: false, loadSeq: 0,
+  onboarding: false, importedDuringOpen: false,
 };
 
 function steamImportMeta(game) {
@@ -2348,28 +2357,27 @@ function renderSteamImportList() {
   $$('#steam-import-list input').forEach((checkbox) => {
     checkbox.onchange = () => {
       const appid = Number(checkbox.value);
-      if (checkbox.checked && steamImport.selected.size >= STEAM_IMPORT_LIMIT) {
-        checkbox.checked = false;
-        $('#steam-import-status').textContent = `Import up to ${STEAM_IMPORT_LIMIT} games at a time.`;
-      } else if (checkbox.checked) steamImport.selected.add(appid);
+      if (checkbox.checked) steamImport.selected.add(appid);
       else steamImport.selected.delete(appid);
+      $('#steam-import-status').textContent = '';
       $('#steam-import-selected').textContent = `${steamImport.selected.size} selected`;
+      $('#steam-import-select-none').disabled = !steamImport.selected.size;
     };
   });
   $('#steam-import-selected').textContent = `${steamImport.selected.size} selected`;
   $('#steam-import-select-all').disabled = !steamImport.items.length;
   $('#steam-import-select-none').disabled = !steamImport.selected.size;
-  $('#steam-import-select-owned').disabled = !steamImport.items.some((game) => game.owned);
-  $('#steam-import-select-wishlist').disabled = !steamImport.items.some((game) => game.wishlisted);
+  $('#steam-import-select-owned').disabled = steamImport.counts?.missingOwned === 0;
+  $('#steam-import-select-wishlist').disabled = steamImport.counts?.missingWishlist === 0;
   $('#steam-import-more').hidden = !steamImport.hasMore;
+  $('#steam-import-more').disabled = steamImport.loading;
 }
 
 function selectSteamImport(predicate) {
   steamImport.selected.clear();
   const matches = steamImport.items.filter(predicate);
-  for (const game of matches.slice(0, STEAM_IMPORT_LIMIT)) steamImport.selected.add(game.appid);
-  $('#steam-import-status').textContent = matches.length > STEAM_IMPORT_LIMIT
-    ? `Selected the first ${STEAM_IMPORT_LIMIT}; import them before continuing.` : '';
+  for (const game of matches) steamImport.selected.add(game.appid);
+  $('#steam-import-status').textContent = '';
   renderSteamImportList();
 }
 
@@ -2387,8 +2395,10 @@ function renderSteamImportSummary() {
   $('#steam-import-summary').textContent = notes.join(' ');
 }
 
-async function loadSteamImport(reset = false) {
+async function loadSteamImport(reset = false, loadAll = false) {
   const slug = state.group.slug;
+  const seq = reset ? ++steamImport.loadSeq : steamImport.loadSeq;
+  if (steamImport.loading && !reset) return;
   if (reset) {
     steamImport.items = [];
     steamImport.selected.clear();
@@ -2397,51 +2407,78 @@ async function loadSteamImport(reset = false) {
     steamImport.ambiguousPlaytime = false;
     steamImport.counts = null;
   }
-  $('#steam-import-status').textContent = 'Reading your public Steam library and wishlist…';
+  steamImport.loading = true;
+  renderSteamImportList();
   try {
-    const result = await gapiFor(slug, '/steam-import', {
-      method: 'POST', body: {
-        action: 'preview', offset: steamImport.nextOffset,
-        includeUnplayed: $('#steam-import-unplayed').checked,
-        source: $('#steam-import-source').value,
-      },
-    });
-    if (state.group?.slug !== slug || !$('#steam-import-dialog').open) return;
-    for (const game of result.items) {
-      if (!steamImport.items.some((item) => item.appid === game.appid)) steamImport.items.push(game);
-      if (steamImport.selected.size < STEAM_IMPORT_LIMIT) steamImport.selected.add(game.appid);
-    }
-    steamImport.nextOffset = result.nextOffset;
-    steamImport.hasMore = result.hasMore;
-    steamImport.ambiguousPlaytime = !result.counts.playtimeReadable;
-    steamImport.counts = result.counts;
-    renderSteamImportSummary();
+    do {
+      $('#steam-import-status').textContent = steamImport.items.length
+        ? `Loading more candidates… ${steamImport.items.length} ready`
+        : 'Reading your public Steam library and wishlist…';
+      const result = await gapiFor(slug, '/steam-import', {
+        method: 'POST', body: {
+          action: 'preview', offset: steamImport.nextOffset,
+          includeUnplayed: $('#steam-import-unplayed').checked,
+          source: $('#steam-import-source').value,
+        },
+      });
+      if (seq !== steamImport.loadSeq || state.group?.slug !== slug
+          || !$('#steam-import-dialog').open) return;
+      for (const game of result.items) {
+        if (steamImport.items.some((item) => item.appid === game.appid)) continue;
+        steamImport.items.push(game);
+        // New rows follow the dialog's opt-out model: they arrive checked, while
+        // anything the player already unticked stays unticked.
+        steamImport.selected.add(game.appid);
+      }
+      steamImport.nextOffset = result.nextOffset;
+      steamImport.hasMore = result.hasMore;
+      steamImport.ambiguousPlaytime = !result.counts.playtimeReadable;
+      steamImport.counts = result.counts;
+      renderSteamImportSummary();
+      renderSteamImportList();
+    } while (loadAll && steamImport.hasMore);
     $('#steam-import-status').textContent = '';
-    renderSteamImportList();
-  } catch (error) { $('#steam-import-status').textContent = error.message; }
+  } catch (error) {
+    if (seq === steamImport.loadSeq) $('#steam-import-status').textContent = error.message;
+  } finally {
+    if (seq === steamImport.loadSeq) {
+      steamImport.loading = false;
+      renderSteamImportList();
+    }
+  }
 }
 
-function openSteamImport() {
+function openSteamImport({ onboarding = false } = {}) {
   $('#steam-import-source').value = 'all';
   $('#steam-import-unplayed').checked = false;
+  steamImport.onboarding = onboarding;
+  steamImport.importedDuringOpen = false;
   $('#steam-import-dialog').showModal();
   void loadSteamImport(true);
 }
 
-$('#steam-import-source').onchange = () => void loadSteamImport(true);
-$('#steam-import-unplayed').onchange = () => void loadSteamImport(true);
+async function selectSteamImportSource(source) {
+  $('#steam-import-source').value = source;
+  await loadSteamImport(true, true);
+}
+
+$('#steam-import-dialog').addEventListener('close', () => {
+  const sendToCatalogue = steamImport.onboarding && !steamImport.importedDuringOpen
+    && state.group?.mode === 'personal' && !activeGames().length;
+  steamImport.onboarding = false;
+  if (sendToCatalogue) setView('browse');
+});
+
+$('#steam-import-source').onchange = () => void loadSteamImport(true, true);
+$('#steam-import-unplayed').onchange = () => void loadSteamImport(true, true);
 $('#steam-import-more').onclick = () => void loadSteamImport(false);
 $('#steam-import-select-all').onclick = () => selectSteamImport(() => true);
 $('#steam-import-select-none').onclick = () => selectSteamImport(() => false);
-$('#steam-import-select-owned').onclick = () => selectSteamImport((game) => game.owned);
-$('#steam-import-select-wishlist').onclick = () => selectSteamImport((game) => game.wishlisted);
+$('#steam-import-select-owned').onclick = () => void selectSteamImportSource('owned');
+$('#steam-import-select-wishlist').onclick = () => void selectSteamImportSource('wishlist');
 $('#steam-import-submit').onclick = async () => {
   const appids = [...steamImport.selected];
   if (!appids.length) { $('#steam-import-status').textContent = 'Select at least one game.'; return; }
-  if (appids.length > STEAM_IMPORT_LIMIT) {
-    $('#steam-import-status').textContent = `Import up to ${STEAM_IMPORT_LIMIT} games at a time.`;
-    return;
-  }
   const needsZeroConfirmation = steamImport.ambiguousPlaytime && steamImport.items.some((game) =>
     steamImport.selected.has(game.appid) && game.owned && !game.wishlisted && !game.played);
   const acceptAmbiguousZero = needsZeroConfirmation
@@ -2451,45 +2488,104 @@ $('#steam-import-submit').onclick = async () => {
   const slug = state.group.slug;
   const button = $('#steam-import-submit');
   button.disabled = true;
-  $('#steam-import-status').textContent = 'Importing your games…';
+  let imported = 0;
+  let importedPlayed = 0;
+  let metadataRemaining = 0;
   try {
-    const result = await gapiFor(slug, '/steam-import', {
-      method: 'POST', body: { action: 'import', appids, acceptAmbiguousZero },
-    });
-    if (result.metadataRemaining) {
-      $('#steam-import-status').textContent = 'Adding Steam artwork for the first games…';
-      await gapiFor(slug, '/steam-import', { method: 'POST', body: { action: 'enrich' } });
+    for (let i = 0; i < appids.length; i += STEAM_IMPORT_BATCH) {
+      const batch = appids.slice(i, i + STEAM_IMPORT_BATCH);
+      $('#steam-import-status').textContent = appids.length > STEAM_IMPORT_BATCH
+        ? `Importing ${i + 1}–${Math.min(i + batch.length, appids.length)} of ${appids.length}…`
+        : 'Importing your games…';
+      const result = await gapiFor(slug, '/steam-import', {
+        method: 'POST', body: { action: 'import', appids: batch, acceptAmbiguousZero },
+      });
+      imported += result.imported;
+      importedPlayed += result.importedPlayed || 0;
+      metadataRemaining = result.metadataRemaining;
+      for (const appid of batch) steamImport.selected.delete(appid);
+      steamImport.items = steamImport.items.filter((game) => !batch.includes(game.appid));
+      renderSteamImportList();
     }
+    const onboarding = steamImport.onboarding;
+    steamImport.importedDuringOpen = true;
     $('#steam-import-dialog').close();
-    if (!await reloadGroupView(slug, 'members')) return;
-    toast(`Imported ${result.imported} game${result.imported === 1 ? '' : 's'} from Steam`);
+    if (!await reloadGroupView(slug, onboarding ? 'queue' : 'members')) return;
+    toast(`Imported ${imported} game${imported === 1 ? '' : 's'} from Steam`);
+    void runPostImportMaintenance(slug, { metadataRemaining, scanAchievements: importedPlayed > 0 });
   } catch (error) { $('#steam-import-status').textContent = error.message; }
   finally { button.disabled = false; }
 };
 
-async function analyzeAchievements() {
-  const slug = state.group.slug;
-  const button = $('#pt-achievements');
+async function scanAchievementBatches(slug, onProgress = () => {}) {
   const key = `achievement-scan:${slug}`;
   let afterId = Number(sessionStorage.getItem(key)) || 0;
   let total = 0, synced = 0, failures = [];
+  for (let batch = 0; batch < 3; batch++) {
+    onProgress(total);
+    const result = await gapiFor(slug, '/achievement-scan', {
+      method: 'POST', body: { afterId },
+    });
+    total += result.processed;
+    synced += result.synced;
+    failures = failures.concat((result.report || []).filter((item) => !item.ok));
+    afterId = result.nextCursor;
+    if (!result.hasMore || !result.processed) {
+      sessionStorage.removeItem(key);
+      break;
+    }
+    sessionStorage.setItem(key, String(afterId));
+  }
+  state.cache.stats = null;
+  return { total, synced, failures };
+}
+
+async function runPostImportMaintenance(slug, { metadataRemaining, scanAchievements }) {
+  let enriched = 0;
+  let remaining = metadataRemaining;
+  let achievements = { total: 0, synced: 0, failures: [] };
+  try {
+    // Import already refreshes exact playtime and the ownership watermark. The
+    // follow-up only fills store details and achievement evidence, in bounded,
+    // resumable passes so a large library never holds one Worker open indefinitely.
+    for (let pass = 0; pass < AUTO_ENRICH_PASSES && remaining > 0; pass++) {
+      const result = await gapiFor(slug, '/steam-import', {
+        method: 'POST', body: { action: 'enrich' },
+      });
+      enriched += result.enriched;
+      remaining = result.remaining;
+      if (!result.processed) break;
+    }
+    if (scanAchievements) achievements = await scanAchievementBatches(slug);
+    if (state.group?.slug !== slug) return;
+    const work = [];
+    if (enriched) work.push(`added details for ${enriched}`);
+    if (achievements.total) work.push(`checked achievements for ${achievements.total}`);
+    const retry = remaining || achievements.failures.length
+      ? ' You can continue or retry the remaining items in Settings.' : '';
+    if (work.length) toast(`Steam setup ${work.join(' and ')} game${
+      enriched + achievements.total === 1 ? '' : 's'}.${retry}`);
+    if (state.view === 'members') {
+      $('#pt-status').textContent = `Playtime synced during import.${work.length
+        ? ` Steam also ${work.join(' and ')} game${enriched + achievements.total === 1 ? '' : 's'}.`
+        : ''}${retry}`;
+    }
+  } catch (error) {
+    if (state.group?.slug !== slug) return;
+    const message = `The games and playtime were imported, but automatic Steam follow-up paused: ${error.message}`;
+    if (state.view === 'members') $('#pt-status').textContent = message;
+    toast('Import finished; automatic Steam follow-up can be retried in Settings');
+  }
+}
+
+async function analyzeAchievements() {
+  const slug = state.group.slug;
+  const button = $('#pt-achievements');
   button.disabled = true;
   try {
-    for (let batch = 0; batch < 3; batch++) {
-      $('#pt-status').textContent = `Analyzing achievements… ${total} games checked`;
-      const result = await gapiFor(slug, '/achievement-scan', {
-        method: 'POST', body: { afterId },
-      });
-      total += result.processed;
-      synced += result.synced;
-      failures = failures.concat(result.report.filter((item) => !item.ok));
-      afterId = result.nextCursor;
-      if (!result.hasMore || !result.processed) {
-        sessionStorage.removeItem(key);
-        break;
-      }
-      sessionStorage.setItem(key, String(afterId));
-    }
+    const { total, synced, failures } = await scanAchievementBatches(slug, (checked) => {
+      $('#pt-status').textContent = `Analyzing achievements… ${checked} games checked`;
+    });
     state.cache.stats = null;
     const detail = failures.length ? ` ${failures.length} had private or unavailable achievement data.` : '';
     $('#pt-status').textContent = total

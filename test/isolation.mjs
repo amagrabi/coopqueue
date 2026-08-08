@@ -2008,6 +2008,58 @@ await check('wishlist-only import works without a readable library or a false ow
   }
 });
 
+await check('large wishlist previews paginate and imports are no longer capped at fifty', async () => {
+  const visibleFetch = globalThis.fetch;
+  const visibleKey = env.STEAM_API_KEY;
+  const wishlist = Array.from({ length: 321 }, (_, index) => ({
+    appid: 710000 + index, priority: 0, date_added: 1720000000 + index,
+  }));
+  try {
+    env.STEAM_API_KEY = 'test-key';
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      if (target.includes('GetOwnedGames')) {
+        return new Response(JSON.stringify({ response: { games: [] } }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.includes('GetWishlist')) {
+        return new Response(JSON.stringify({ response: { items: wishlist } }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.includes('IStoreBrowseService/GetItems')) {
+        const input = JSON.parse(new URL(target).searchParams.get('input_json'));
+        const storeItems = input.ids.map(({ appid }) => ({ appid, name: `Wishlist ${appid}` }));
+        return new Response(JSON.stringify({ response: { store_items: storeItems } }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 404 });
+    };
+    const { data } = await ctxFor(ALICE, 'alice-solo');
+    const first = await (await steamImportRoute.onRequestPost({
+      request: req({ action: 'preview', source: 'wishlist' }), env, data,
+    })).json();
+    const second = await (await steamImportRoute.onRequestPost({
+      request: req({ action: 'preview', source: 'wishlist', offset: first.nextOffset }), env, data,
+    })).json();
+    const response = await steamImportRoute.onRequestPost({
+      request: req({ action: 'import', appids: wishlist.slice(0, 121).map((item) => item.appid) }), env, data,
+    });
+    const imported = await response.json();
+    const rows = sqlite.prepare(
+      'SELECT COUNT(*) AS n FROM games WHERE group_id=410 AND steam_appid BETWEEN 710000 AND 710120'
+    ).get().n;
+    return (first.items.length === 250 && first.hasMore && second.items.length === 71
+        && !second.hasMore && response.status === 201 && imported.imported === 121 && rows === 121)
+      || `pages ${first.items.length}/${second.items.length}, status ${response.status}, imported ${imported.imported}, rows ${rows}`;
+  } finally {
+    env.STEAM_API_KEY = visibleKey;
+    globalThis.fetch = visibleFetch;
+  }
+});
+
 await check('achievement scan never selects a game from another workspace', async () => {
   steamCalls.length = 0;
   const { data } = await ctxFor(ALICE, 'alice-solo');

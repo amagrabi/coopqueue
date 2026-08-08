@@ -12,9 +12,12 @@ signed-in player. **Import games from Steam** previews only titles missing from 
 current personal workspace across both the owned library and public wishlist.
 Nothing is written until the player reviews checkboxes; the dialog can show both
 sources or either one, include unplayed owned games, select or deselect every shown
-title, and narrow the selection to owned or wishlisted games. Each import is capped
-at 50 games and the server re-fetches both sources before writing, so a crafted
-request cannot inject an arbitrary appid.
+title, and narrow the selection to owned or wishlisted games. The initial combined
+view loads 250 candidates at a time; changing to one source loads every page for
+that source and selects each new row by default. A reviewed selection has no
+browser-side cap. It is sent in batches of at most 250 games, and the server
+re-fetches both sources before every write, so a crafted request cannot inject an
+arbitrary appid.
 
 If Steam reports zero minutes for every owned game, the UI warns that the separate
 "Always keep my total playtime private" setting may be masking the data and asks
@@ -25,11 +28,13 @@ negative. If only the wishlist is readable, its games can still be imported with
 advancing that watermark or pretending the owned library was checked.
 
 Played titles start as `sampled`; unplayed titles start as `backlog`. Lifetime
-minutes and last-played timestamps are saved with provenance. Metadata enrichment
-uses `getAppDetails()` in batches of three, and **Fill missing game details** resumes
-the queue. **Analyze achievements** checks up to twelve games per click through
-four-game server batches and keeps a session cursor, so private or unsupported
-games do not block later titles.
+minutes and last-played timestamps are saved with provenance. The import itself
+refreshes playtime for the whole readable library, so no duplicate sync is needed.
+Afterwards the browser automatically attempts up to three eight-game metadata
+batches and up to twelve played games through four-game achievement batches.
+**Fill missing game details** and **Analyze achievements** remain as resumable retry
+controls, with a session cursor so private or unsupported games do not block later
+titles. Achievement evidence never changes a status automatically.
 
 The curated terminal-achievement allowlist lives in `lib/completion.js`. Matches
 appear as **Likely finished** suggestions in personal Stats, never as automatic

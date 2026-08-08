@@ -3,14 +3,41 @@ import {
   getAppDetails, getAppSummaries, ownedGames, wishlistedGames,
 } from '../../../../lib/steam.js';
 
-const PAGE = 50;
-const MAX_IMPORT = 50;
-const ENRICH_BATCH = 3;
+const PAGE = 250;
+const MAX_IMPORT = 250;
+const DB_BATCH = 50;
+const ENRICH_BATCH = 8;
 
 const day = (timestamp) => timestamp
   ? new Date(Number(timestamp) * 1000).toISOString().slice(0, 10)
   : null;
 const hours = (minutes) => Math.round((Number(minutes) / 60) * 10) / 10;
+const chunks = (items, size = DB_BATCH) => {
+  const result = [];
+  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
+  return result;
+};
+
+async function appSummaries(db, appids) {
+  const summaries = [];
+  // The store-browse helper is intentionally capped at 50 appids. Keep that
+  // upstream safety boundary even though one import can now span several D1
+  // batches; preview rows already in the shared cache cost no Steam request.
+  for (const batch of chunks(appids)) summaries.push(...await getAppSummaries(db, batch));
+  return summaries;
+}
+
+async function cachedApps(db, appids) {
+  const rows = [];
+  for (const batch of chunks(appids)) {
+    const placeholders = batch.map(() => '?').join(',');
+    const result = await db.prepare(
+      `SELECT * FROM steam_apps WHERE appid IN (${placeholders})`
+    ).bind(...batch).all();
+    rows.push(...(result.results || []));
+  }
+  return rows;
+}
 
 function personalOnly(data) {
   return data.group.workspace_mode === 'personal'
@@ -96,7 +123,7 @@ async function preview(db, data, steam, input) {
 
   const offset = Math.max(0, Math.floor(Number(input.offset) || 0));
   const page = source.slice(offset, offset + PAGE);
-  const summaries = new Map((await getAppSummaries(db, page.map((game) => game.appid)))
+  const summaries = new Map((await appSummaries(db, page.map((game) => game.appid)))
     .map((summary) => [summary.appid, summary]));
   const items = page.map((game) => {
     const summary = summaries.get(game.appid);
@@ -154,15 +181,13 @@ async function importSelected(env, data, steam, input) {
   const room = Math.max(0, 2000 - (count?.n ?? 0));
   if (selected.length > room) return bad('this library has hit the 2000-game limit', 429);
 
-  const placeholders = selected.map(() => '?').join(',');
-  const summaries = new Map((await getAppSummaries(db, selected.map((game) => game.appid)))
+  const selectedAppids = selected.map((game) => Number(game.appid));
+  const summaries = new Map((await appSummaries(db, selectedAppids))
     .map((summary) => [summary.appid, summary]));
-  const cachedRows = await db.prepare(
-    `SELECT * FROM steam_apps WHERE appid IN (${placeholders})`
-  ).bind(...selected.map((game) => Number(game.appid))).all();
-  const cached = new Map((cachedRows.results || []).map((row) => [Number(row.appid), row]));
+  const cached = new Map((await cachedApps(db, selectedAppids))
+    .map((row) => [Number(row.appid), row]));
 
-  await db.batch(selected.map((game) => {
+  const inserts = selected.map((game) => {
     const meta = cached.get(Number(game.appid));
     const summary = summaries.get(Number(game.appid));
     const played = Number(game.minutes) > 0;
@@ -180,15 +205,16 @@ async function importSelected(env, data, steam, input) {
       played ? day(game.lastPlayed) : null, data.user.steam_id,
       Number(meta?.fetched_at) > 0 ? Math.floor(Date.now() / 1000) : null
     );
-  }));
+  });
+  for (const batch of chunks(inserts)) await db.batch(batch);
 
   // The watermark below says this whole library was visible. Persist every owned
   // app already tracked here as well as the new selections, or an existing owned
   // game with no older playtime row would be misread as a proven negative.
   const groupApps = new Set([...existing, ...selected.map((game) => Number(game.appid))]);
   const matchedPlaytime = steam.owned.filter((game) => groupApps.has(Number(game.appid)));
-  if (steam.owned.length) for (let i = 0; i < matchedPlaytime.length; i += 50) {
-    await db.batch(matchedPlaytime.slice(i, i + 50).map((game) => db.prepare(
+  if (steam.owned.length) for (const batch of chunks(matchedPlaytime)) {
+    await db.batch(batch.map((game) => db.prepare(
       `INSERT INTO playtime (steam_id,appid,minutes,last_played,fetched_at)
        VALUES (?,?,?,?,unixepoch())
        ON CONFLICT(steam_id,appid) DO UPDATE SET minutes=excluded.minutes,
@@ -196,12 +222,17 @@ async function importSelected(env, data, steam, input) {
     ).bind(data.user.steam_id, Number(game.appid), Number(game.minutes) || 0, game.lastPlayed ?? null)));
   }
 
-  const insertedRows = await db.prepare(
-    `SELECT id,steam_appid,hours,finished FROM games
-      WHERE group_id = ? AND steam_appid IN (${placeholders})`
-  ).bind(gid, ...selected.map((game) => Number(game.appid))).all();
+  const insertedRows = [];
+  for (const batch of chunks(selectedAppids)) {
+    const placeholders = batch.map(() => '?').join(',');
+    const result = await db.prepare(
+      `SELECT id,steam_appid,hours,finished FROM games
+        WHERE group_id = ? AND steam_appid IN (${placeholders})`
+    ).bind(gid, ...batch).all();
+    insertedRows.push(...(result.results || []));
+  }
   const facts = [];
-  for (const game of insertedRows.results || []) {
+  for (const game of insertedRows) {
     if (game.hours != null) facts.push(db.prepare(
       `INSERT OR IGNORE INTO game_fact_sources (group_id,game_id,field,source,set_by)
        VALUES (?,?,'hours','steam-hours',?)`
@@ -211,7 +242,7 @@ async function importSelected(env, data, steam, input) {
        VALUES (?,?,'finished','steam-last-played',?)`
     ).bind(gid, game.id, data.user.steam_id));
   }
-  for (let i = 0; i < facts.length; i += 50) await db.batch(facts.slice(i, i + 50));
+  for (const batch of chunks(facts)) await db.batch(batch);
 
   if (steam.owned.length) {
     const playedCount = steam.owned.filter((game) => Number(game.minutes) > 0).length;
@@ -234,6 +265,7 @@ async function importSelected(env, data, steam, input) {
     imported: selected.length,
     importedOwned: selected.filter((game) => game.owned).length,
     importedWishlist: selected.filter((game) => game.wishlisted).length,
+    importedPlayed: selected.filter((game) => Number(game.minutes) > 0).length,
     names: selected.slice(0, 5).map((game) => game.name
       || summaries.get(game.appid)?.name || `Steam app ${game.appid}`),
     metadataRemaining: pending,

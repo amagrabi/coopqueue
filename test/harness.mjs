@@ -610,6 +610,10 @@ const server = http.createServer(async (req, res) => {
           owned: false, wishlisted: true, wishlistedAt: '2025-03-14', image: null },
         { appid: 1868140, name: 'DREDGE', hours: 0, lastPlayed: null, played: false,
           owned: true, wishlisted: false, wishlistedAt: null, image: null },
+        { appid: 1497440, name: 'COCOON', hours: 0, lastPlayed: null, played: false,
+          owned: false, wishlisted: true, wishlistedAt: '2025-01-03', image: null },
+        { appid: 646570, name: 'Slay the Spire', hours: 0, lastPlayed: null, played: false,
+          owned: false, wishlisted: true, wishlistedAt: '2024-11-27', image: null },
       ];
       const missing = samples.filter((game) =>
         !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
@@ -620,16 +624,23 @@ const server = http.createServer(async (req, res) => {
         if (source === 'wishlist') return game.wishlisted;
         return game.wishlisted || ownedVisible;
       });
-      if (b.action === 'preview') return send(res, 200, {
-        items: visible, offset: 0, nextOffset: visible.length, hasMore: false,
-        counts: { owned: 3, wishlisted: 1,
-          tracked: q('SELECT id FROM games WHERE group_id=?', gid).length,
-          missingTotal: missing.length,
-          missingOwned: missing.filter((game) => game.owned).length,
-          missingWishlist: missing.filter((game) => game.wishlisted).length,
-          matching: visible.length, playtimeReadable: true,
-          ownedState: 'available', wishlistState: 'available' },
-      });
+      if (b.action === 'preview') {
+        // Two rows makes the real pagination behaviour easy to exercise in the
+        // browser harness: load-more rows and a multi-page wishlist both exist.
+        const offset = Math.max(0, Math.floor(Number(b.offset) || 0));
+        const items = visible.slice(offset, offset + 2);
+        return send(res, 200, {
+          items, offset, nextOffset: offset + items.length,
+          hasMore: offset + items.length < visible.length,
+          counts: { owned: 3, wishlisted: 3,
+            tracked: q('SELECT id FROM games WHERE group_id=?', gid).length,
+            missingTotal: missing.length,
+            missingOwned: missing.filter((game) => game.owned).length,
+            missingWishlist: missing.filter((game) => game.wishlisted).length,
+            matching: visible.length, playtimeReadable: true,
+            ownedState: 'available', wishlistState: 'available' },
+        });
+      }
       const appids = new Set((b.appids || []).map(Number));
       const selected = missing.filter((game) => appids.has(game.appid));
       for (const game of selected) {
@@ -642,6 +653,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { imported: selected.length,
         importedOwned: selected.filter((game) => game.owned).length,
         importedWishlist: selected.filter((game) => game.wishlisted).length,
+        importedPlayed: selected.filter((game) => game.played).length,
         names: selected.map((game) => game.name), metadataRemaining: 0 });
     }
     if (sub === '/achievement-scan' && req.method === 'POST') {

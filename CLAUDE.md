@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 159 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 160 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -379,7 +379,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-159/159 assertions pass. `npm run test:ui` does **not** run on macOS: it
+160/160 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -628,18 +628,24 @@ in `docs/PERSONAL_STEAM_HISTORY.md`; both migrations are idempotent and preserve
 newer user edits.
 
 `POST /api/g/:slug/steam-import` is personal-only and has three bounded actions.
-`preview` reads `GetOwnedGames` and the public wishlist, then returns 50 untracked
-titles at a time with owned/wishlist source filters. Wishlist ids get cache-first
-names and art through one bounded `getAppSummaries()` request. `import` re-fetches
-both sources, intersects at most 50 requested appids with that union, and writes
-only to `data.group.group_id`; `enrich` resolves at most three known appids through
-`getAppDetails()`. That second server-side intersection is a security boundary: the
+`preview` reads `GetOwnedGames` and the public wishlist, then returns 250 untracked
+titles at a time with owned/wishlist source filters. Selecting a source in the UI
+loads all of its pages, while the initial combined view keeps an explicit Load more
+control. Wishlist ids get cache-first names and art through bounded 50-app
+`getAppSummaries()` requests. `import` re-fetches both sources, intersects at most
+250 requested appids with that union, and writes only to `data.group.group_id`; the
+browser chunks a larger reviewed selection into those batches. `enrich` resolves at
+most eight known appids through `getAppDetails()`. That second server-side
+intersection is a security boundary: the
 browser cannot use the bulk endpoint to inject arbitrary Steam apps or another
 group's rows. Archived games count as already tracked, so the unique
 `(group_id, steam_appid)` row is preserved. Wishlist-only imports do not advance
 the owned-library watermark or manufacture ownership negatives. The import stores
 `steam-hours` and `steam-last-played` provenance when Steam provides them but never
-invents a first-played date.
+invents a first-played date. It already refreshes playtime and ownership, so the
+browser does not repeat that call. After an import it automatically runs at most
+three eight-game metadata passes and three four-game achievement passes; the manual
+Settings controls resume or retry anything left over.
 
 ## History-shaped stats
 

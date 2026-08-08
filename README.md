@@ -110,12 +110,18 @@ They have no invite link or group-only comparisons, use your Steam playtime in
 history and Stats, and retain the co-op-first catalogue and verified-cap metadata.
 Settings includes a selective Steam import for both the owned library and public
 wishlist. It previews every candidate before writing, with source filters,
-select/deselect-all controls and owned-only or wishlist-only shortcuts. Played
+select/deselect-all controls and owned-only or wishlist-only shortcuts. A new
+personal workspace opens this review immediately; cancelling an empty import goes
+to Find games instead of an empty rating queue. New co-op groups also begin in Find
+games. Source filters load their complete candidate set, and larger reviewed
+selections are submitted in bounded batches. Played
 games begin as **Sampled**; unplayed and wishlisted games begin as **Backlog**.
 Exact lifetime minutes are rounded to one decimal hour. Store art is filled in
-through the shared metadata cache in small resumable batches. Achievement analysis
-is resumable too; it can suggest **Finished** only for a small curated set of
-explicit ending achievements, and the player must confirm every status change.
+through the shared metadata cache in small resumable batches. Playtime sync is part
+of the import; metadata and achievement analysis begin automatically in bounded
+passes and remain resumable from Settings. Achievement evidence can suggest
+**Finished** only for a small curated set of explicit ending achievements, and the
+player must confirm every status change.
 
 **Group / Settings.** Members, invite links you can rotate or disable, the headcount that
 drives the viability check, and owner-only JSON or per-table CSV exports — including
@@ -284,7 +290,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 159 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 160 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
