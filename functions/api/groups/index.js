@@ -18,6 +18,20 @@ export async function onRequestPost({ request, env, data }) {
     return bad('group size must be a whole number between 2 and 64');
   }
 
+  /* Names are reusable across unrelated private workspaces. Making them globally
+     unique would let this endpoint reveal that somebody else already uses a name.
+     A collision inside the caller's own workspace list is both visible to them and
+     genuinely ambiguous, so creation follows the same scoped rule as rename. */
+  const duplicate = await env.DB.prepare(
+    `SELECT g.name FROM groups g
+       JOIN memberships m ON m.group_id = g.id AND m.steam_id = ?
+      WHERE g.name = ? COLLATE NOCASE`
+  ).bind(data.user.steam_id, clean).first();
+  if (duplicate) {
+    return bad(`you are already in another group called "${duplicate.name}" — `
+             + 'pick something else so you can tell them apart', 409);
+  }
+
   // A soft ceiling so one account cannot fill the free tier on its own.
   const mine = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM memberships WHERE steam_id = ? AND role = 'owner'"

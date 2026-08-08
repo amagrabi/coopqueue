@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 160 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 161 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -379,7 +379,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-160/160 assertions pass. `npm run test:ui` does **not** run on macOS: it
+161/161 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -617,7 +617,9 @@ A personal workspace is still a group of one internally, so the tenancy boundary
 library, ratings, archive/restore, comments, exports and history provenance all stay
 on the existing code paths. It has `max_players = 1`, no invite link, and hides
 coverage leaderboards, member comparisons, blind-rating controls and empty Stats
-panels. Stats and Complete our history use that account's Steam playtime directly.
+panels. Its Library presents the sole member score as one Rating column rather than
+repeating Players, member, Avg and Votes columns that all describe the same person.
+Stats and Complete our history use that account's Steam playtime directly.
 A one-member co-op group can be converted in Settings; a multi-member group must
 remove the others first, and conversion is a transactional D1 batch.
 
@@ -949,6 +951,11 @@ current view on save, and having that silently undo your sort would be maddening
 Reset button appears only when something deviates, so it is a way back rather than a
 permanently lit control that usually does nothing.
 
+Workspace entry still prefers Rate while its queue has work. A `/queue` entry with
+no unrated games instead opens Library, or Find games if the active library itself is
+empty; an explicit later click on the Rate tab still exposes its completed state.
+The game detail dialog closes through its X, Escape, or a click on the backdrop.
+
 ## Recommendations, and the co-op filter
 
 "Recommended for us" is the default sort on **Find new games**. The ranking is
@@ -1088,10 +1095,12 @@ sense:
 **Group names are deliberately not globally unique.** Enforcing that would turn
 rename into an oracle for the existence of private groups, which is precisely what
 the 404-not-403 boundary prevents — you could sit typing names and learn which are
-taken. What *is* refused is a name colliding with another group **the caller is
-already in**: that is information they already have, and without the check their
-group switcher shows two identical entries. Renaming never touches the slug, so
-URLs and invite links already handed out keep working.
+taken. What *is* refused, on both create and rename, is a name colliding with
+another group **the caller is already in**: that is information they already have,
+and without the check their group switcher shows two identical entries. Existing
+duplicates are labelled with their slug in that switcher until one is renamed.
+Renaming never touches the slug, so URLs and invite links already handed out keep
+working.
 
 ## Conventions
 

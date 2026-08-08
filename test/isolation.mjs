@@ -210,14 +210,27 @@ await check('the only owner cannot leave and orphan the group', async () => {
 console.log('\nGroup creation');
 
 await check('creating a group makes you its owner with a unique slug', async () => {
+  sqlite.exec(`INSERT INTO groups (slug,name,max_players) VALUES ('same-name','Same Name',4)`);
+  const existing = sqlite.prepare("SELECT id FROM groups WHERE slug='same-name'").get();
+  sqlite.prepare("INSERT INTO memberships (group_id,steam_id,short_name,role) VALUES (?,?,?,'owner')")
+    .run(existing.id, ALICE, 'Ama');
   const before = sqlite.prepare('SELECT COUNT(*) AS n FROM groups').get().n;
-  const r = await groupsRoute.onRequestPost({ request: req({ name: 'g4m1ng', maxPlayers: 6 }), env, data: { user: user(MALLORY) } });
+  const r = await groupsRoute.onRequestPost({ request: req({ name: 'Same Name', maxPlayers: 6 }), env, data: { user: user(MALLORY) } });
   const b = await r.json();
-  if (b.slug === 'g4m1ng') return 'slug collided with the existing group';
+  if (b.slug === 'same-name') return 'slug collided with the existing group';
   const row = sqlite.prepare('SELECT * FROM groups WHERE slug=?').get(b.slug);
   const mem = sqlite.prepare("SELECT role FROM memberships WHERE group_id=? AND steam_id=?").get(row.id, MALLORY);
   const after = sqlite.prepare('SELECT COUNT(*) AS n FROM groups').get().n;
   return (after === before + 1 && mem.role === 'owner' && row.max_players === 6) || `slug ${b.slug}, role ${mem?.role}, cap ${row.max_players}`;
+});
+
+await check('creating a duplicate name in your own workspace list is refused', async () => {
+  const before = sqlite.prepare('SELECT COUNT(*) AS n FROM groups').get().n;
+  const r = await groupsRoute.onRequestPost({
+    request: req({ name: '  SAME NAME  ', maxPlayers: 4 }), env, data: { user: user(MALLORY) },
+  });
+  const after = sqlite.prepare('SELECT COUNT(*) AS n FROM groups').get().n;
+  return (r.status === 409 && after === before) || `status ${r.status}, rows ${before} -> ${after}`;
 });
 
 await check('a reserved slug is never handed out', async () => {

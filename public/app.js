@@ -369,7 +369,10 @@ async function openFromHash() {
     if (!loaded || loaded === 'claim') return;
   }
   if (state.group?.slug !== slug) return;
-  setView(route?.view || 'queue');
+  const requested = route?.view || 'queue';
+  // A group link still defaults to Rate, but an empty queue should land somewhere
+  // useful. Keep the Rate tab available when somebody deliberately clicks it.
+  setView(requested === 'queue' && !state.queue.length ? workspaceHomeView() : requested);
 }
 
 window.addEventListener('hashchange', () => {
@@ -475,10 +478,16 @@ function renderChrome() {
 }
 
 function renderGroupMenu() {
+  const nameCounts = new Map();
+  for (const group of state.groups) {
+    const key = group.name.trim().toLocaleLowerCase();
+    nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
+  }
   const items = state.groups.map((g) => `
     <button class="group-item${g.slug === state.group.slug ? ' is-current' : ''}" data-slug="${esc(g.slug)}" role="menuitem">
       <span class="group-item-name">${esc(g.name)}</span>
-      <span class="group-item-meta">${g.mode === 'personal' ? 'Personal' : `${g.members} member${g.members === 1 ? '' : 's'}`} · ${g.games} games${
+      <span class="group-item-meta">${nameCounts.get(g.name.trim().toLocaleLowerCase()) > 1 ? `${esc(g.slug)} · ` : ''}${
+        g.mode === 'personal' ? 'Personal' : `${g.members} member${g.members === 1 ? '' : 's'}`} · ${g.games} games${
         g.unrated ? ` · <b>${g.unrated} to rate</b>` : ''}</span>
     </button>`).join('');
   $('#group-menu').innerHTML = items + `
@@ -582,8 +591,9 @@ function wireOnce() {
     state.qIndex = 0;
     renderQueue();
   }));
-  // The logo is the way back to the thing you came here to do.
-  $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView('queue'); });
+  // The logo is the way back to useful work: rating when there is a queue, then
+  // the existing library, and finally discovery for a completely empty workspace.
+  $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView(workspaceHomeView()); });
   $('#btn-skip').addEventListener('click', () => skipGame(false));
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   $('#btn-unskip').addEventListener('click', unskipGame);
@@ -620,6 +630,16 @@ function wireOnce() {
   // Re-render only; the server result is unchanged, this filter is client-side.
   $('#browse-hide-owned').addEventListener('change', () => renderBrowse(false));
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
+
+  const detailDialog = $('#detail-dialog');
+  detailDialog.addEventListener('click', (e) => {
+    if (e.target !== detailDialog) return;
+    const rect = detailDialog.getBoundingClientRect();
+    const outside = e.clientX < rect.left || e.clientX > rect.right
+      || e.clientY < rect.top || e.clientY > rect.bottom;
+    if (outside) detailDialog.close();
+  });
+  detailDialog.addEventListener('close', () => { detailGameId = null; });
 
   $('#man-add').addEventListener('click', addManual);
   $('#man-name').addEventListener('keydown', (e) => {
@@ -737,6 +757,9 @@ const hoursOf = (g) => {
 /** Archived games are out of everything except the Library's archived filter. */
 const isActive = (g) => !g.archived_at;
 const activeGames = () => state.games.filter(isActive);
+const workspaceHomeView = () => state.queue.length
+  ? 'queue'
+  : activeGames().length ? 'library' : 'browse';
 
 // A game you failed to finish is still one you played and can score.
 const PLAYED_STATUS = new Set(['finished', 'unfinished', 'dropped', 'sampled']);
@@ -1246,33 +1269,42 @@ function libIsDefault() {
 
 let libSort = null;   // { key, dir } — null means the dropdown is in charge
 
-const LIB_COLUMNS = () => [
-  { key: 'name',     label: 'Game',     cls: 'c-name', type: 'text', title: 'Game title' },
-  { key: 'genre',    label: 'Genre',    cls: 'c-genre', type: 'text' },
-  { key: 'status',   label: 'Status',   cls: 'c-status', type: 'text' },
-  { key: 'players',  label: 'Players',  cls: 'c-num c-players', type: 'num',
-    title: 'Max simultaneous online co-op players' },
-  ...state.members.map((m) => ({
-    key: `p:${m.steam_id}`, label: m.short_name, cls: 'c-p', type: 'num',
-    color: colorOf(m.steam_id), title: `${m.short_name}'s own score` })),
-  { key: 'raw',      label: 'Avg',      cls: 'c-num c-avg', type: 'num',
-    title: 'The group\'s score: the plain mean of what people gave it. '
-         + 'Read it next to Votes — a 9.0 from one person is not a 9.0 from four.' },
-  { key: 'n',        label: 'Votes',    cls: 'c-num c-votes', type: 'num',
-    title: 'How many of you have scored this. A high average from one person is '
-         + 'thin evidence; this is the column that tells you so.' },
-  { key: 'started',  label: 'Started',  cls: 'c-date', type: 'text',
-    title: 'When you first played it. Steam publishes no first-played date, so this '
-         + 'is typed by hand in the game\'s details.' },
-  { key: 'hours',    label: 'Hrs',      cls: 'c-num c-hours', type: 'num',
-    title: 'Hours logged for this game, entered by hand' },
-];
+const LIB_COLUMNS = () => {
+  const identity = [
+    { key: 'name', label: 'Game', cls: 'c-name', type: 'text', title: 'Game title' },
+    { key: 'genre', label: 'Genre', cls: 'c-genre', type: 'text' },
+    { key: 'status', label: 'Status', cls: 'c-status', type: 'text' },
+  ];
+  const scores = state.group.mode === 'personal'
+    ? [{ key: 'mine', label: 'Rating', cls: 'c-num c-avg', type: 'num', title: 'Your score' }]
+    : [
+      { key: 'players', label: 'Players', cls: 'c-num c-players', type: 'num',
+        title: 'Max simultaneous online co-op players' },
+      ...state.members.map((m) => ({
+        key: `p:${m.steam_id}`, label: m.short_name, cls: 'c-p', type: 'num',
+        color: colorOf(m.steam_id), title: `${m.short_name}'s own score` })),
+      { key: 'raw', label: 'Avg', cls: 'c-num c-avg', type: 'num',
+        title: 'The group\'s score: the plain mean of what people gave it. '
+             + 'Read it next to Votes — a 9.0 from one person is not a 9.0 from four.' },
+      { key: 'n', label: 'Votes', cls: 'c-num c-votes', type: 'num',
+        title: 'How many of you have scored this. A high average from one person is '
+             + 'thin evidence; this is the column that tells you so.' },
+    ];
+  return [...identity, ...scores,
+    { key: 'started', label: 'Started', cls: 'c-date', type: 'text',
+      title: 'When you first played it. Steam publishes no first-played date, so this '
+           + 'is typed by hand in the game\'s details.' },
+    { key: 'hours', label: 'Hrs', cls: 'c-num c-hours', type: 'num',
+      title: 'Hours logged for this game, entered by hand' },
+  ];
+};
 
 const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
   if (key === 'started') return g.started || null;
   if (key === 'hours')   return hoursOf(g).value;
   if (key === 'status')  return libraryStatusLabel(g);
+  if (key === 'mine')    return g.votes[state.me.steamId];
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
   return g[key];
 };
@@ -1502,6 +1534,7 @@ function renderLibrary() {
     }[sort]);
   }
 
+  const personal = state.group.mode === 'personal';
   $('#lib-table tbody').innerHTML = rows.map((g) => `
     <tr data-id="${g.id}"${g.archived_at ? ' class="is-archived"' : ''}>
       <td class="c-name cell-strong">
@@ -1511,7 +1544,9 @@ function renderLibrary() {
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
         g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span>
-        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : libraryStatusLabel(g)} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
+        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : libraryStatusLabel(g)} · ${personal
+          ? (g.votes[state.me.steamId] == null ? 'not rated' : `${fmt(g.votes[state.me.steamId], 1)} rating`)
+          : `${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes`}</span>
         </button></td>
       <td class="c-genre">${esc(g.genre || '—')}</td>
       <td class="c-status">${g.archived_at
@@ -1519,15 +1554,17 @@ function renderLibrary() {
         : `<span class="status-tag status-${esc(libraryStatusClass(g))}"${g.completionSuggestion
           ? ` title="Estimated from the unlocked ending achievement: ${esc(g.completionSuggestion.label)}. Confirm it in game details."`
           : ''}>${esc(libraryStatusLabel(g))}</span>`}</td>
-      <td class="c-num c-players"${g.max_players == null
+      ${personal ? '' : `<td class="c-num c-players"${g.max_players == null
         ? ' title="No verified simultaneous online co-op player cap is available yet"'
-        : ''}>${g.max_players ?? '?'}</td>
-      ${state.members.map((m) => {
+        : ''}>${g.max_players ?? '?'}</td>`}
+      ${personal ? '' : state.members.map((m) => {
         const v = g.votes[m.steam_id];
         return v == null ? '<td class="c-p miss">·</td>' : `<td class="c-p">${fmt(v, 1)}</td>`;
       }).join('')}
-      <td class="c-num c-avg cell-strong">${fmt(g.raw, 1)}</td>
-      <td class="c-num c-votes">${g.n || '–'}</td>
+      ${personal
+        ? `<td class="c-num c-avg cell-strong">${fmt(g.votes[state.me.steamId], 1)}</td>`
+        : `<td class="c-num c-avg cell-strong">${fmt(g.raw, 1)}</td>
+          <td class="c-num c-votes">${g.n || '–'}</td>`}
       <td class="c-date">${g.started
         ? `<span${factIsApproximate(g, 'started') ? ' class="est"' : ''}
              title="${factIsApproximate(g, 'started') ? 'Approximate · ' : ''}Started ${esc(g.started)}">${

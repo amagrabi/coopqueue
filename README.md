@@ -69,6 +69,8 @@ finds missing first-played, last-played and group-hours facts for games the grou
 has actually played. It asks likely participants first, offers clearly marked
 Steam/release-date approximations when there is honest evidence, and lets each
 person answer, defer or dismiss a prompt without hiding it from everyone else.
+Personal libraries collapse the group-only player, member, average and vote-count
+columns into one **Rating** column.
 
 **Find games.** The most-reviewed online co-op games on Steam, as a global
 catalogue, defaulting to a **Recommended for us** order built from your group's
@@ -125,6 +127,11 @@ passes and remain resumable from Settings. Achievement analysis can save the
 earliest unlock as an approximate first-played boundary. It shows **Likely finished**
 only for a small curated set of explicit ending achievements, and the player must
 confirm every status change.
+
+Opening a workspace normally leads to Rate while it has unrated games. Once the
+queue is clear it opens the Library instead, or Find games when the library itself
+is empty. Workspace names only need to be unique within one person's own switcher;
+unrelated private workspaces may use the same name.
 
 **Group / Settings.** Members, invite links you can rotate or disable, the headcount that
 drives the viability check, and owner-only JSON or per-table CSV exports — including
@@ -293,7 +300,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 160 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 161 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
