@@ -1,7 +1,7 @@
 {
   "name": "CoopQueue",
   "short_name": "CoopQueue",
-  "description": "Rate the games you've played, vote on what's next, and see which ones your whole group can actually play together.",
+  "description": "Rate co-op games with friends, rank your shared backlog, and find what your group should play next.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d0d0d",

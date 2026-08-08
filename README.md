@@ -43,6 +43,13 @@ does not sleep. Rough headroom is in [Scaling](#scaling-and-what-it-would-cost).
 The screenshots use the realistic `g4m1ng` fixture with publishable placeholder
 identities; no member account, avatar, invite code or private comment is shown.
 
+The public landing page is also the one canonical, indexable URL. Its search and
+sharing metadata lives in `public/index.html`; `public/robots.txt` keeps API routes
+out of crawlers, and `public/sitemap.xml` lists the canonical page. Keep all three
+on `https://coopqueue.pages.dev/` unless the production domain changes, then update
+them together. Do not add estimated sitemap dates or review scores: search metadata
+must describe facts the app can substantiate.
+
 ---
 
 ## What it does
