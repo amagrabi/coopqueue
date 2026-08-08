@@ -876,6 +876,14 @@ a question for the rest of the group; filling the shared fact removes it for all
 17 owner-approved release-date fallbacks for `g4m1ng` are backfilled as
 `release-date`, so they are not retroactively presented as recalled dates.
 
+Migration 025 revisits the weak `g4m1ng` fallbacks after comparing the now-public
+2022–2025 Steam Replays, public Community achievement unlock timestamps, and the
+synced library. Eight starts move to stronger achievement evidence, two missing
+last-played values accept the visible account's Steam timestamp, and The Division
+2's impossible post-finish Steam release fallback is removed. It deliberately does
+not copy Ama's lifetime hours into `games.hours`: that remains personal playtime,
+not evidence of hours played together.
+
 ## The Library's default view
 
 `LIB_DEFAULTS` in `app.js` is the single definition, and the default sort is
