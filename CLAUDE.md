@@ -606,6 +606,16 @@ panels. Stats and Complete our history use that account's Steam playtime directl
 A one-member co-op group can be converted in Settings; a multi-member group must
 remove the others first, and conversion is a transactional D1 batch.
 
+The stored `sampled` outcome is labelled **Played** in a personal workspace. Solo
+history often proves that a game was launched without proving whether its story was
+finished, dropped or merely tried; presenting that evidence as “Sampled” asks the
+user to make a distinction Steam cannot make. Co-op workspaces retain the original
+Sampled label. Migration 026 uses this neutral outcome for the account's played
+Steam imports, Backlog for the one known zero-hour title, exact lifetime Steam
+minutes for hours, and earliest/latest public achievement unlocks as approximate
+first/last-played evidence. It is deliberately insert-only so replaying it cannot
+overwrite newer edits or achievement syncs.
+
 ## History-shaped stats
 
 The Stats page's **Library shape** counts every active game by the six stored

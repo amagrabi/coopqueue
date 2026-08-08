@@ -57,6 +57,9 @@ const STATUS_LABEL = {
   backlog: 'Backlog', playing: 'Playing', finished: 'Finished',
   unfinished: 'Failed to finish', dropped: 'Dropped', sampled: 'Sampled',
 };
+const statusLabel = (status) => state.group?.mode === 'personal' && status === 'sampled'
+  ? 'Played'
+  : STATUS_LABEL[status];
 
 // The library payload's viability is for the workspace's usual headcount. Play
 // Next can select a different crew, so it must recompute the same rule locally.
@@ -446,6 +449,7 @@ function renderChrome() {
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
   $('#group-name').textContent = state.group.name;
   $('#workspace-tab').textContent = state.group.mode === 'personal' ? 'Settings' : 'Group';
+  $('#lib-status').querySelector('option[value="sampled"]').textContent = statusLabel('sampled');
   $('#queue-empty-copy').textContent = state.group.mode === 'personal'
     ? 'You have rated or skipped everything in this library. Add a game, or revisit one you already rated.'
     : 'You have rated or skipped everything in this group. Add a game, or go argue on the Play next tab.';
@@ -951,7 +955,7 @@ function metaChips(g, fit = g.viability, need = state.group.maxPlayers) {
   }
   const ownership = ownershipChip(g);
   if (ownership) chips.push(ownership);
-  if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
+  if (g.status !== 'backlog') chips.push(`<span class="chip">${statusLabel(g.status)}</span>`);
   /* Who put this on the list. Only when we can name them — most of an imported
      library has no attribution, and "Added by Someone" is worse than silence. */
   const adder = g.added_by && state.members.find((m) => m.steam_id === g.added_by);
@@ -1256,7 +1260,7 @@ const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
   if (key === 'started') return g.started || null;
   if (key === 'hours')   return hoursOf(g).value;
-  if (key === 'status')  return STATUS_LABEL[g.status];
+  if (key === 'status')  return statusLabel(g.status);
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
   return g[key];
 };
@@ -1492,12 +1496,12 @@ function renderLibrary() {
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
         g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span>
-        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : STATUS_LABEL[g.status]} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
+        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : statusLabel(g.status)} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
         </button></td>
       <td class="c-genre">${esc(g.genre || '—')}</td>
       <td class="c-status">${g.archived_at
         ? '<span class="status-tag status-archived">Archived</span>'
-        : `<span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span>`}</td>
+        : `<span class="status-tag status-${esc(g.status)}">${statusLabel(g.status)}</span>`}</td>
       <td class="c-num c-players">${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
@@ -1542,14 +1546,14 @@ function renderStatusStats(s) {
   const total = items.reduce((sum, item) => sum + item.count, 0);
   $('#status-shape').innerHTML = total ? `
     <div class="shape-bar" role="img" aria-label="${esc(items.map((item) =>
-      `${STATUS_LABEL[item.status]} ${item.count}`).join(', '))}">
+      `${statusLabel(item.status)} ${item.count}`).join(', '))}">
       ${items.map((item) => `<i class="shape-${item.status}"
         style="width:${(item.count / total) * 100}%"
-        title="${esc(STATUS_LABEL[item.status])}: ${item.count}"></i>`).join('')}
+        title="${esc(statusLabel(item.status))}: ${item.count}"></i>`).join('')}
     </div>
     <div class="shape-legend">
       ${items.map((item) => `<span><i class="shape-${item.status}"></i>
-        <b>${item.count}</b> ${esc(STATUS_LABEL[item.status])}</span>`).join('')}
+        <b>${item.count}</b> ${esc(statusLabel(item.status))}</span>`).join('')}
     </div>` : '';
 }
 
@@ -2108,7 +2112,7 @@ async function runSearch(term) {
              aria-label="Open ${esc(r.name)} on Steam (new tab)">Steam page ↗</a>
         </span>
         ${have
-          ? `<span class="chip chip-good">already in ${esc(STATUS_LABEL[have.status] || 'your library')}</span>`
+          ? `<span class="chip chip-good">already in ${esc(statusLabel(have.status) || 'your library')}</span>`
           : `<button type="button" class="btn btn-sm" data-add-appid="${appid}">Add</button>`}
       </div>`;
     }).join('');
@@ -2446,8 +2450,8 @@ function openDetail(id, focusField = null) {
         <div class="detail-field">
           <label for="d-status">Status</label>
           <select id="d-status" class="input">
-            ${Object.entries(STATUS_LABEL).map(([v, l]) =>
-              `<option value="${v}"${g.status === v ? ' selected' : ''}>${l}</option>`).join('')}
+            ${Object.keys(STATUS_LABEL).map((v) =>
+              `<option value="${v}"${g.status === v ? ' selected' : ''}>${statusLabel(v)}</option>`).join('')}
           </select>
         </div>
         <div class="detail-field">
