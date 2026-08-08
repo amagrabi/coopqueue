@@ -5,6 +5,9 @@ ship, how to change the database without losing it, and what has actually gone
 wrong. `README.md` covers the product and first-time setup; this is the runbook
 for an instance that already exists.
 
+The evidence rules and migration checklist for importing a personal Steam library
+are in [`PERSONAL_STEAM_HISTORY.md`](PERSONAL_STEAM_HISTORY.md).
+
 ---
 
 ## What is deployed
@@ -53,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 152 assertions — ALWAYS before a deploy
+npm test          # 153 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 

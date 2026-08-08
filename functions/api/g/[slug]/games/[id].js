@@ -70,6 +70,10 @@ export async function onRequestPatch({ params, request, env, data }) {
         && (!Number.isFinite(Number(patch[k])) || Number(patch[k]) < 0 || Number(patch[k]) > 100000)) {
       return bad('hours must be a number from 0 to 100000');
     }
+    // Steam reports whole minutes, while this field is hours. One decimal keeps
+    // that useful precision without leaking repeating conversions such as
+    // 12.333333333 into the details form, exports, or aggregate statistics.
+    if (k === 'hours' && patch[k] !== null) patch[k] = Math.round(Number(patch[k]) * 10) / 10;
     if (k === 'name') {
       const name = String(patch[k] ?? '').trim();
       if (!name) return bad('name cannot be empty');

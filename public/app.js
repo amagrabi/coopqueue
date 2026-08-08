@@ -57,9 +57,6 @@ const STATUS_LABEL = {
   backlog: 'Backlog', playing: 'Playing', finished: 'Finished',
   unfinished: 'Failed to finish', dropped: 'Dropped', sampled: 'Sampled',
 };
-const statusLabel = (status) => state.group?.mode === 'personal' && status === 'sampled'
-  ? 'Played'
-  : STATUS_LABEL[status];
 
 // The library payload's viability is for the workspace's usual headcount. Play
 // Next can select a different crew, so it must recompute the same rule locally.
@@ -110,6 +107,10 @@ const steamStoreUrl = (appid) => {
   return Number.isSafeInteger(id) && id > 0 ? `https://store.steampowered.com/app/${id}/` : null;
 };
 const fmt = (n, d = 2) => (n == null ? '–' : Number(n).toFixed(d));
+const roundedHours = (n) => n == null ? null : Math.round(Number(n) * 10) / 10;
+const fmtHours = (n) => n == null ? '–' : roundedHours(n).toLocaleString(undefined, {
+  maximumFractionDigits: 1,
+});
 /** Rough relative time. Comment threads read better in "2 days ago" than dates. */
 const when = (epoch) => {
   const secs = Math.max(0, Math.floor(Date.now() / 1000) - Number(epoch || 0));
@@ -449,7 +450,6 @@ function renderChrome() {
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
   $('#group-name').textContent = state.group.name;
   $('#workspace-tab').textContent = state.group.mode === 'personal' ? 'Settings' : 'Group';
-  $('#lib-status').querySelector('option[value="sampled"]').textContent = statusLabel('sampled');
   $('#queue-empty-copy').textContent = state.group.mode === 'personal'
     ? 'You have rated or skipped everything in this library. Add a game, or revisit one you already rated.'
     : 'You have rated or skipped everything in this group. Add a game, or go argue on the Play next tab.';
@@ -715,14 +715,14 @@ const hoursOf = (g) => {
   if (g.hours != null) {
     const approximate = factIsApproximate(g, 'hours');
     return {
-      value: g.hours,
+      value: roundedHours(g.hours),
       manual: !approximate,
       accepted: approximate,
       participants: approximate ? null : g.hours_participants ?? 0,
     };
   }
   if (g.hours_estimated != null) {
-    return { value: g.hours_estimated, manual: false, participants: g.hours_participants ?? 0 };
+    return { value: roundedHours(g.hours_estimated), manual: false, participants: g.hours_participants ?? 0 };
   }
   return { value: null, manual: false };
 };
@@ -955,7 +955,7 @@ function metaChips(g, fit = g.viability, need = state.group.maxPlayers) {
   }
   const ownership = ownershipChip(g);
   if (ownership) chips.push(ownership);
-  if (g.status !== 'backlog') chips.push(`<span class="chip">${statusLabel(g.status)}</span>`);
+  if (g.status !== 'backlog') chips.push(`<span class="chip">${STATUS_LABEL[g.status]}</span>`);
   /* Who put this on the list. Only when we can name them — most of an imported
      library has no attribution, and "Added by Someone" is worse than silence. */
   const adder = g.added_by && state.members.find((m) => m.steam_id === g.added_by);
@@ -1260,7 +1260,7 @@ const libValue = (g, key) => {
   if (key === 'players') return g.max_players;
   if (key === 'started') return g.started || null;
   if (key === 'hours')   return hoursOf(g).value;
-  if (key === 'status')  return statusLabel(g.status);
+  if (key === 'status')  return STATUS_LABEL[g.status];
   if (key.startsWith('p:')) return g.votes[key.slice(2)];
   return g[key];
 };
@@ -1496,12 +1496,12 @@ function renderLibrary() {
           : '<span class="lib-art lib-art-none"></span>'}<span>${esc(g.name)}</span>${
         g.viability.ok === false ? ' <span class="chip chip-bad">' + esc(g.viability.label) + '</span>' : ''}${
         g.early_access ? ' <span class="chip chip-warn" title="Still in Early Access on Steam">EA</span>' : ''}</span>
-        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : statusLabel(g.status)} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
+        <span class="lib-mobile-meta">${g.archived_at ? 'Archived' : STATUS_LABEL[g.status]} · ${g.max_players ?? '?'} players · ${fmt(g.raw, 1)} avg · ${g.n || 0} votes</span>
         </button></td>
       <td class="c-genre">${esc(g.genre || '—')}</td>
       <td class="c-status">${g.archived_at
         ? '<span class="status-tag status-archived">Archived</span>'
-        : `<span class="status-tag status-${esc(g.status)}">${statusLabel(g.status)}</span>`}</td>
+        : `<span class="status-tag status-${esc(g.status)}">${STATUS_LABEL[g.status]}</span>`}</td>
       <td class="c-num c-players">${g.max_players ?? '?'}</td>
       ${state.members.map((m) => {
         const v = g.votes[m.steam_id];
@@ -1518,10 +1518,10 @@ function renderLibrary() {
         const h = hoursOf(g);
         if (!h.value) return '–';
         return h.manual
-          ? fmt(h.value, 0)
+          ? fmtHours(h.value)
           : h.accepted
-            ? `<span class="est" title="Approximate: accepted from an earlier Steam group-hours estimate. A snapshot, not a measurement.">≈${fmt(h.value, 0)}</span>`
-            : `<span class="est" title="Estimated: the smallest playtime among the ${h.participants} of you who played it. An upper bound on time played together, not a measurement.">≈${fmt(h.value, 0)}</span>`;
+            ? `<span class="est" title="Approximate: accepted from an earlier Steam group-hours estimate. A snapshot, not a measurement.">≈${fmtHours(h.value)}</span>`
+            : `<span class="est" title="Estimated: the smallest playtime among the ${h.participants} of you who played it. An upper bound on time played together, not a measurement.">≈${fmtHours(h.value)}</span>`;
       })()}</td>
     </tr>`).join('');
 
@@ -1546,14 +1546,14 @@ function renderStatusStats(s) {
   const total = items.reduce((sum, item) => sum + item.count, 0);
   $('#status-shape').innerHTML = total ? `
     <div class="shape-bar" role="img" aria-label="${esc(items.map((item) =>
-      `${statusLabel(item.status)} ${item.count}`).join(', '))}">
+      `${STATUS_LABEL[item.status]} ${item.count}`).join(', '))}">
       ${items.map((item) => `<i class="shape-${item.status}"
         style="width:${(item.count / total) * 100}%"
-        title="${esc(statusLabel(item.status))}: ${item.count}"></i>`).join('')}
+        title="${esc(STATUS_LABEL[item.status])}: ${item.count}"></i>`).join('')}
     </div>
     <div class="shape-legend">
       ${items.map((item) => `<span><i class="shape-${item.status}"></i>
-        <b>${item.count}</b> ${esc(statusLabel(item.status))}</span>`).join('')}
+        <b>${item.count}</b> ${esc(STATUS_LABEL[item.status])}</span>`).join('')}
     </div>` : '';
 }
 
@@ -1570,7 +1570,7 @@ function renderGenreStats(s) {
   let items, max, decimals, note;
   if (statsGenreMetric === 'hours') {
     items = genres.filter((genre) => genre.hoursGames > 0)
-      .map((genre) => ({ label: genre.genre, value: genre.hours, display: `${fmt(genre.hours, 0)}h` }))
+      .map((genre) => ({ label: genre.genre, value: genre.hours, display: `${fmtHours(genre.hours)}h` }))
       .sort((a, b) => b.value - a.value);
     max = Math.max(1, ...items.map((item) => item.value));
     decimals = 0;
@@ -1656,8 +1656,8 @@ function renderScatterStats(s) {
           ${points.map((point) => {
             const left = Math.max(2, Math.min(98, (point.hours / maxHours) * 100));
             const bottom = Math.max(2, Math.min(98, ((point.rating - 1) / 9) * 100));
-            const roundedHours = Math.round(point.hours);
-            const label = `${point.name} · ${fmt(point.rating, 1)} rating · ${fmt(point.hours, 0)} hour${roundedHours === 1 ? '' : 's'}`;
+            const pointHours = roundedHours(point.hours);
+            const label = `${point.name} · ${fmt(point.rating, 1)} rating · ${fmtHours(point.hours)} hour${pointHours === 1 ? '' : 's'}`;
             const tone = point.rating >= 8 ? 'good' : point.rating < 6.5 ? 'bad' : '';
             const edge = left > 75 ? 'right' : left < 25 ? 'left' : '';
             return `<button type="button" class="scatter-point" data-id="${point.id}"
@@ -1693,12 +1693,12 @@ async function renderStats() {
     ${tile(s.totals.games, 'games tracked')}
     ${tile(s.totals.finished, 'finished')}
     ${tile(s.totals.backlog, 'in the backlog')}
-    ${tile(s.totals.hours.toLocaleString(), 'hours played', 'Steam sync or saved history')}
+    ${tile(fmtHours(s.totals.hours), 'hours played', 'Steam sync or saved history')}
     ${tile(s.totals.ratings, 'ratings given')}
     ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'average rating')}` : `
     ${tile(s.totals.games, 'games tracked')}
     ${tile(s.totals.finished, 'finished together')}
-    ${tile(s.totals.hours.toLocaleString(), 'hours logged', 'manual or accepted history entries')}
+    ${tile(fmtHours(s.totals.hours), 'hours logged', 'manual or accepted history entries')}
     ${tile(s.totals.ratings, 'ratings given')}
     ${s.totals.groupMean == null ? '' : tile(fmt(s.totals.groupMean, 2), 'group average', 'across every score anyone has given')}
     ${tile(s.totals.unviableBacklog, 'backlog games we cannot play', `fewer than ${s.totals.maxPlayers} co-op slots`, true)}`;
@@ -1782,7 +1782,7 @@ async function renderStats() {
   $$('#shrugged-list .shrug').forEach((b) =>
     b.addEventListener('click', () => openDetail(Number(b.dataset.id))));
   $('#hours-chart').innerHTML = barChart(
-    s.mostHours.map((g) => ({ label: g.name, value: g.hours })),
+    s.mostHours.map((g) => ({ label: g.name, value: g.hours, display: `${fmtHours(g.hours)}h` })),
     Math.max(...s.mostHours.map((g) => g.hours), 1), () => '', 0);
 
   // An empty chart is not a statistic. Personal workspaces also omit every
@@ -2112,7 +2112,7 @@ async function runSearch(term) {
              aria-label="Open ${esc(r.name)} on Steam (new tab)">Steam page ↗</a>
         </span>
         ${have
-          ? `<span class="chip chip-good">already in ${esc(statusLabel(have.status) || 'your library')}</span>`
+          ? `<span class="chip chip-good">already in ${esc(STATUS_LABEL[have.status] || 'your library')}</span>`
           : `<button type="button" class="btn btn-sm" data-add-appid="${appid}">Add</button>`}
       </div>`;
     }).join('');
@@ -2450,8 +2450,8 @@ function openDetail(id, focusField = null) {
         <div class="detail-field">
           <label for="d-status">Status</label>
           <select id="d-status" class="input">
-            ${Object.keys(STATUS_LABEL).map((v) =>
-              `<option value="${v}"${g.status === v ? ' selected' : ''}>${statusLabel(v)}</option>`).join('')}
+            ${Object.entries(STATUS_LABEL).map(([v, l]) =>
+              `<option value="${v}"${g.status === v ? ' selected' : ''}>${l}</option>`).join('')}
           </select>
         </div>
         <div class="detail-field">
@@ -2466,7 +2466,7 @@ function openDetail(id, focusField = null) {
         </div>
         <div class="detail-field">
           <label for="d-hours">Hours played</label>
-          <input id="d-hours" class="input" type="number" step="0.5" min="0" value="${g.hours ?? ''}">
+          <input id="d-hours" class="input" type="number" step="0.1" min="0" value="${roundedHours(g.hours) ?? ''}">
           ${factSourceHelp(g, 'hours')}
         </div>
       </div>

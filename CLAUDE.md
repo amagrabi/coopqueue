@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 152 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 153 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -376,7 +376,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-152/152 assertions pass. `npm run test:ui` does **not** run on macOS: it
+153/153 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -606,15 +606,15 @@ panels. Stats and Complete our history use that account's Steam playtime directl
 A one-member co-op group can be converted in Settings; a multi-member group must
 remove the others first, and conversion is a transactional D1 batch.
 
-The stored `sampled` outcome is labelled **Played** in a personal workspace. Solo
-history often proves that a game was launched without proving whether its story was
-finished, dropped or merely tried; presenting that evidence as “Sampled” asks the
-user to make a distinction Steam cannot make. Co-op workspaces retain the original
-Sampled label. Migration 026 uses this neutral outcome for the account's played
-Steam imports, Backlog for the one known zero-hour title, exact lifetime Steam
-minutes for hours, and earliest/latest public achievement unlocks as approximate
-first/last-played evidence. It is deliberately insert-only so replaying it cannot
-overwrite newer edits or achievement syncs.
+`sampled` is labelled **Sampled** in both personal and co-op workspaces. The same
+stored state must not change vocabulary when switching groups. Migration 026 uses
+this neutral outcome for Steam imports because playtime proves a launch but not an
+ending; migration 027 promotes only games with explicit terminal-achievement
+evidence. Backlog remains the known zero-hour outcome. Lifetime Steam minutes are
+stored as hours rounded to one decimal, and achievement dates remain approximate
+first/last-played evidence. The evidence rules and repeatable import procedure live
+in `docs/PERSONAL_STEAM_HISTORY.md`; both migrations are idempotent and preserve
+newer user edits.
 
 ## History-shaped stats
 

@@ -1242,6 +1242,27 @@ await check('start and end dates can be set by hand', async () => {
     || `status ${r.status}, got ${JSON.stringify(row)}`;
 });
 
+await check('hours are stored to one decimal place', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const g = sqlite.prepare('SELECT id,hours FROM games WHERE group_id=1 LIMIT 1 OFFSET 8').get();
+  const priorSource = sqlite.prepare(
+    "SELECT source,set_by,updated_at FROM game_fact_sources WHERE group_id=1 AND game_id=? AND field='hours'"
+  ).get(g.id);
+  const r = await gameIdRoute.onRequestPatch({
+    params: { id: String(g.id) }, request: req({ hours: 12.333333333 }), env, data,
+  });
+  const stored = sqlite.prepare('SELECT hours FROM games WHERE id=?').get(g.id).hours;
+  sqlite.prepare('UPDATE games SET hours=? WHERE id=?').run(g.hours, g.id);
+  if (priorSource) {
+    sqlite.prepare(`UPDATE game_fact_sources SET source=?,set_by=?,updated_at=?
+                     WHERE group_id=1 AND game_id=? AND field='hours'`)
+      .run(priorSource.source, priorSource.set_by, priorSource.updated_at, g.id);
+  } else {
+    sqlite.prepare("DELETE FROM game_fact_sources WHERE group_id=1 AND game_id=? AND field='hours'").run(g.id);
+  }
+  return (r.status === 200 && stored === 12.3) || `status ${r.status}, stored ${stored}`;
+});
+
 await check('impossible calendar dates are refused', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const g = sqlite.prepare('SELECT id FROM games WHERE group_id=1 LIMIT 1').get();

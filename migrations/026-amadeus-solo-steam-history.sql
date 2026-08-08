@@ -2,9 +2,9 @@
 -- personal workspace. Generated through getAppDetails(), never raw store metadata.
 -- Hours are the 2026-08-07 lifetime-minute snapshot. Achievement dates prove only
 -- that the game had been played by then, so their provenance remains approximate.
--- Completion cannot be inferred from Steam; played rows use the neutral sampled
--- outcome (rendered as Played in personal workspaces), while zero-hour rows remain
--- in Backlog.
+-- Completion cannot be inferred from playtime alone; played rows use the neutral
+-- Sampled outcome, while zero-hour rows remain in Backlog. Migration 027 rounds
+-- these hours and promotes only explicit terminal-achievement evidence.
 
 INSERT OR IGNORE INTO steam_apps
   (appid,name,genre,header_image,trailer_url,short_description,price,release_date,
