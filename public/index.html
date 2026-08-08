@@ -260,6 +260,15 @@
 
     <!-- ══════════════ RATE ══════════════ -->
     <section class="view" data-view="queue">
+      <div class="empty empty-library" hidden>
+        <h2>No games here yet</h2>
+        <p>Import your Steam library or wishlist, or browse games to get this workspace started.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" data-empty-import>Import from Steam</button>
+          <button class="btn btn-ghost" type="button" data-empty-find>Find games</button>
+          <button class="btn btn-ghost" type="button" data-empty-archived hidden>View archived games</button>
+        </div>
+      </div>
       <!-- Rating coverage is the app's real problem: a ranking built from a
            quarter of the votes is noise. Keep the number in front of the person
            who can fix it, on the screen where they can fix it. -->
@@ -355,6 +364,15 @@
 
     <!-- ══════════════ PLAY NEXT ══════════════ -->
     <section class="view" data-view="next">
+      <div class="empty empty-library" hidden>
+        <h2>No games to shortlist yet</h2>
+        <p>Import your Steam library or wishlist, or browse games to build your first shortlist.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" data-empty-import>Import from Steam</button>
+          <button class="btn btn-ghost" type="button" data-empty-find>Find games</button>
+          <button class="btn btn-ghost" type="button" data-empty-archived hidden>View archived games</button>
+        </div>
+      </div>
       <div class="view-head">
         <div>
           <h2>What to play next</h2>
@@ -382,6 +400,15 @@
 
     <!-- ══════════════ LIBRARY ══════════════ -->
     <section class="view" data-view="library">
+      <div class="empty empty-library" hidden>
+        <h2>Your library is empty</h2>
+        <p>Import games from Steam or browse the catalogue to add the first one.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" data-empty-import>Import from Steam</button>
+          <button class="btn btn-ghost" type="button" data-empty-find>Find games</button>
+          <button class="btn btn-ghost" type="button" data-empty-archived hidden>View archived games</button>
+        </div>
+      </div>
       <div class="view-head">
         <h2>Library</h2>
         <div class="filters">
@@ -493,6 +520,15 @@
     </section>
 
     <section class="view" data-view="stats">
+      <div class="empty empty-library" hidden>
+        <h2>No stats without games</h2>
+        <p>Import your Steam library or find a few games, then your stats will build themselves as you rate and play.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" data-empty-import>Import from Steam</button>
+          <button class="btn btn-ghost" type="button" data-empty-find>Find games</button>
+          <button class="btn btn-ghost" type="button" data-empty-archived hidden>View archived games</button>
+        </div>
+      </div>
       <div class="tiles" id="stat-tiles"></div>
       <section class="panel stats-shape-compact" id="stats-shape">
         <div class="stats-shape-copy">

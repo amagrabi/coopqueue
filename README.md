@@ -118,7 +118,9 @@ select/deselect-all controls, import actions above and below the list, and owned
 or wishlist-only shortcuts. New personal and co-op workspaces open this review
 immediately; personal libraries enable every game type while co-op groups begin
 with Co-op selected. Cancelling an empty import goes to Find games instead of an
-empty rating queue. Source filters load their complete candidate set, and larger reviewed
+empty rating queue. Until a game is added, Rate, Play next, Library and Stats each
+offer direct routes back to the Steam importer and Find games. Source filters load
+their complete candidate set, and larger reviewed
 selections are submitted in bounded batches. Played
 games begin as **Sampled**; unplayed and wishlisted games begin as **Backlog**.
 Exact lifetime minutes are rounded to one decimal hour. Verified catalogue player

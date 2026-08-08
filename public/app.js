@@ -614,6 +614,23 @@ const closeGroupMenu = () => {
 /* ───────────────────────────── navigation ────────────────────────────── */
 const VIEWS = ['queue', 'next', 'library', 'browse', 'stats', 'members'];
 
+/** Replace a view with its getting-started actions only when no active game exists.
+ *  An archived-only workspace keeps a third route to its restore controls, while
+ *  an empty rating queue in a populated library means "all caught up".
+ */
+function renderEmptyLibrary(view) {
+  const section = $(`.view[data-view="${view}"]`);
+  const hasArchived = state.games.some((game) => !!game.archived_at);
+  const browsingArchived = view === 'library' && hasArchived && $('#lib-archived').value !== 'active';
+  const empty = activeGames().length === 0 && !browsingArchived;
+  section?.classList.toggle('is-library-empty', empty);
+  const prompt = section?.querySelector('.empty-library');
+  if (prompt) prompt.hidden = !empty;
+  const archived = prompt?.querySelector('[data-empty-archived]');
+  if (archived) archived.hidden = !hasArchived;
+  return empty;
+}
+
 function setView(view) {
   if (!VIEWS.includes(view)) view = 'queue';
   /* Leaving the queue stops the trailer. Hiding the section does not: a <video> in
@@ -660,6 +677,13 @@ function wireOnce() {
 
   $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
   $$('[data-open-add]').forEach((b) => b.addEventListener('click', openAdd));
+  $$('[data-empty-import]').forEach((button) => button.addEventListener('click', () => openSteamImport()));
+  $$('[data-empty-find]').forEach((button) => button.addEventListener('click', () => setView('browse')));
+  $$('[data-empty-archived]').forEach((button) => button.addEventListener('click', () => {
+    setView('library');
+    $('#lib-archived').value = 'archived';
+    renderLibrary();
+  }));
 
   $('#group-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -942,6 +966,13 @@ function queuesByMode() {
 }
 
 function renderQueue() {
+  if (renderEmptyLibrary('queue')) {
+    trailerSeq++;
+    const video = $('#rate-video');
+    video.pause();
+    detachTrailer(video);
+    return;
+  }
   const byMode = queuesByMode();
 
   // Default to whichever mode has work, preferring Played. Also auto-advances
@@ -1226,6 +1257,7 @@ async function skipGame(notPlayed = false) {
 
 /* ══════════════════════════════ PLAY NEXT ═════════════════════════════ */
 function renderNext() {
+  if (renderEmptyLibrary('next')) return;
   renderAttendeeFilter();
   const attendees = state.nextAttendees || state.members.map((member) => member.steam_id);
   const selected = new Set(attendees);
@@ -1470,7 +1502,7 @@ const historyFieldLabel = (field) => field === 'hours' && state.group.mode === '
 async function loadHistory(force = false) {
   const slug = state.group?.slug;
   if (!slug || state.view !== 'library') return;
-  if (!state.group.historyPrompts) {
+  if (!activeGames().length || !state.group.historyPrompts) {
     state.history = null;
     $('#history-card').hidden = true;
     return;
@@ -1569,6 +1601,10 @@ async function historyAction(action) {
 }
 
 function renderLibrary() {
+  if (renderEmptyLibrary('library')) {
+    $('#history-card').hidden = true;
+    return;
+  }
   $('#lib-reset').hidden = libIsDefault();
   const q = $('#lib-search').value.trim().toLowerCase();
   const status = $('#lib-status').value;
@@ -1912,6 +1948,10 @@ function renderPersonalStats(s) {
 }
 
 async function renderStats() {
+  if (renderEmptyLibrary('stats')) {
+    statsSeq++;
+    return;
+  }
   const slug = state.group.slug;
   const seq = ++statsSeq;
   let s;

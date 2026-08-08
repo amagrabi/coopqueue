@@ -187,6 +187,12 @@ kbd {
 .empty { text-align: center; padding: 80px 20px; color: var(--text-secondary); }
 .empty h2 { font-size: 22px; color: var(--text-primary); margin-bottom: 8px; }
 .empty p { max-width: 46ch; margin: 0 auto 20px; }
+.empty-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+/* A truly empty workspace has no useful controls or zero-filled charts. Keep the
+   view itself reachable, but replace its normal contents with ways to begin (or
+   restore an archived game). Filtered-empty and fully-rated libraries do not use
+   this state. */
+.view.is-library-empty > :not(.empty-library) { display: none; }
 
 /* ────────────────────────── rating queue ──────────────────────────────── */
 .rate-card {
