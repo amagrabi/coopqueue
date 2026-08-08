@@ -196,9 +196,9 @@ const FIXTURE_TAGS = [
   }
 }
 
-/* A few play dates, so the Library's default "Recently started" order is actually
-   testable locally. Spread across months rather than all today, or every row sorts
-   equal and the ordering proves nothing. */
+/* A few play dates, so the Library's default playing/recent/backlog order is testable
+   locally. Spread across months rather than all today, or every row inside a tier
+   sorts equal and the secondary ordering proves nothing. */
 db.exec(`UPDATE games SET started = date('now', '-' || (id % 20) || ' months')
           WHERE group_id=1 AND id % 3 = 0`);
 db.exec(`UPDATE games SET finished_estimated = date('now', '-' || (id % 9) || ' months')

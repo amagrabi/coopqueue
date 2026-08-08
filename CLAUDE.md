@@ -916,11 +916,12 @@ not evidence of hours played together.
 ## The Library's default view
 
 `LIB_DEFAULTS` in `app.js` is the single definition, and the default sort is
-**Recently started**: the Library doubles as the group's history, and what you most
-often want from it is what you have been playing lately. Games with no start date sort
-to the bottom and keep best-first order among themselves — without that fallback a
-library nobody has dated yet (which is every library, at first) opens looking randomly
-shuffled.
+**Playing first, Backlog last**. Finished, Sampled, Unfinished and Dropped share the
+middle tier and sort together by newest start date; the same date order applies
+inside Playing and Backlog. Missing dates sink within their tier and fall back to
+A–Z. This keeps the games currently in motion visible without breaking the settled
+history into arbitrary status blocks. Explicit choices such as Best first still sort
+the whole filtered library exactly as labelled.
 
 The defaults are re-established when you arrive at the Library **from another view**,
 and deliberately not on a same-view re-render: the detail dialog re-renders the

@@ -1195,11 +1195,10 @@ function renderAttendeeFilter() {
  */
 /* The Library's default view, and the single definition of it.
 
-   "Recently started" is the default: the Library doubles as the group's history, and
-   the thing you most often want is what you have been playing lately. Games with no
-   start date fall to the bottom and keep the old best-first order among themselves,
-   so a library nobody has dated yet still opens on something sensible rather than
-   looking shuffled. */
+   The default follows the group's play history: current games first, the backlog
+   last, and newest start dates first everywhere in between and inside those two
+   groups. Explicit choices such as Best first still sort the whole filtered library
+   exactly as labelled. */
 const LIB_DEFAULTS = {
   'lib-search': '', 'lib-status': '', 'lib-sort': 'started',
   'lib-mine': '', 'lib-score': '', 'lib-played': '',
@@ -1209,6 +1208,8 @@ const LIB_DEFAULTS = {
   // default view. Both symptoms of the same typo.
   'lib-archived': 'active',
 };
+
+const libraryStatusBucket = (status) => status === 'playing' ? 0 : status === 'backlog' ? 2 : 1;
 
 /** Put every Library control back to its default. Returns true if anything moved. */
 function resetLibControls() {
@@ -1469,15 +1470,16 @@ function renderLibrary() {
     });
   } else {
     rows.sort({
-      /* Most recently started first. Games with no start date fall to the bottom
-         rather than clumping at the top as equal-nulls, and among themselves keep
-         the old default order — otherwise a library that has not been dated yet
-         (which is every library, at first) looks randomly shuffled. */
+      /* Keep the active story legible: games in progress lead, settled games share
+         the date-sorted middle, and the backlog waits at the bottom. Missing dates
+         sink within their tier and use the title as a deterministic fallback. */
       started:  (a, b) => {
+        const byStatusBucket = libraryStatusBucket(a.status) - libraryStatusBucket(b.status);
+        if (byStatusBucket) return byStatusBucket;
         if (a.started && b.started) return b.started.localeCompare(a.started);
         if (a.started) return -1;
         if (b.started) return 1;
-        return (b.raw ?? -1) - (a.raw ?? -1);
+        return a.name.localeCompare(b.name);
       },
       best:     (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
       name:     (a, b) => a.name.localeCompare(b.name),
