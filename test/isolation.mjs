@@ -1895,6 +1895,17 @@ globalThis.fetch = async (url) => {
         rtime_last_played: 1690000000, img_icon_url: 'abcdef5678' },
     ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
   }
+  if (String(url).includes('GetWishlist')) {
+    return new Response(JSON.stringify({ response: { items: [
+      { appid: 700005, priority: 0, date_added: 1710000000 },
+    ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  if (String(url).includes('IStoreBrowseService/GetItems')) {
+    return new Response(JSON.stringify({ response: { store_items: [
+      { appid: 700001, name: 'Imported Solo Game' },
+      { appid: 700005, name: 'Wishlist Solo Game' },
+    ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
   if (String(url).includes('GetPlayerAchievements')) {
     return new Response(JSON.stringify({ playerstats: { success: true, achievements: [{
       apiname: 'chapter_one', name: 'Chapter One', achieved: 1, unlocktime: 1690000000,
@@ -1909,12 +1920,24 @@ await check('personal import compares and writes only inside the selected worksp
   const preview = await (await steamImportRoute.onRequestPost({
     request: req({ action: 'preview' }), env, data,
   })).json();
-  if (preview.items?.[0]?.appid !== 700001) return `foreign group suppressed preview: ${JSON.stringify(preview)}`;
+  const wishlistPreview = await (await steamImportRoute.onRequestPost({
+    request: req({ action: 'preview', source: 'wishlist' }), env, data,
+  })).json();
+  if (preview.items?.[0]?.appid !== 700001 || !preview.items.some((game) => game.appid === 700005)
+      || wishlistPreview.items?.length !== 1 || wishlistPreview.items[0].appid !== 700005) {
+    return `unexpected previews: ${JSON.stringify({ preview, wishlistPreview })}`;
+  }
   const response = await steamImportRoute.onRequestPost({
-    request: req({ action: 'import', appids: [700001, 999999] }), env, data,
+    request: req({ action: 'import', appids: [700001, 700005, 999999] }), env, data,
   });
+  const enrichment = await (await steamImportRoute.onRequestPost({
+    request: req({ action: 'enrich' }), env, data,
+  })).json();
   const own = sqlite.prepare(
     'SELECT status,hours,finished FROM games WHERE group_id=410 AND steam_appid=700001'
+  ).get();
+  const wishlisted = sqlite.prepare(
+    'SELECT name,status,hours FROM games WHERE group_id=410 AND steam_appid=700005'
   ).get();
   const foreign = sqlite.prepare(
     'SELECT COUNT(*) AS n FROM games WHERE group_id=1 AND steam_appid=700001'
@@ -1923,8 +1946,11 @@ await check('personal import compares and writes only inside the selected worksp
     'SELECT minutes FROM playtime WHERE steam_id=? AND appid=700003'
   ).get(ALICE)?.minutes;
   return (response.status === 201 && own?.status === 'sampled' && own.hours === 2.1
-      && own.finished === '2023-11-14' && foreign === 1 && refreshed === 60)
-    || `status ${response.status}, own ${JSON.stringify(own)}, foreign ${foreign}, refreshed ${refreshed}`;
+      && own.finished === '2023-11-14' && wishlisted?.name === 'Wishlist Solo Game'
+      && wishlisted.status === 'backlog' && wishlisted.hours == null
+      && foreign === 1 && refreshed === 60 && enrichment.enriched === 0
+      && enrichment.remaining >= 2)
+    || `status ${response.status}, own ${JSON.stringify(own)}, wishlisted ${JSON.stringify(wishlisted)}, foreign ${foreign}, refreshed ${refreshed}, enrichment ${JSON.stringify(enrichment)}`;
 });
 
 await check('an all-zero Steam library is not silently imported as a real backlog', async () => {
@@ -1942,6 +1968,44 @@ await check('an all-zero Steam library is not silently imported as a real backlo
     ).get().n;
     return (response.status === 409 && inserted === 0) || `status ${response.status}, rows ${inserted}`;
   } finally { globalThis.fetch = visibleFetch; }
+});
+
+await check('wishlist-only import works without a readable library or a false ownership watermark', async () => {
+  const visibleFetch = globalThis.fetch;
+  const visibleKey = env.STEAM_API_KEY;
+  try {
+    env.STEAM_API_KEY = '';
+    sqlite.exec('DELETE FROM group_library_sync WHERE group_id=410');
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('GetWishlist')) {
+        return new Response(JSON.stringify({ response: { items: [
+          { appid: 700006, priority: 0, date_added: 1720000000 },
+        ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (String(url).includes('IStoreBrowseService/GetItems')) {
+        return new Response(JSON.stringify({ response: { store_items: [
+          { appid: 700006, name: 'Wishlist Without Library' },
+        ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response('{}', { status: 404 });
+    };
+    const { data } = await ctxFor(ALICE, 'alice-solo');
+    const response = await steamImportRoute.onRequestPost({
+      request: req({ action: 'import', appids: [700006] }), env, data,
+    });
+    const inserted = sqlite.prepare(
+      'SELECT name,status,hours FROM games WHERE group_id=410 AND steam_appid=700006'
+    ).get();
+    const watermark = sqlite.prepare(
+      'SELECT COUNT(*) AS n FROM group_library_sync WHERE group_id=410'
+    ).get().n;
+    return (response.status === 201 && inserted?.name === 'Wishlist Without Library'
+        && inserted.status === 'backlog' && inserted.hours == null && watermark === 0)
+      || `status ${response.status}, inserted ${JSON.stringify(inserted)}, watermark ${watermark}`;
+  } finally {
+    env.STEAM_API_KEY = visibleKey;
+    globalThis.fetch = visibleFetch;
+  }
 });
 
 await check('achievement scan never selects a game from another workspace', async () => {

@@ -9,16 +9,20 @@ playing it or whether they consider it complete.
 
 Personal library Settings now exposes the repeatable parts of this process to every
 signed-in player. **Import games from Steam** previews only titles missing from the
-current personal workspace, selects played games by default, and can optionally
-include owned games with no playtime. Each import is capped at 50 games and the
-server re-fetches the signed-in account's library before writing, so a crafted
-request cannot inject an app the account does not own.
+current personal workspace across both the owned library and public wishlist.
+Nothing is written until the player reviews checkboxes; the dialog can show both
+sources or either one, include unplayed owned games, select or deselect every shown
+title, and narrow the selection to owned or wishlisted games. Each import is capped
+at 50 games and the server re-fetches both sources before writing, so a crafted
+request cannot inject an arbitrary appid.
 
 If Steam reports zero minutes for every owned game, the UI warns that the separate
 "Always keep my total playtime private" setting may be masking the data and asks
-for confirmation before treating selected titles as Backlog. A successful import
-also refreshes playtime for every already-tracked owned title before advancing the
-group library watermark, so ownership can never become a false negative.
+for confirmation before treating selected owned titles as Backlog. A successful
+import also refreshes playtime for every already-tracked owned title before
+advancing the group library watermark, so ownership can never become a false
+negative. If only the wishlist is readable, its games can still be imported without
+advancing that watermark or pretending the owned library was checked.
 
 Played titles start as `sampled`; unplayed titles start as `backlog`. Lifetime
 minutes and last-played timestamps are saved with provenance. Metadata enrichment
@@ -39,6 +43,7 @@ Use the sources in this order:
 | Source | Safe conclusions | Important limitation |
 |---|---|---|
 | Steam `GetOwnedGames` | owned app ids, exact lifetime minutes, most recent play timestamp | no first-played date, no completion state |
+| Steam `IWishlistService/GetWishlist` | public wishlisted app ids and dates added | undocumented by Valve; an empty response can mean empty or private |
 | `GetPlayerAchievements` | unlocked achievements and their timestamps | locked/private data can be unavailable; not every game has a terminal achievement |
 | Steam Replay | games played in a year and their share of that year's playtime | percentages are not lifetime hours and the page omits many exact dates |
 | Steam store metadata via `getAppDetails()` | title, art, genre, release date and store fields | store data describes the game, not this player's history |
@@ -93,8 +98,10 @@ proven), The Wolf Among Us (partial episodes), and Deponia: The Complete Journey
    key out of source files and logs. Compare app ids with both the source group and
    target personal workspace; import only the intended difference.
 
-3. Resolve every game's metadata through `getAppDetails(db, appid)`. Do not fetch
-   and persist raw Steam store responses outside that cache path.
+3. Resolve every game's full metadata through `getAppDetails(db, appid)`. A bounded
+   selective-import preview may use `getAppSummaries(db, appids)` for names and art;
+   its partial cache rows stay stale until full enrichment. Do not fetch and persist
+   raw Steam store responses outside those cache paths.
 
 4. Fetch public achievements. Record the earliest unlock only as an approximate
    first-played date and the latest unlock as an approximate last-played date. Prefer

@@ -2324,17 +2324,25 @@ async function syncPlaytime() {
 
 const STEAM_IMPORT_LIMIT = 50;
 const steamImport = {
-  items: [], selected: new Set(), nextOffset: 0, hasMore: false, ambiguousPlaytime: false,
+  items: [], selected: new Set(), nextOffset: 0, hasMore: false,
+  ambiguousPlaytime: false, counts: null,
 };
+
+function steamImportMeta(game) {
+  const sources = [];
+  if (game.owned) sources.push(game.played
+    ? `Owned, ${fmtHours(game.hours)}h${game.lastPlayed ? `, last played ${game.lastPlayed}` : ''}`
+    : 'Owned, never launched');
+  if (game.wishlisted) sources.push(`Wishlist${game.wishlistedAt ? `, added ${game.wishlistedAt}` : ''}`);
+  return sources.join(' · ');
+}
 
 function renderSteamImportList() {
   $('#steam-import-list').innerHTML = steamImport.items.map((game) => `
     <label class="steam-import-item">
       <input type="checkbox" value="${game.appid}" ${steamImport.selected.has(game.appid) ? 'checked' : ''}>
       ${game.image ? `<img src="${esc(game.image)}" alt="" loading="lazy">` : '<span class="steam-import-placeholder"></span>'}
-      <span><strong>${esc(game.name)}</strong><small>${game.played
-        ? `${fmtHours(game.hours)}h${game.lastPlayed ? ` · last played ${esc(game.lastPlayed)}` : ''}`
-        : 'Owned, never launched'}</small></span>
+      <span><strong>${esc(game.name)}</strong><small>${esc(steamImportMeta(game))}</small></span>
       <a href="${steamStoreUrl(game.appid)}" target="_blank" rel="noopener" aria-label="Open ${esc(game.name)} on Steam">Steam ↗</a>
     </label>`).join('') || '<p class="panel-sub">Nothing new to import with these filters.</p>';
   $$('#steam-import-list input').forEach((checkbox) => {
@@ -2349,11 +2357,34 @@ function renderSteamImportList() {
     };
   });
   $('#steam-import-selected').textContent = `${steamImport.selected.size} selected`;
-  $('#steam-import-select').textContent = steamImport.items.length
-    && steamImport.items.every((game) => steamImport.selected.has(game.appid))
-    ? 'Clear selection'
-    : steamImport.items.length > STEAM_IMPORT_LIMIT ? `Select first ${STEAM_IMPORT_LIMIT}` : 'Select all shown';
+  $('#steam-import-select-all').disabled = !steamImport.items.length;
+  $('#steam-import-select-none').disabled = !steamImport.selected.size;
+  $('#steam-import-select-owned').disabled = !steamImport.items.some((game) => game.owned);
+  $('#steam-import-select-wishlist').disabled = !steamImport.items.some((game) => game.wishlisted);
   $('#steam-import-more').hidden = !steamImport.hasMore;
+}
+
+function selectSteamImport(predicate) {
+  steamImport.selected.clear();
+  const matches = steamImport.items.filter(predicate);
+  for (const game of matches.slice(0, STEAM_IMPORT_LIMIT)) steamImport.selected.add(game.appid);
+  $('#steam-import-status').textContent = matches.length > STEAM_IMPORT_LIMIT
+    ? `Selected the first ${STEAM_IMPORT_LIMIT}; import them before continuing.` : '';
+  renderSteamImportList();
+}
+
+function renderSteamImportSummary() {
+  const counts = steamImport.counts;
+  if (!counts) return;
+  const notes = [
+    `${counts.missingTotal} untracked Steam game${counts.missingTotal === 1 ? '' : 's'}, including ${counts.missingOwned} owned and ${counts.missingWishlist} wishlisted.`,
+  ];
+  if (counts.ownedState === 'unavailable') notes.push('Your owned library could not be read.');
+  else if (counts.ownedState === 'empty') notes.push('Steam returned no public owned games.');
+  else if (!counts.playtimeReadable) notes.push('Steam shows no playtime across your owned library, which can be a privacy setting.');
+  if (counts.wishlistState === 'unavailable') notes.push('Your wishlist could not be read.');
+  else if (counts.wishlistState === 'empty') notes.push('Steam returned no public wishlist.');
+  $('#steam-import-summary').textContent = notes.join(' ');
 }
 
 async function loadSteamImport(reset = false) {
@@ -2364,13 +2395,15 @@ async function loadSteamImport(reset = false) {
     steamImport.nextOffset = 0;
     steamImport.hasMore = false;
     steamImport.ambiguousPlaytime = false;
+    steamImport.counts = null;
   }
-  $('#steam-import-status').textContent = 'Reading your public Steam library…';
+  $('#steam-import-status').textContent = 'Reading your public Steam library and wishlist…';
   try {
     const result = await gapiFor(slug, '/steam-import', {
       method: 'POST', body: {
         action: 'preview', offset: steamImport.nextOffset,
         includeUnplayed: $('#steam-import-unplayed').checked,
+        source: $('#steam-import-source').value,
       },
     });
     if (state.group?.slug !== slug || !$('#steam-import-dialog').open) return;
@@ -2381,32 +2414,27 @@ async function loadSteamImport(reset = false) {
     steamImport.nextOffset = result.nextOffset;
     steamImport.hasMore = result.hasMore;
     steamImport.ambiguousPlaytime = !result.counts.playtimeReadable;
-    $('#steam-import-summary').textContent = steamImport.ambiguousPlaytime
-      ? `Steam shows zero playtime across all ${result.counts.owned} owned games. Your playtime may be hidden; only import these as Backlog if that is what you want.`
-      : `${result.counts.missingPlayed} played and ${result.counts.missingUnplayed} unplayed games are not tracked yet.`;
+    steamImport.counts = result.counts;
+    renderSteamImportSummary();
     $('#steam-import-status').textContent = '';
     renderSteamImportList();
   } catch (error) { $('#steam-import-status').textContent = error.message; }
 }
 
 function openSteamImport() {
+  $('#steam-import-source').value = 'all';
   $('#steam-import-unplayed').checked = false;
   $('#steam-import-dialog').showModal();
   void loadSteamImport(true);
 }
 
+$('#steam-import-source').onchange = () => void loadSteamImport(true);
 $('#steam-import-unplayed').onchange = () => void loadSteamImport(true);
 $('#steam-import-more').onclick = () => void loadSteamImport(false);
-$('#steam-import-select').onclick = () => {
-  const allSelected = steamImport.items.every((game) => steamImport.selected.has(game.appid));
-  for (const game of steamImport.items) {
-    if (allSelected) steamImport.selected.delete(game.appid);
-    else if (steamImport.selected.size < STEAM_IMPORT_LIMIT) steamImport.selected.add(game.appid);
-  }
-  $('#steam-import-status').textContent = !allSelected && steamImport.items.length > STEAM_IMPORT_LIMIT
-    ? `Selected the first ${STEAM_IMPORT_LIMIT}; import them before continuing.` : '';
-  renderSteamImportList();
-};
+$('#steam-import-select-all').onclick = () => selectSteamImport(() => true);
+$('#steam-import-select-none').onclick = () => selectSteamImport(() => false);
+$('#steam-import-select-owned').onclick = () => selectSteamImport((game) => game.owned);
+$('#steam-import-select-wishlist').onclick = () => selectSteamImport((game) => game.wishlisted);
 $('#steam-import-submit').onclick = async () => {
   const appids = [...steamImport.selected];
   if (!appids.length) { $('#steam-import-status').textContent = 'Select at least one game.'; return; }
@@ -2414,10 +2442,12 @@ $('#steam-import-submit').onclick = async () => {
     $('#steam-import-status').textContent = `Import up to ${STEAM_IMPORT_LIMIT} games at a time.`;
     return;
   }
-  const acceptAmbiguousZero = steamImport.ambiguousPlaytime
+  const needsZeroConfirmation = steamImport.ambiguousPlaytime && steamImport.items.some((game) =>
+    steamImport.selected.has(game.appid) && game.owned && !game.wishlisted && !game.played);
+  const acceptAmbiguousZero = needsZeroConfirmation
     ? confirm('Steam reports zero playtime for every owned game. Import the selection as Backlog anyway?')
     : false;
-  if (steamImport.ambiguousPlaytime && !acceptAmbiguousZero) return;
+  if (needsZeroConfirmation && !acceptAmbiguousZero) return;
   const slug = state.group.slug;
   const button = $('#steam-import-submit');
   button.disabled = true;

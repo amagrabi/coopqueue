@@ -22,7 +22,7 @@ Live at <https://coopqueue.pages.dev>.
 ## Before you finish
 
 ```bash
-npm test                 # 158 assertions — MUST pass before any deploy
+npm test                 # 159 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -68,9 +68,12 @@ invariants plus the evidence.
    *below* the tenancy boundary instead (that is why `recommend.js` is a separate
    route rather than a `sort=` on the catalogue).
 
-5. **Steam metadata goes through `getAppDetails(db, appid)`**, never a raw fetch. It
-   is cache-first; Steam throttles ~200 requests / 5 min per IP and Workers share an
-   egress pool.
+5. **Steam metadata goes through the cache-first helpers in `lib/steam.js`**, never
+   a raw route fetch. Full records use `getAppDetails(db, appid)`; the selective
+   wishlist preview may use `getAppSummaries(db, appids)` for one bounded batch of
+   names and art. Summary rows stay deliberately stale (`fetched_at = 0`) so full
+   enrichment still runs. Steam throttles ~200 requests / 5 min per IP and Workers
+   share an egress pool.
 
 6. **`max_players` is written only by a human.** It means max *simultaneous online
    co-op* players. Steam publishes no reliable machine-readable cap, so unverified
@@ -122,7 +125,7 @@ public/                 the entire frontend: index.html, app.js, styles.css, bra
 crawler/                the hourly cron Worker (Pages Functions cannot carry crons)
 migrations/             additive, idempotent, applied by hand
 scripts/                setup, crawl, IGDB measurement, tags, palette validation
-test/isolation.mjs      158 assertions against the REAL route handlers
+test/isolation.mjs      159 assertions against the REAL route handlers
 test/harness.mjs        local server; reimplements routes over real lib/ + schema
 schema.sql              fresh installs and tests ONLY — never production
 ```

@@ -1000,10 +1000,17 @@ tr.is-archived td { opacity: .55; }
 /* ── personal Steam import ─────────────────────────────────────────────── */
 .steam-tools { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
 .steam-import-dialog { width: min(820px, calc(100vw - 32px)); }
-.steam-import-toggle { margin: 10px 0 14px; }
+.steam-import-filters {
+  display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px; margin: 14px 0;
+}
+.steam-import-filters > label:not(.toggle) { display: grid; gap: 6px; min-width: min(280px,100%); }
+.steam-import-filters > label:not(.toggle) > span {
+  color: var(--text-muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+}
+.steam-import-toggle { margin-bottom: 11px; }
 .steam-import-summary { color: var(--text-secondary); font-size: 13.5px; }
 .steam-import-actions,
-.steam-import-foot { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
+.steam-import-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 10px; }
 .steam-import-actions span { color: var(--text-muted); font-size: 12.5px; }
 .steam-import-foot { justify-content: space-between; margin: 14px 0 0; }
 .steam-import-submit { margin-left: auto; }
@@ -1052,6 +1059,7 @@ tr.is-archived td { opacity: .55; }
   .steam-import-item { grid-template-columns: auto 36px minmax(0,1fr); }
   .steam-import-item img, .steam-import-placeholder { width: 36px; height: 36px; }
   .steam-import-item a { grid-column: 3; }
+  .steam-import-actions span { flex-basis: 100%; }
 }
 @media (max-width: 480px) {
   .pair-callouts { grid-template-columns: 1fr; }

@@ -689,18 +689,31 @@
 
 <dialog id="steam-import-dialog" class="dialog dialog-wide steam-import-dialog">
   <form method="dialog" class="dialog-head">
-    <h3>Import your Steam library</h3><button class="btn btn-icon" value="cancel" aria-label="Close">✕</button>
+    <h3>Import from Steam</h3><button class="btn btn-icon" value="cancel" aria-label="Close">✕</button>
   </form>
   <div class="dialog-body">
-    <p class="panel-sub">Choose the games you want to track. Played games start as <strong>Sampled</strong> and
-      unplayed games start in <strong>Backlog</strong>. Hours and last-played dates come from Steam;
-      first-played dates remain unknown.</p>
-    <label class="toggle steam-import-toggle" for="steam-import-unplayed">
-      <input type="checkbox" id="steam-import-unplayed"> Also show owned games with no playtime
-    </label>
+    <p class="panel-sub">Review your owned games and wishlist before anything is added. Played games start as
+      <strong>Sampled</strong>; unplayed and wishlisted games start in <strong>Backlog</strong>. Steam supplies
+      hours and last-played dates when available, but not first-played dates.</p>
+    <div class="steam-import-filters">
+      <label>
+        <span>Show</span>
+        <select class="input" id="steam-import-source">
+          <option value="all">Owned games and wishlist</option>
+          <option value="owned">Owned games only</option>
+          <option value="wishlist">Wishlist only</option>
+        </select>
+      </label>
+      <label class="toggle steam-import-toggle" for="steam-import-unplayed">
+        <input type="checkbox" id="steam-import-unplayed"> Include owned games with no playtime
+      </label>
+    </div>
     <div class="steam-import-summary" id="steam-import-summary"></div>
     <div class="steam-import-actions">
-      <button class="btn btn-sm" id="steam-import-select" type="button">Select all shown</button>
+      <button class="btn btn-sm" id="steam-import-select-all" type="button">Select all shown</button>
+      <button class="btn btn-sm" id="steam-import-select-none" type="button">Deselect all</button>
+      <button class="btn btn-sm" id="steam-import-select-owned" type="button">Owned only</button>
+      <button class="btn btn-sm" id="steam-import-select-wishlist" type="button">Wishlist only</button>
       <span id="steam-import-selected">0 selected</span>
     </div>
     <div id="steam-import-list" class="steam-import-list"></div>

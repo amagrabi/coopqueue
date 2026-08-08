@@ -602,19 +602,36 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.action === 'enrich') return send(res, 200, { processed: 0, enriched: 0, remaining: 0 });
       const samples = [
-        { appid: 1145360, name: 'Hades', hours: 42.3, lastPlayed: '2024-06-18', played: true, image: null },
-        { appid: 504230, name: 'Celeste', hours: 8.7, lastPlayed: '2021-02-11', played: true, image: null },
-        { appid: 2379780, name: 'Balatro', hours: 0, lastPlayed: null, played: false, image: null },
-      ].filter((game) => b.includeUnplayed || game.played)
-        .filter((game) => !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
+        { appid: 1145360, name: 'Hades', hours: 42.3, lastPlayed: '2024-06-18', played: true,
+          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+        { appid: 504230, name: 'Celeste', hours: 8.7, lastPlayed: '2021-02-11', played: true,
+          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+        { appid: 2379780, name: 'Balatro', hours: 0, lastPlayed: null, played: false,
+          owned: false, wishlisted: true, wishlistedAt: '2025-03-14', image: null },
+        { appid: 1868140, name: 'DREDGE', hours: 0, lastPlayed: null, played: false,
+          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+      ];
+      const missing = samples.filter((game) =>
+        !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
+      const source = ['owned', 'wishlist'].includes(b.source) ? b.source : 'all';
+      const visible = missing.filter((game) => {
+        const ownedVisible = game.owned && (b.includeUnplayed || game.played);
+        if (source === 'owned') return ownedVisible;
+        if (source === 'wishlist') return game.wishlisted;
+        return game.wishlisted || ownedVisible;
+      });
       if (b.action === 'preview') return send(res, 200, {
-        items: samples, offset: 0, nextOffset: samples.length, hasMore: false,
-        counts: { owned: 6, tracked: q('SELECT id FROM games WHERE group_id=?', gid).length,
-          missingPlayed: samples.filter((game) => game.played).length, missingUnplayed: 1,
-          playtimeReadable: true },
+        items: visible, offset: 0, nextOffset: visible.length, hasMore: false,
+        counts: { owned: 3, wishlisted: 1,
+          tracked: q('SELECT id FROM games WHERE group_id=?', gid).length,
+          missingTotal: missing.length,
+          missingOwned: missing.filter((game) => game.owned).length,
+          missingWishlist: missing.filter((game) => game.wishlisted).length,
+          matching: visible.length, playtimeReadable: true,
+          ownedState: 'available', wishlistState: 'available' },
       });
       const appids = new Set((b.appids || []).map(Number));
-      const selected = samples.filter((game) => appids.has(game.appid));
+      const selected = missing.filter((game) => appids.has(game.appid));
       for (const game of selected) {
         db.prepare(`INSERT OR IGNORE INTO games
           (group_id,name,steam_appid,status,hours,finished,added_by,enriched_at)
@@ -622,7 +639,10 @@ const server = http.createServer(async (req, res) => {
           .run(gid, game.name, game.appid, game.played ? 'sampled' : 'backlog',
             game.played ? game.hours : null, game.played ? game.lastPlayed : null, ME);
       }
-      return send(res, 201, { imported: selected.length, names: selected.map((game) => game.name), metadataRemaining: 0 });
+      return send(res, 201, { imported: selected.length,
+        importedOwned: selected.filter((game) => game.owned).length,
+        importedWishlist: selected.filter((game) => game.wishlisted).length,
+        names: selected.map((game) => game.name), metadataRemaining: 0 });
     }
     if (sub === '/achievement-scan' && req.method === 'POST') {
       if (ctx.workspace_mode !== 'personal') return send(res, 409, { error: 'personal workspaces only' });
