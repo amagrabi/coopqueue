@@ -322,9 +322,10 @@ function groupCtx(slug) {
   return one(
     `SELECT g.id AS group_id, g.slug, g.name, g.invite_code, g.max_players, g.blind_rating,
             COALESCE(w.mode,'coop') AS workspace_mode,
-            m.short_name, m.role
+            m.short_name, m.role, COALESCE(p.history_prompts,0) AS history_prompts
        FROM groups g LEFT JOIN workspace_settings w ON w.group_id=g.id
        JOIN memberships m ON m.group_id=g.id AND m.steam_id=?
+       LEFT JOIN member_preferences p ON p.group_id=m.group_id AND p.steam_id=m.steam_id
       WHERE g.slug=?`, ME, slug);
 }
 
@@ -453,7 +454,38 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, {
       user: { steamId: ME, displayName: 'Amadeus', avatar: null },
       groups: SCENARIO === 'fresh' && !freshCreated ? [] : groups,
+      invites: q(
+        `SELECT i.id,g.name AS groupName,u.display_name AS inviterName,u.avatar AS inviterAvatar,
+                i.created_at AS createdAt
+           FROM group_invites i JOIN groups g ON g.id=i.group_id
+           JOIN users u ON u.steam_id=i.invited_by
+          WHERE i.invited_steam_id=? AND i.status='pending'`, ME),
     });
+  }
+
+  if (p === '/api/invites' && req.method === 'GET') {
+    return send(res, 200, { invites: q(
+      `SELECT i.id,g.name AS groupName,u.display_name AS inviterName,u.avatar AS inviterAvatar,
+              i.created_at AS createdAt
+         FROM group_invites i JOIN groups g ON g.id=i.group_id
+         JOIN users u ON u.steam_id=i.invited_by
+        WHERE i.invited_steam_id=? AND i.status='pending'`, ME),
+    });
+  }
+  if (p === '/api/invites' && req.method === 'POST') {
+    const b = await readBody(req);
+    const invite = one(
+      `SELECT i.*,g.slug,g.name FROM group_invites i JOIN groups g ON g.id=i.group_id
+        WHERE i.id=? AND i.invited_steam_id=? AND i.status='pending'`, Number(b.id), ME);
+    if (!invite) return send(res, 404, { error: 'that invitation is no longer available' });
+    if (b.action === 'reject') {
+      db.prepare("UPDATE group_invites SET status='rejected',responded_at=unixepoch() WHERE id=?").run(invite.id);
+      return send(res, 200, { ok: true, action: 'reject' });
+    }
+    db.prepare("INSERT OR IGNORE INTO memberships (group_id,steam_id,short_name,role) VALUES (?,?,?,'member')")
+      .run(invite.group_id, ME, 'Amadeus');
+    db.prepare("UPDATE group_invites SET status='accepted',responded_at=unixepoch() WHERE id=?").run(invite.id);
+    return send(res, 200, { ok: true, action: 'accept', slug: invite.slug, name: invite.name });
   }
 
   if (p === '/api/groups' && req.method === 'POST') {
@@ -525,7 +557,8 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, {
         games: L.games, members: L.members,
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
-                 blindRating: !!ctx.blind_rating, mode: ctx.workspace_mode },
+                 blindRating: !!ctx.blind_rating, mode: ctx.workspace_mode,
+                 historyPrompts: !!ctx.history_prompts },
         model: { mean: +L.glob.mean.toFixed(2), sd: +L.glob.sd.toFixed(2) },
       });
     }
@@ -597,29 +630,74 @@ const server = http.createServer(async (req, res) => {
     if (sub === '/playtime' && req.method === 'POST') {
       return send(res, 200, { ok: true, members: [], gamesEstimated: 0 });
     }
+    if (sub === '/invites' && req.method === 'GET') {
+      if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can invite people' });
+      const term = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const pending = q(
+        `SELECT i.id,i.invited_steam_id AS steamId,u.display_name AS displayName,u.avatar,
+                i.created_at AS createdAt
+           FROM group_invites i JOIN users u ON u.steam_id=i.invited_steam_id
+          WHERE i.group_id=? AND i.status='pending'`, gid);
+      const results = term.length < 2 ? [] : q(
+        `SELECT u.steam_id AS steamId,u.display_name AS displayName,u.avatar
+           FROM users u WHERE u.steam_id<>?
+             AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.group_id=? AND m.steam_id=u.steam_id)
+             AND (LOWER(u.display_name) LIKE ? OR u.steam_id LIKE ?) LIMIT 12`,
+        ME, gid, `%${term}%`, `%${term}%`).map((player) => ({
+          ...player, pending: pending.some((invite) => invite.steamId === player.steamId),
+        }));
+      return send(res, 200, { pending, results });
+    }
+    if (sub === '/invites' && req.method === 'POST') {
+      if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can invite people' });
+      const b = await readBody(req);
+      if (!one('SELECT 1 AS x FROM users WHERE steam_id=?', String(b.steamId))) {
+        return send(res, 404, { error: 'that player has not signed in yet' });
+      }
+      db.prepare(`INSERT INTO group_invites (group_id,invited_steam_id,invited_by,status)
+                  VALUES (?,?,?,'pending')
+                  ON CONFLICT(group_id,invited_steam_id) DO UPDATE SET status='pending',
+                    invited_by=excluded.invited_by,created_at=unixepoch(),responded_at=NULL`)
+        .run(gid, String(b.steamId), ME);
+      return send(res, 201, { ok: true });
+    }
+    if (sub === '/invites' && req.method === 'DELETE') {
+      if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can invite people' });
+      const b = await readBody(req);
+      db.prepare("UPDATE group_invites SET status='cancelled',responded_at=unixepoch() WHERE id=? AND group_id=?")
+        .run(Number(b.id), gid);
+      return send(res, 200, { ok: true });
+    }
     if (sub === '/steam-import' && req.method === 'POST') {
-      if (ctx.workspace_mode !== 'personal') return send(res, 409, { error: 'personal workspaces only' });
       const b = await readBody(req);
       if (b.action === 'enrich') return send(res, 200, { processed: 0, enriched: 0, remaining: 0 });
       const samples = [
         { appid: 1145360, name: 'Hades', hours: 42.3, lastPlayed: '2024-06-18', played: true,
-          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+          owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'solo' },
         { appid: 504230, name: 'Celeste', hours: 8.7, lastPlayed: '2021-02-11', played: true,
-          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+          owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'solo' },
         { appid: 2379780, name: 'Balatro', hours: 0, lastPlayed: null, played: false,
-          owned: false, wishlisted: true, wishlistedAt: '2025-03-14', image: null },
+          owned: false, wishlisted: true, wishlistedAt: '2025-03-14', image: null, gameType: 'solo' },
         { appid: 1868140, name: 'DREDGE', hours: 0, lastPlayed: null, played: false,
-          owned: true, wishlisted: false, wishlistedAt: null, image: null },
+          owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'solo' },
         { appid: 1497440, name: 'COCOON', hours: 0, lastPlayed: null, played: false,
-          owned: false, wishlisted: true, wishlistedAt: '2025-01-03', image: null },
+          owned: false, wishlisted: true, wishlistedAt: '2025-01-03', image: null, gameType: 'solo' },
         { appid: 646570, name: 'Slay the Spire', hours: 0, lastPlayed: null, played: false,
-          owned: false, wishlisted: true, wishlistedAt: '2024-11-27', image: null },
+          owned: false, wishlisted: true, wishlistedAt: '2024-11-27', image: null, gameType: 'solo' },
+        { appid: 548430, name: 'Deep Rock Galactic', hours: 18.2, lastPlayed: '2025-04-08', played: true,
+          owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'coop' },
+        { appid: 1172470, name: 'Apex Legends', hours: 6.4, lastPlayed: '2023-09-02', played: true,
+          owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'multiplayer' },
       ];
       const missing = samples.filter((game) =>
         !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
       const source = ['owned', 'wishlist'].includes(b.source) ? b.source : 'all';
+      const requestedTypes = Array.isArray(b.gameTypes)
+        ? new Set(b.gameTypes) : new Set(ctx.workspace_mode === 'personal'
+          ? ['coop', 'multiplayer', 'solo'] : ['coop']);
       const visible = missing.filter((game) => {
         const ownedVisible = game.owned && (b.includeUnplayed || game.played);
+        if (!requestedTypes.has(game.gameType)) return false;
         if (source === 'owned') return ownedVisible;
         if (source === 'wishlist') return game.wishlisted;
         return game.wishlisted || ownedVisible;
@@ -638,6 +716,9 @@ const server = http.createServer(async (req, res) => {
             missingOwned: missing.filter((game) => game.owned).length,
             missingWishlist: missing.filter((game) => game.wishlisted).length,
             matching: visible.length, playtimeReadable: true,
+            types: Object.fromEntries(['coop', 'multiplayer', 'solo'].map((type) => [
+              type, missing.filter((game) => game.gameType === type).length,
+            ])),
             ownedState: 'available', wishlistState: 'available' },
         });
       }
@@ -936,6 +1017,7 @@ const server = http.createServer(async (req, res) => {
             WHERE m.group_id=? ORDER BY m.is_seed, m.short_name COLLATE NOCASE`, gid),
         group: { slug: ctx.slug, name: ctx.name, maxPlayers: need, role: ctx.role,
                  blindRating: !!ctx.blind_rating, mode: ctx.workspace_mode,
+                 historyPrompts: !!ctx.history_prompts,
                  inviteCode: ctx.role === 'owner' && ctx.workspace_mode === 'coop'
                    ? ctx.invite_code : null },
       });
@@ -946,6 +1028,11 @@ const server = http.createServer(async (req, res) => {
       if (b.myName != null) {
         db.prepare('UPDATE memberships SET short_name=? WHERE group_id=? AND steam_id=?')
           .run(String(b.myName).slice(0, 16), gid, ME);
+      }
+      if (b.historyPrompts != null) {
+        db.prepare(`INSERT INTO member_preferences (group_id,steam_id,history_prompts) VALUES (?,?,?)
+                    ON CONFLICT(group_id,steam_id) DO UPDATE SET history_prompts=excluded.history_prompts`)
+          .run(gid, ME, b.historyPrompts ? 1 : 0);
       }
       if (b.blindRating != null) {
         if (ctx.role !== 'owner') return send(res, 403, { error: 'only the group owner can change blind rating' });

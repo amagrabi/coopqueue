@@ -166,6 +166,7 @@
   <div class="gate-card gate-card-wide">
     <h1 class="gate-title">Welcome, <span id="onboard-name"></span></h1>
     <p class="gate-sub">Start a co-op group, make a personal game library, or join friends with a code.</p>
+    <div id="onboard-invites" class="onboard-invites" hidden></div>
 
     <div class="onboard-split">
       <form class="onboard-card" id="create-form">
@@ -243,6 +244,9 @@
     </nav>
 
     <div class="topbar-right">
+      <button class="btn btn-sm invite-notice" id="incoming-invite-btn" hidden>
+        Invites <span class="pill" id="incoming-invite-count"></span>
+      </button>
       <button class="btn btn-sm btn-primary" data-open-add>+ Add game</button>
       <div class="who">
         <img id="me-avatar" alt="" width="28" height="28">
@@ -709,6 +713,13 @@
         <input type="checkbox" id="steam-import-unplayed"> Include owned games with no playtime
       </label>
     </div>
+    <fieldset class="steam-import-types">
+      <legend>Game type</legend>
+      <label class="toggle"><input type="checkbox" value="coop" data-steam-import-type> Co-op</label>
+      <label class="toggle"><input type="checkbox" value="multiplayer" data-steam-import-type> Multiplayer</label>
+      <label class="toggle"><input type="checkbox" value="solo" data-steam-import-type> Solo</label>
+      <small>Based on cached Steam modes. Titles not classified yet appear under Solo.</small>
+    </fieldset>
     <div class="steam-import-summary" id="steam-import-summary"></div>
     <div class="steam-import-actions">
       <button class="btn btn-sm" id="steam-import-select-all" type="button">Select all shown</button>
@@ -726,6 +737,16 @@
               data-steam-import-submit type="button">Import selected</button>
     </div>
     <p class="add-status" id="steam-import-status"></p>
+  </div>
+</dialog>
+
+<dialog id="incoming-invite-dialog" class="dialog">
+  <form method="dialog" class="dialog-head">
+    <h3>Group invitations</h3><button class="btn btn-icon" value="cancel" aria-label="Close">✕</button>
+  </form>
+  <div class="dialog-body">
+    <div id="incoming-invite-list" class="invite-list"></div>
+    <p id="incoming-invite-status" class="add-status"></p>
   </div>
 </dialog>
 

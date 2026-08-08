@@ -17,7 +17,9 @@ DROP TABLE IF EXISTS seed_assignments;
 DROP TABLE IF EXISTS skips;
 DROP TABLE IF EXISTS ratings;
 DROP TABLE IF EXISTS games;
+DROP TABLE IF EXISTS member_preferences;
 DROP TABLE IF EXISTS memberships;
+DROP TABLE IF EXISTS group_invites;
 DROP TABLE IF EXISTS workspace_settings;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS users;
@@ -70,6 +72,33 @@ CREATE TABLE memberships (
   joined_at  INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (group_id, steam_id)
 );
+
+-- Member-facing housekeeping is opt-in. Keeping this in a side table means a
+-- missing row is the safe default for every existing and newly-created member.
+CREATE TABLE member_preferences (
+  group_id        INTEGER NOT NULL,
+  steam_id        TEXT    NOT NULL,
+  history_prompts INTEGER NOT NULL DEFAULT 0 CHECK (history_prompts IN (0,1)),
+  PRIMARY KEY (group_id, steam_id),
+  FOREIGN KEY (group_id, steam_id) REFERENCES memberships(group_id, steam_id)
+    ON DELETE CASCADE
+);
+
+-- A direct invitation names an existing account but does not create membership.
+-- The recipient must explicitly accept before the tenancy boundary lets them in.
+CREATE TABLE group_invites (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id         INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  invited_steam_id TEXT    NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+  invited_by       TEXT    NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+  status           TEXT    NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','accepted','rejected','cancelled')),
+  created_at       INTEGER NOT NULL DEFAULT (unixepoch()),
+  responded_at     INTEGER,
+  UNIQUE (group_id, invited_steam_id)
+);
+CREATE INDEX idx_group_invites_recipient
+  ON group_invites(invited_steam_id, status, created_at DESC);
 
 -- ── shared Steam metadata cache ──────────────────────────────────────────────
 -- Keyed by appid and shared across every group, so a thousand groups adding

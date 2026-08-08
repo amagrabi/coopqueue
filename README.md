@@ -64,11 +64,12 @@ separate block. Steam header art keeps both lists recognizable at a glance.
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
 Filterable by whose votes a game already has, by group score, and by whether
-anyone has logged hours. A one-question-at-a-time **Complete our history** card
+anyone has logged hours. An optional one-question-at-a-time **Complete our history** card
 finds missing first-played, last-played and group-hours facts for games the group
 has actually played. It asks likely participants first, offers clearly marked
 Steam/release-date approximations when there is honest evidence, and lets each
 person answer, defer or dismiss a prompt without hiding it from everyone else.
+It starts disabled and each member can opt in from Settings when they want it.
 Personal libraries collapse the group-only player, member, average and vote-count
 columns into one **Rating** column.
 
@@ -111,19 +112,21 @@ existing one-person group from Settings without losing games, ratings or history
 They have no invite link or group-only comparisons, use your Steam playtime in
 history and Stats, and retain the co-op-first catalogue and verified-cap metadata.
 Settings includes a selective Steam import for both the owned library and public
-wishlist. It previews every candidate before writing, with source filters,
+wishlist. The same review is available to co-op groups. It previews every candidate before writing, with source and
+Co-op / Multiplayer / Solo filters,
 select/deselect-all controls, import actions above and below the list, and owned-only
-or wishlist-only shortcuts. A new
-personal workspace opens this review immediately; cancelling an empty import goes
-to Find games instead of an empty rating queue. New co-op groups also begin in Find
-games. Source filters load their complete candidate set, and larger reviewed
+or wishlist-only shortcuts. New personal and co-op workspaces open this review
+immediately; personal libraries enable every game type while co-op groups begin
+with Co-op selected. Cancelling an empty import goes to Find games instead of an
+empty rating queue. Source filters load their complete candidate set, and larger reviewed
 selections are submitted in bounded batches. Played
 games begin as **Sampled**; unplayed and wishlisted games begin as **Backlog**.
 Exact lifetime minutes are rounded to one decimal hour. Verified catalogue player
 caps carry across; unknown caps remain visibly unknown. Store art is filled in
 through the shared metadata cache in small resumable batches. Playtime sync is part
-of the import; metadata and achievement analysis begin automatically in bounded
-passes and remain resumable from Settings. Achievement analysis can save the
+of the import; metadata enrichment begins automatically in bounded passes and
+remains resumable from Settings. Personal workspaces also start bounded achievement
+analysis automatically. It can save the
 earliest unlock as an approximate first-played boundary. It shows **Likely finished**
 only for a small curated set of explicit ending achievements, and the player must
 confirm every status change.
@@ -133,9 +136,12 @@ queue is clear it opens the Library instead, or Find games when the library itse
 is empty. Workspace names only need to be unique within one person's own switcher;
 unrelated private workspaces may use the same name.
 
-**Group / Settings.** Members, invite links you can rotate or disable, the headcount that
+**Group / Settings.** Members, invite links you can rotate or disable, direct invitations
+to registered CoopQueue accounts, the headcount that
 drives the viability check, and owner-only JSON or per-table CSV exports — including
-history provenance — before a group is permanently deleted.
+history provenance — before a group is permanently deleted. Direct invitations stay
+outside the group until the named account explicitly accepts; recipients can accept
+or decline from their onboarding screen or the Invites button in the app.
 
 ### The scoring model
 
@@ -182,13 +188,15 @@ What actually happens on first sign-in:
    set a signed session cookie good for 90 days.
 
 That account is just an identity. It grants access to nothing until they either
-**create a co-op group or personal workspace** or **join one with an invite link**. Groups are private by
+**create a co-op group or personal workspace**, **join one with an invite link**, or
+**accept a direct in-app invitation**. Groups are private by
 default: a non-member asking for `/api/g/some-group/games` gets a 404, not a
 403, so a private group can't even be confirmed to exist by guessing the URL.
 
-So for your four: you sign in, claim the "Ama" identity, create an invite link
-on the Group tab, and send it to the other three. They click it, sign in with
-Steam, and land straight in the group with the claim prompt waiting.
+So for your four: you sign in, claim the "Ama" identity, then either send the Group
+tab's invite link or search for friends who have already used CoopQueue. A direct
+invite creates no membership until that exact Steam account accepts it. Either join
+path still applies a pre-assigned imported identity and its ratings automatically.
 
 Using Steam rather than email has one more payoff. Because a SteamID64 is a real
 Steam account, playtime and ownership come from Steam's public Web API keyed on the
@@ -300,15 +308,15 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 161 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 170 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
 `isolation.mjs` imports the **real route handlers** and runs them against a D1
 shim over SQLite, so it tests shipped code rather than a reimplementation. It
 covers the things that would actually hurt: cross-group reads, cross-group
-writes by guessed id, invite-code validation, owner-only actions, and the
-last-owner-can't-leave rule.
+writes by guessed id, invite-code and direct-invite validation, owner-only actions,
+recipient-only acceptance, and the last-owner-can't-leave rule.
 
 ---
 
@@ -320,7 +328,8 @@ functions/
   api/
     auth/steam.js                start Steam OpenID (carries an invite code)
     auth/callback.js             verify with Steam, set the signed cookie
-    me.js                        current user + their groups
+    me.js                        current user + groups + pending invitations
+    invites.js                   accept or reject a direct invitation
     groups/index.js              GET my groups · POST create one
     groups/join.js               POST an invite code
     steam/search.js              store search for the add-a-game box
@@ -329,6 +338,8 @@ functions/
       games/index.js             GET the group library with scores · POST add
       games/[id].js              PATCH · DELETE · PUT to link a Steam appid
       history.js                 shared-history cleanup prompts
+      invites.js                 owner search, invite and cancellation
+      steam-import.js            selective library/wishlist import
       play-night.js              attendee-specific backlog ranking
       export.js                  owner-only JSON and CSV downloads
       achievements.js            cached per-game Trophy relay

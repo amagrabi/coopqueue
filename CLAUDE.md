@@ -84,7 +84,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 161 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 170 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -379,7 +379,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-161/161 assertions pass. `npm run test:ui` does **not** run on macOS: it
+170/170 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -397,6 +397,14 @@ resolve, so `STEAM_API_KEY` works), `POST /api/groups/join`, claiming a seed
 identity, `PATCH /api/g/:slug/members {invite:'on'}` to rotate the invite link,
 `/enrich`, and a trailer playing in the rating queue in **Chromium** — the
 browser that could not play one before hls.js.
+
+Direct invitations are a second, explicit join path. Only a co-op workspace owner
+can search registered `users` and create one; placeholders and existing members are
+excluded. A `group_invites` row is not membership, so the group middleware still
+returns 404 until the named SteamID64 accepts through `/api/invites`. Accepting uses
+the same 64-member ceiling and post-insert `applySeedAssignment()` path as an invite
+code. Reject and owner cancellation retain an auditable terminal state. Converting a
+one-person group to personal cancels any pending invitations.
 
 ## The agreed v2 shape
 
@@ -633,9 +641,15 @@ first/last-played evidence. The evidence rules and repeatable import procedure l
 in `docs/PERSONAL_STEAM_HISTORY.md`; both migrations are idempotent and preserve
 newer user edits.
 
-`POST /api/g/:slug/steam-import` is personal-only and has three bounded actions.
+`POST /api/g/:slug/steam-import` works in both workspace modes and has three bounded actions.
 `preview` reads `GetOwnedGames` and the public wishlist, then returns 250 untracked
-titles at a time with owned/wishlist source filters. Selecting a source in the UI
+titles at a time with owned/wishlist source filters plus Co-op / Multiplayer / Solo
+classification. Personal workspaces enable all three by default; co-op workspaces
+start with Co-op only. The catalogue's measured `is_coop` flag wins when present;
+otherwise cached Steam categories distinguish co-op and multiplayer, and an
+unclassified app stays in the Solo bucket until full enrichment supplies better
+evidence. This classification is only a review filter. It never writes or claims a
+player cap. Selecting a source or type in the UI
 loads all of its pages, while the initial combined view keeps an explicit Load more
 control. Wishlist ids get cache-first names and art through bounded 50-app
 `getAppSummaries()` requests. `import` re-fetches both sources, intersects at most
@@ -651,10 +665,12 @@ the owned-library watermark or manufacture ownership negatives. The import store
 a player cap only when the global catalogue already carries a non-NULL verified
 source; unknown caps stay unknown rather than being inferred from unreliable store
 categories. It already refreshes playtime and ownership, so the browser does not
-repeat that call. After an import it automatically runs at most three eight-game
-metadata passes and three four-game achievement passes; those achievement passes can
-add approximate first-played boundaries and completion suggestions. The manual
-Settings controls resume or retry anything left over.
+repeat that call. After any import it automatically runs at most three eight-game
+metadata passes. Personal workspaces also run three four-game achievement passes,
+which can add approximate first-played boundaries and completion suggestions. The
+manual Settings controls resume or retry anything left over. Bulk achievement
+analysis remains personal-only; co-op workspaces use the existing bounded
+per-member, per-game Trophy relay instead.
 
 ## History-shaped stats
 
@@ -901,7 +917,7 @@ group's. Shown only when nobody has typed `finished`.
 
 ## Complete our history
 
-The Library asks one missing fact at a time for non-backlog, non-archived games:
+The Library can ask one missing fact at a time for non-backlog, non-archived games:
 first played, total group hours, and last played. A rating, at least one personal
 Steam hour, or being the person who added the game moves a prompt earlier because
 that member is more likely to remember; it never changes who is allowed to edit.
@@ -922,6 +938,12 @@ batch. Manual edits replace the provenance with `manual`. **Remind me next week*
 and **I don't know** are per-member states, so one person's dismissal cannot suppress
 a question for the rest of the group; filling the shared fact removes it for all.
 
+The card is disabled by default and each member opts in independently from Settings.
+`member_preferences` is a side table rather than a membership column, so a missing
+row is the safe off state for existing members as well as new ones. The preference
+only controls whether the Library fetches and renders the card; it does not delete
+history facts, provenance or somebody else's nudge state.
+
 `game_fact_sources` and `history_nudges` arrive in migration 023. Migration 022's
 17 owner-approved release-date fallbacks for `g4m1ng` are backfilled as
 `release-date`, so they are not retroactively presented as recalled dates.
@@ -933,6 +955,9 @@ last-played values accept the visible account's Steam timestamp, and The Divisio
 2's impossible post-finish Steam release fallback is removed. It deliberately does
 not copy Ama's lifetime hours into `games.hours`: that remains personal playtime,
 not evidence of hours played together.
+
+Migration 028 adds `member_preferences` and `group_invites`. Both are additive,
+idempotent side tables; no membership, game or rating row is rebuilt.
 
 ## The Library's default view
 

@@ -7,9 +7,13 @@ playing it or whether they consider it complete.
 
 ## Built-in import for any player
 
-Personal library Settings now exposes the repeatable parts of this process to every
+Workspace Settings now exposes the repeatable parts of this process to every
 signed-in player. **Import games from Steam** previews only titles missing from the
-current personal workspace across both the owned library and public wishlist.
+current workspace across both the owned library and public wishlist. Personal
+libraries enable Co-op, Multiplayer and Solo filters by default; co-op workspaces
+begin with only Co-op enabled. Cached catalogue/Steam mode evidence powers this
+review filter, and a title that has not been classified yet appears under Solo.
+The filter never guesses or writes a player cap.
 Nothing is written until the player reviews checkboxes; the dialog can show both
 sources or either one, include unplayed owned games, select or deselect every shown
 title, and narrow the selection to owned or wishlisted games. The initial combined
@@ -36,7 +40,9 @@ If the shared catalogue already has a player cap with explicit verification
 provenance, that cap and its note are copied into the new workspace. Steam's store
 categories are not a trustworthy cap, so every other game remains unknown.
 Afterwards the browser automatically attempts up to three eight-game metadata
-batches and up to twelve played games through four-game achievement batches.
+batches. Personal workspaces also attempt up to twelve played games through
+four-game achievement batches; co-op workspaces retain the per-member, per-game
+Trophy relay rather than starting a large cross-member scan.
 **Fill missing game details** and **Analyze achievements** remain as resumable retry
 controls, with a session cursor so private or unsupported games do not block later
 titles. The earliest unlocked achievement is saved as an approximate first-played

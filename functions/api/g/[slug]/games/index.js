@@ -161,6 +161,7 @@ export async function onRequestGet({ env, data }) {
     group: {
       slug: data.group.slug, name: data.group.name, maxPlayers: need, role: data.group.role,
       blindRating: !!data.group.blind_rating, mode: data.group.workspace_mode,
+      historyPrompts: !!data.group.history_prompts,
     },
     model: { mean: Math.round(glob.mean * 100) / 100, sd: Math.round(glob.sd * 100) / 100 },
   });

@@ -1,9 +1,12 @@
 import { json } from '../../lib/http.js';
-import { myGroups } from '../../lib/groups.js';
+import { myGroups, pendingInvites } from '../../lib/groups.js';
 
 export async function onRequestGet(context) {
   const { env, data } = context;
-  const groups = await myGroups(env.DB, data.user.steam_id);
+  const [groups, invites] = await Promise.all([
+    myGroups(env.DB, data.user.steam_id),
+    pendingInvites(env.DB, data.user.steam_id),
+  ]);
   // Presence is useful, but it is not part of this response. Sample it hourly and
   // keep the D1 write off the page-load path; Pages binds waitUntil to `context`.
   context.waitUntil(env.DB.prepare(
@@ -22,5 +25,6 @@ export async function onRequestGet(context) {
       avatar: data.user.avatar,
     },
     groups,
+    invites,
   });
 }

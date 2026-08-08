@@ -74,6 +74,12 @@ function rateLimitFor(method, pathname) {
   if (method === 'GET' && pathname === '/api/steam/search') {
     return { bucket: 'steam-search', max: 30, windowSeconds: 60 };
   }
+  if (method === 'GET' && /^\/api\/g\/[^/]+\/invites$/.test(pathname)) {
+    // Registered-account search is intentionally useful but must not become an
+    // unbounded directory scraper. The owner sees at most twelve matches per
+    // request and normal typeahead stays comfortably under this ceiling.
+    return { bucket: 'account-search', max: 30, windowSeconds: 60 };
+  }
   const expensive = (method === 'POST' && /\/(games|enrich|playtime|achievements|steam-import|achievement-scan)$/.test(pathname))
     || (method === 'PUT' && /\/games\/\d+$/.test(pathname));
   if (expensive) return { bucket: 'steam-write', max: 20, windowSeconds: 300 };

@@ -33,6 +33,10 @@ export async function onRequestPost({ request, env, data }) {
   // pre-assigned this SteamID64 an identity, in which case the person skips the
   // "which one are you?" prompt entirely.
   const claimed = await applySeedAssignment(env.DB, group.id, data.user.steam_id);
+  await env.DB.prepare(
+    `UPDATE group_invites SET status='accepted',responded_at=unixepoch()
+      WHERE group_id=? AND invited_steam_id=? AND status='pending'`
+  ).bind(group.id, data.user.steam_id).run();
 
   return json({
     ok: true, slug: group.slug, name: group.name,

@@ -37,7 +37,9 @@ sqlite.exec(fs.readFileSync(path.join(SITE, 'seed.sql'), 'utf8'));
 
 const ALICE = '76561198000000001';
 const MALLORY = '76561198000000002';
-sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${ALICE}','Alice'),('${MALLORY}','Mallory')`);
+const BOB = '76561198000000003';
+sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES
+  ('${ALICE}','Alice'),('${MALLORY}','Mallory'),('${BOB}','Bob Builder')`);
 sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ALICE}','Ama','owner')`);
 sqlite.exec(`INSERT INTO groups (id, slug, name, invite_code, max_players) VALUES (2,'mallorys','Mallorys Crew','MALLORY123',4)`);
 sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (2,'${MALLORY}','Mallory','owner')`);
@@ -47,7 +49,8 @@ const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
        commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute,
-       historyRoute, statsRoute, steamImportRoute, achievementScanRoute] = await Promise.all([
+       historyRoute, statsRoute, steamImportRoute, achievementScanRoute, directInvitesRoute,
+       incomingInvitesRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -66,6 +69,8 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/stats.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/steam-import.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/achievement-scan.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/invites.js')),
+  import(path.join(SITE, 'functions/api/invites.js')),
 ]);
 const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
 const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
@@ -192,6 +197,95 @@ await check('a plain member CAN rename themselves', async () => {
   return (r.status === 200 && n === 'Mal') || `status ${r.status}, name ${n}`;
 });
 
+await check('history prompts are off by default and opt in per member', async () => {
+  const alice = await ctxFor(ALICE, 'g4m1ng');
+  const mallory = await ctxFor(MALLORY, 'g4m1ng');
+  const before = await (await membersRoute.onRequestGet({ env, data: alice.data })).json();
+  const response = await membersRoute.onRequestPatch({
+    request: req({ historyPrompts: true }), env, data: mallory.data,
+  });
+  const aliceSetting = sqlite.prepare(
+    'SELECT history_prompts FROM member_preferences WHERE group_id=1 AND steam_id=?'
+  ).get(ALICE);
+  const mallorySetting = sqlite.prepare(
+    'SELECT history_prompts FROM member_preferences WHERE group_id=1 AND steam_id=?'
+  ).get(MALLORY);
+  return (!before.group.historyPrompts && response.status === 200 && !aliceSetting
+      && mallorySetting?.history_prompts === 1)
+    || JSON.stringify({ before: before.group.historyPrompts, aliceSetting, mallorySetting });
+});
+
+await check('only an owner can search registered accounts for a direct invite', async () => {
+  const owner = await ctxFor(ALICE, 'g4m1ng');
+  const member = await ctxFor(MALLORY, 'g4m1ng');
+  const found = await (await directInvitesRoute.onRequestGet({
+    request: new Request('https://x/api/g/g4m1ng/invites?q=bob'), env, data: owner.data,
+  })).json();
+  const blocked = await directInvitesRoute.onRequestGet({
+    request: new Request('https://x/api/g/g4m1ng/invites?q=bob'), env, data: member.data,
+  });
+  return (found.results?.[0]?.steamId === BOB && blocked.status === 403)
+    || `found ${JSON.stringify(found)}, member status ${blocked.status}`;
+});
+
+await check('a direct invitation stays pending until the named account accepts', async () => {
+  const owner = await ctxFor(ALICE, 'g4m1ng');
+  const created = await directInvitesRoute.onRequestPost({
+    request: req({ steamId: BOB }), env, data: owner.data,
+  });
+  const inbox = await (await incomingInvitesRoute.onRequestGet({
+    env, data: { user: user(BOB) },
+  })).json();
+  const membership = sqlite.prepare(
+    'SELECT 1 FROM memberships WHERE group_id=1 AND steam_id=?'
+  ).get(BOB);
+  return (created.status === 201 && inbox.invites?.length === 1 && !membership)
+    || `status ${created.status}, inbox ${JSON.stringify(inbox)}, membership ${!!membership}`;
+});
+
+await check('another account cannot answer someone else\'s invitation', async () => {
+  const invite = sqlite.prepare(
+    "SELECT id FROM group_invites WHERE group_id=1 AND invited_steam_id=? AND status='pending'"
+  ).get(BOB);
+  const response = await incomingInvitesRoute.onRequestPost({
+    request: req({ id: invite.id, action: 'accept' }), env, data: { user: user(ALICE) },
+  });
+  return response.status === 404 || `got ${response.status}`;
+});
+
+await check('accepting a direct invite creates exactly the intended membership', async () => {
+  const invite = sqlite.prepare(
+    "SELECT id FROM group_invites WHERE group_id=1 AND invited_steam_id=? AND status='pending'"
+  ).get(BOB);
+  const response = await incomingInvitesRoute.onRequestPost({
+    request: req({ id: invite.id, action: 'accept' }), env, data: { user: user(BOB) },
+  });
+  const payload = await response.json();
+  const joined = sqlite.prepare(
+    'SELECT COUNT(*) AS n FROM memberships WHERE group_id=1 AND steam_id=?'
+  ).get(BOB).n;
+  const status = sqlite.prepare('SELECT status FROM group_invites WHERE id=?').get(invite.id).status;
+  return (response.status === 200 && payload.slug === 'g4m1ng' && joined === 1 && status === 'accepted')
+    || `status ${response.status}, payload ${JSON.stringify(payload)}, rows ${joined}, invite ${status}`;
+});
+
+await check('a direct-invite id from another group cannot be cancelled', async () => {
+  const mallory = await ctxFor(MALLORY, 'mallorys');
+  const alice = await ctxFor(ALICE, 'g4m1ng');
+  const created = await directInvitesRoute.onRequestPost({
+    request: req({ steamId: BOB }), env, data: mallory.data,
+  });
+  const foreign = sqlite.prepare(
+    "SELECT id FROM group_invites WHERE group_id=2 AND invited_steam_id=? AND status='pending'"
+  ).get(BOB);
+  const cancelled = await directInvitesRoute.onRequestDelete({
+    request: req({ id: foreign.id }), env, data: alice.data,
+  });
+  const status = sqlite.prepare('SELECT status FROM group_invites WHERE id=?').get(foreign.id).status;
+  return (created.status === 201 && cancelled.status === 404 && status === 'pending')
+    || `created ${created.status}, cancel ${cancelled.status}, status ${status}`;
+});
+
 await check('a member cannot remove another member', async () => {
   const { data } = await ctxFor(MALLORY, 'g4m1ng');
   const r = await membersRoute.onRequestDelete({
@@ -261,6 +355,14 @@ await check('creating a personal workspace records intent, one player, and no in
       && row.max_players === 1 && row.invite_code == null && row.role === 'owner'
       && library.group.mode === 'personal')
     || `status ${r.status}, ${JSON.stringify({ row, group: library.group })}`;
+});
+
+await check('personal workspaces reject direct invitations', async () => {
+  const { data } = await ctxFor(MALLORY, 'my-history');
+  const response = await directInvitesRoute.onRequestPost({
+    request: req({ steamId: ALICE }), env, data,
+  });
+  return response.status === 409 || `got ${response.status}`;
 });
 
 await check('a one-person workspace can switch modes without losing its identity', async () => {
@@ -1900,6 +2002,8 @@ sqlite.exec(`INSERT INTO games (group_id,name,steam_appid,status)
 sqlite.exec(`INSERT INTO coop_apps (appid,name,max_players,max_players_src) VALUES
              (700001,'Imported Solo Game',4,'manual:test'),
              (700005,'Wishlist Solo Game',3,NULL)`);
+sqlite.exec(`INSERT INTO coop_apps (appid,name,max_players,max_players_src,coop_categories,is_coop)
+             VALUES (700008,'Wishlist Co-op Game',4,'manual:test','["Online Co-op"]',1)`);
 
 const originalFetch = globalThis.fetch;
 const steamCalls = [];
@@ -1916,12 +2020,16 @@ globalThis.fetch = async (url) => {
   if (String(url).includes('GetWishlist')) {
     return new Response(JSON.stringify({ response: { items: [
       { appid: 700005, priority: 0, date_added: 1710000000 },
+      { appid: 700008, priority: 0, date_added: 1710001000 },
+      { appid: 700009, priority: 0, date_added: 1710002000 },
     ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
   }
   if (String(url).includes('IStoreBrowseService/GetItems')) {
     return new Response(JSON.stringify({ response: { store_items: [
       { appid: 700001, name: 'Imported Solo Game' },
       { appid: 700005, name: 'Wishlist Solo Game' },
+      { appid: 700008, name: 'Wishlist Co-op Game' },
+      { appid: 700009, name: 'Wishlist Solo Two' },
     ] } }), { status: 200, headers: { 'content-type': 'application/json' } });
   }
   if (String(url).includes('GetPlayerAchievements')) {
@@ -1942,7 +2050,9 @@ await check('personal import compares and writes only inside the selected worksp
     request: req({ action: 'preview', source: 'wishlist' }), env, data,
   })).json();
   if (preview.items?.[0]?.appid !== 700001 || !preview.items.some((game) => game.appid === 700005)
-      || wishlistPreview.items?.length !== 1 || wishlistPreview.items[0].appid !== 700005) {
+      || wishlistPreview.items?.length !== 3
+      || !wishlistPreview.items.some((game) => game.appid === 700005)
+      || !wishlistPreview.items.some((game) => game.appid === 700008)) {
     return `unexpected previews: ${JSON.stringify({ preview, wishlistPreview })}`;
   }
   const response = await steamImportRoute.onRequestPost({
@@ -1970,6 +2080,32 @@ await check('personal import compares and writes only inside the selected worksp
       && foreign === 1 && refreshed === 60 && enrichment.enriched === 0
       && enrichment.remaining >= 2)
     || `status ${response.status}, own ${JSON.stringify(own)}, wishlisted ${JSON.stringify(wishlisted)}, foreign ${foreign}, refreshed ${refreshed}, enrichment ${JSON.stringify(enrichment)}`;
+});
+
+await check('co-op workspaces can preview Steam imports and default to co-op games', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const response = await steamImportRoute.onRequestPost({
+    request: req({ action: 'preview' }), env, data,
+  });
+  const preview = await response.json();
+  return (response.status === 200 && preview.items?.some((game) => game.appid === 700008)
+      && preview.items.every((game) => game.gameType === 'coop'))
+    || `status ${response.status}, preview ${JSON.stringify(preview.items)}`;
+});
+
+await check('Steam import game-type filters apply across the full candidate set', async () => {
+  const { data } = await ctxFor(ALICE, 'alice-solo');
+  const solo = await (await steamImportRoute.onRequestPost({
+    request: req({ action: 'preview', gameTypes: ['solo'] }), env, data,
+  })).json();
+  const coop = await (await steamImportRoute.onRequestPost({
+    request: req({ action: 'preview', gameTypes: ['coop'] }), env, data,
+  })).json();
+  return (solo.items?.some((game) => game.appid === 700009)
+      && solo.items.every((game) => game.gameType === 'solo')
+      && coop.items?.some((game) => game.appid === 700008)
+      && coop.items.every((game) => game.gameType === 'coop'))
+    || JSON.stringify({ solo: solo.items, coop: coop.items });
 });
 
 await check('an all-zero Steam library is not silently imported as a real backlog', async () => {

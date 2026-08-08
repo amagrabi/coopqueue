@@ -10,6 +10,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const state = {
   me: null,
   groups: [],
+  invites: [],
   group: null,      // { slug, name, maxPlayers, role }
   members: [],
   games: [],
@@ -253,6 +254,7 @@ async function boot() {
 
   state.me = me.user;
   state.groups = me.groups;
+  state.invites = me.invites || [];
 
   // Arrived via an invite link.
   const join = params.get('join');
@@ -260,7 +262,9 @@ async function boot() {
     history.replaceState(null, '', '/');
     try {
       const r = await api('/api/groups/join', { method: 'POST', body: { code: join } });
-      state.groups = (await api('/api/me')).groups;
+      const refreshed = await api('/api/me');
+      state.groups = refreshed.groups;
+      state.invites = refreshed.invites || [];
       location.hash = `#/g/${r.slug}/queue`;
       toast(r.alreadyMember ? `You're already in ${r.name}` : `Joined ${r.name}`);
     } catch (e) {
@@ -297,6 +301,93 @@ function wireLandingShowcase() {
   });
 }
 
+function inviteCards(invites) {
+  if (!invites.length) return '<p class="panel-sub">No invitations waiting.</p>';
+  return invites.map((invite) => `
+    <article class="invite-card">
+      ${invite.inviterAvatar
+        ? `<img src="${esc(invite.inviterAvatar)}" alt="" width="40" height="40">`
+        : '<span class="invite-avatar" aria-hidden="true">CQ</span>'}
+      <div>
+        <strong>${esc(invite.groupName)}</strong>
+        <small>Invited by ${esc(invite.inviterName)} · ${when(invite.createdAt)}</small>
+      </div>
+      <div class="invite-card-actions">
+        <button class="btn btn-sm btn-primary" data-invite-action="accept" data-invite-id="${invite.id}">Accept</button>
+        <button class="btn btn-sm btn-ghost" data-invite-action="reject" data-invite-id="${invite.id}">Decline</button>
+      </div>
+    </article>`).join('');
+}
+
+function wireIncomingInviteActions(root) {
+  $$('[data-invite-action]', root).forEach((button) => {
+    button.onclick = () => void respondToInvite(Number(button.dataset.inviteId), button.dataset.inviteAction);
+  });
+}
+
+function renderInviteNotice() {
+  const count = state.invites.length;
+  $('#incoming-invite-btn').hidden = !count;
+  $('#incoming-invite-count').textContent = count || '';
+  if ($('#incoming-invite-dialog').open) {
+    $('#incoming-invite-list').innerHTML = inviteCards(state.invites);
+    wireIncomingInviteActions($('#incoming-invite-list'));
+  }
+}
+
+function renderOnboardInvites() {
+  const box = $('#onboard-invites');
+  box.hidden = !state.invites.length;
+  box.innerHTML = state.invites.length
+    ? `<h2>Group invitations</h2>${inviteCards(state.invites)}` : '';
+  if (!box.hidden) wireIncomingInviteActions(box);
+}
+
+let invitesRefreshedAt = 0;
+async function refreshIncomingInvites() {
+  if (!state.me || Date.now() - invitesRefreshedAt < 30_000) return;
+  invitesRefreshedAt = Date.now();
+  try {
+    const result = await api('/api/invites');
+    state.invites = result.invites || [];
+    renderInviteNotice();
+    if (!$('#onboard').hidden) renderOnboardInvites();
+  } catch { /* The next normal page load will retry; invitations are not urgent. */ }
+}
+
+async function respondToInvite(id, action) {
+  const buttons = $$(`[data-invite-id="${id}"]`);
+  buttons.forEach((button) => { button.disabled = true; });
+  $('#incoming-invite-status').textContent = action === 'accept' ? 'Joining…' : 'Declining…';
+  try {
+    const result = await api('/api/invites', { method: 'POST', body: { id, action } });
+    const me = await api('/api/me');
+    state.groups = me.groups;
+    state.invites = me.invites || [];
+    if (action === 'accept') {
+      $('#incoming-invite-dialog').close();
+      state.group = null;
+      location.hash = `#/g/${result.slug}/queue`;
+      await openFromHash();
+      toast(`Joined ${result.name}`);
+    } else {
+      renderInviteNotice();
+      renderOnboardInvites();
+      $('#incoming-invite-status').textContent = '';
+    }
+  } catch (error) {
+    $('#incoming-invite-status').textContent = error.message;
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+$('#incoming-invite-btn').onclick = () => {
+  $('#incoming-invite-list').innerHTML = inviteCards(state.invites);
+  $('#incoming-invite-status').textContent = '';
+  wireIncomingInviteActions($('#incoming-invite-list'));
+  $('#incoming-invite-dialog').showModal();
+};
+
 /* ───────────────────────── onboarding: no groups ─────────────────────── */
 function showOnboard() {
   show('onboard');
@@ -304,6 +395,7 @@ function showOnboard() {
   $('#join-form').reset();
   $('#onboard-status').textContent = '';
   $('#onboard-name').textContent = state.me.displayName || 'stranger';
+  renderOnboardInvites();
 
   const syncCreateMode = () => {
     const personal = $('[name="create-mode"]:checked').value === 'personal';
@@ -324,14 +416,13 @@ function showOnboard() {
     try {
       const r = await api('/api/groups', { method: 'POST', body: { name, maxPlayers, mode } });
       state.groups = (await api('/api/me')).groups;
-      // A new workspace has nothing useful to rate yet. Personal libraries start
-      // with the selective Steam review; co-op groups start in the catalogue.
-      location.hash = `#/g/${r.slug}/${mode === 'personal' ? 'members' : 'browse'}`;
+      // A new workspace has nothing useful to rate yet. Both workspace types
+      // start with a selective Steam review; co-op defaults to co-op games while
+      // a personal library shows every game type.
+      location.hash = `#/g/${r.slug}/members`;
       await openFromHash();
-      if (mode === 'personal' && state.group?.slug === r.slug) {
+      if (state.group?.slug === r.slug) {
         openSteamImport({ onboarding: true });
-      } else {
-        toast(`${r.name} created — add a few games, then invite the others`);
       }
     } catch (err) { $('#onboard-status').textContent = err.message; }
   };
@@ -341,7 +432,9 @@ function showOnboard() {
     $('#onboard-status').textContent = 'Looking up that code…';
     try {
       const r = await api('/api/groups/join', { method: 'POST', body: { code: $('#join-code').value } });
-      state.groups = (await api('/api/me')).groups;
+      const refreshed = await api('/api/me');
+      state.groups = refreshed.groups;
+      state.invites = refreshed.invites || [];
       location.hash = `#/g/${r.slug}/queue`;
       await openFromHash();
       toast(`Joined ${r.name}`);
@@ -474,6 +567,7 @@ function renderChrome() {
   renderMyCoverage();
   renderGroupMenu();
   renderLibHead();
+  renderInviteNotice();
   wireOnce();
 }
 
@@ -558,6 +652,11 @@ let wired = false;
 function wireOnce() {
   if (wired) return;
   wired = true;
+
+  window.addEventListener('focus', () => void refreshIncomingInvites());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void refreshIncomingInvites();
+  });
 
   $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
   $$('[data-open-add]').forEach((b) => b.addEventListener('click', openAdd));
@@ -1371,6 +1470,11 @@ const historyFieldLabel = (field) => field === 'hours' && state.group.mode === '
 async function loadHistory(force = false) {
   const slug = state.group?.slug;
   if (!slug || state.view !== 'library') return;
+  if (!state.group.historyPrompts) {
+    state.history = null;
+    $('#history-card').hidden = true;
+    return;
+  }
   if (state.history && !force) { renderHistoryCard(); return; }
   const seq = ++historySeq;
   try {
@@ -1999,9 +2103,9 @@ async function renderMembers() {
       + 'played a game. That is an upper bound on time you played it <em>together</em> — Steam records '
       + 'how long each of you played, never when or with whom. A figure saved in the Library stays put; '
       + 'accepted estimates remain visibly approximate.';
-  $('#pt-import').hidden = !personal;
+  $('#pt-import').hidden = false;
   $('#pt-achievements').hidden = !personal;
-  $('#pt-enrich').hidden = !personal;
+  $('#pt-enrich').hidden = false;
 
   /* ── coverage leaderboard ──────────────────────────────────────────────── */
   const active = activeGames();
@@ -2092,6 +2196,12 @@ async function renderMembers() {
       <input id="s-size" class="input" type="number" min="2" max="64" value="${d.group.maxPlayers < 2 ? 4 : d.group.maxPlayers}" ${isOwner ? '' : 'disabled'}>
     </div>
     <p class="field-help" id="s-size-help" ${personal ? 'hidden' : ''}>Games that can't fit this many get flagged on Play next.</p>
+    <hr class="settings-rule">
+    <label class="toggle" for="s-history-prompts">
+      <input type="checkbox" id="s-history-prompts" ${d.group.historyPrompts ? 'checked' : ''}>
+      Show ${personal ? 'Complete my history' : 'Complete our history'} prompts
+    </label>
+    <p class="field-help">Optional one-question prompts for missing dates and playtime in the Library. This setting affects only you and starts off disabled.</p>
     <button class="btn btn-primary" id="s-save" style="margin-top:12px">Save</button>
 
     ${isOwner ? `
@@ -2168,7 +2278,10 @@ async function renderMembers() {
 
   $('#s-save').addEventListener('click', async () => {
     const slug = state.group.slug;
-    const patch = { myName: $('#s-myname').value };
+    const patch = {
+      myName: $('#s-myname').value,
+      historyPrompts: $('#s-history-prompts').checked,
+    };
     if (isOwner) {
       patch.name = $('#s-name').value;
       patch.mode = $('#s-mode').value;
@@ -2189,7 +2302,7 @@ async function renderMembers() {
   });
 
   const link = d.group.inviteCode ? `${location.origin}/?join=${d.group.inviteCode}` : null;
-  $('#invite-panel').innerHTML = !isOwner
+  const linkMarkup = !isOwner
     ? '<p class="panel-sub">Ask the group owner for an invite link.</p>'
     : link
       ? `<p class="panel-sub">Anyone with this link can join. Rotate it if it leaks.</p>
@@ -2201,6 +2314,19 @@ async function renderMembers() {
          </div>`
       : `<p class="panel-sub">Joining by link is disabled — nobody new can get in.</p>
          <button class="btn btn-primary" id="invite-on">Create an invite link</button>`;
+  $('#invite-panel').innerHTML = linkMarkup + (!isOwner ? '' : `
+    <hr class="settings-rule">
+    <div class="direct-invite-head">
+      <div>
+        <h4>Invite a CoopQueue player</h4>
+        <p class="panel-sub">Search players who have already signed in. They choose whether to join.</p>
+      </div>
+      <input class="input" id="direct-invite-search" type="search" autocomplete="off"
+             placeholder="Steam name or SteamID64" aria-label="Search registered players">
+    </div>
+    <div id="direct-invite-results" class="people compact-people"></div>
+    <div id="direct-invite-pending"></div>
+    <p id="direct-invite-status" class="add-status"></p>`);
 
   $('#invite-copy')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(link); toast('Invite link copied'); }
@@ -2217,6 +2343,90 @@ async function renderMembers() {
   $('#invite-rotate')?.addEventListener('click', () => setInvite('rotate'));
   $('#invite-off')?.addEventListener('click', () => setInvite('off'));
   $('#invite-on')?.addEventListener('click', () => setInvite('rotate'));
+  if (isOwner) wireDirectInvites(slug);
+}
+
+let directInviteSeq = 0;
+let directInviteTimer;
+
+function renderDirectInvites(data, slug) {
+  const results = $('#direct-invite-results');
+  const pending = $('#direct-invite-pending');
+  if (!results || state.group?.slug !== slug) return;
+  results.innerHTML = data.results.length ? data.results.map((player) => `
+    <div class="person">
+      ${player.avatar
+        ? `<img class="person-avatar" src="${esc(player.avatar)}" alt="" width="32" height="32">`
+        : '<span class="person-avatar invite-avatar" aria-hidden="true">CQ</span>'}
+      <div>
+        <div class="person-name">${esc(player.displayName)}</div>
+        <div class="person-sub">${esc(player.steamId)}</div>
+      </div>
+      <button class="btn btn-sm${player.pending ? ' btn-ghost' : ' btn-primary'}"
+              data-direct-invite="${esc(player.steamId)}" ${player.pending ? 'disabled' : ''}>
+        ${player.pending ? 'Invited' : 'Invite'}
+      </button>
+    </div>`).join('') : ($('#direct-invite-search').value.trim().length >= 2
+      ? '<p class="panel-sub">No registered players found.</p>'
+      : '<p class="panel-sub">Type at least two characters to search.</p>');
+  pending.innerHTML = data.pending.length ? `
+    <h4 class="subsection-title">Waiting for a reply</h4>
+    <div class="people compact-people">${data.pending.map((invite) => `
+      <div class="person">
+        ${invite.avatar
+          ? `<img class="person-avatar" src="${esc(invite.avatar)}" alt="" width="32" height="32">`
+          : '<span class="person-avatar invite-avatar" aria-hidden="true">CQ</span>'}
+        <div><div class="person-name">${esc(invite.displayName || invite.steamId)}</div>
+          <div class="person-sub">invited ${when(invite.createdAt)}</div></div>
+        <button class="btn btn-sm btn-ghost" data-cancel-invite="${invite.id}">Cancel</button>
+      </div>`).join('')}</div>` : '';
+
+  $$('[data-direct-invite]', results).forEach((button) => {
+    button.onclick = async () => {
+      button.disabled = true;
+      $('#direct-invite-status').textContent = 'Sending invitation…';
+      try {
+        await gapiFor(slug, '/invites', { method: 'POST', body: { steamId: button.dataset.directInvite } });
+        $('#direct-invite-status').textContent = '';
+        toast('Invitation sent');
+        await loadDirectInvites(slug, $('#direct-invite-search').value);
+      } catch (error) {
+        $('#direct-invite-status').textContent = error.message;
+        button.disabled = false;
+      }
+    };
+  });
+  $$('[data-cancel-invite]', pending).forEach((button) => {
+    button.onclick = async () => {
+      button.disabled = true;
+      try {
+        await gapiFor(slug, '/invites', { method: 'DELETE', body: { id: Number(button.dataset.cancelInvite) } });
+        await loadDirectInvites(slug, $('#direct-invite-search').value);
+      } catch (error) { $('#direct-invite-status').textContent = error.message; button.disabled = false; }
+    };
+  });
+}
+
+async function loadDirectInvites(slug, query = '') {
+  const seq = ++directInviteSeq;
+  try {
+    const data = await gapiFor(slug, `/invites?q=${encodeURIComponent(query.trim())}`);
+    if (seq !== directInviteSeq || state.group?.slug !== slug || state.view !== 'members') return;
+    renderDirectInvites(data, slug);
+  } catch (error) {
+    if (seq === directInviteSeq && $('#direct-invite-status')) {
+      $('#direct-invite-status').textContent = error.message;
+    }
+  }
+}
+
+function wireDirectInvites(slug) {
+  const input = $('#direct-invite-search');
+  input.oninput = () => {
+    clearTimeout(directInviteTimer);
+    directInviteTimer = setTimeout(() => void loadDirectInvites(slug, input.value), 250);
+  };
+  void loadDirectInvites(slug);
 }
 
 /* ══════════════════════════════ ADD GAME ══════════════════════════════ */
@@ -2387,6 +2597,7 @@ const steamImport = {
 
 function steamImportMeta(game) {
   const sources = [];
+  sources.push({ coop: 'Co-op', multiplayer: 'Multiplayer', solo: 'Solo' }[game.gameType] || 'Solo');
   if (game.owned) sources.push(game.played
     ? `Owned, ${fmtHours(game.hours)}h${game.lastPlayed ? `, last played ${game.lastPlayed}` : ''}`
     : 'Owned, never launched');
@@ -2467,6 +2678,7 @@ async function loadSteamImport(reset = false, loadAll = false) {
           action: 'preview', offset: steamImport.nextOffset,
           includeUnplayed: $('#steam-import-unplayed').checked,
           source: $('#steam-import-source').value,
+          gameTypes: $$('[data-steam-import-type]:checked').map((input) => input.value),
         },
       });
       if (seq !== steamImport.loadSeq || state.group?.slug !== slug
@@ -2499,6 +2711,9 @@ async function loadSteamImport(reset = false, loadAll = false) {
 function openSteamImport({ onboarding = false } = {}) {
   $('#steam-import-source').value = 'all';
   $('#steam-import-unplayed').checked = false;
+  $$('[data-steam-import-type]').forEach((input) => {
+    input.checked = state.group.mode === 'personal' || input.value === 'coop';
+  });
   steamImport.onboarding = onboarding;
   steamImport.importedDuringOpen = false;
   $('#steam-import-dialog').showModal();
@@ -2512,13 +2727,16 @@ async function selectSteamImportSource(source) {
 
 $('#steam-import-dialog').addEventListener('close', () => {
   const sendToCatalogue = steamImport.onboarding && !steamImport.importedDuringOpen
-    && state.group?.mode === 'personal' && !activeGames().length;
+    && !activeGames().length;
   steamImport.onboarding = false;
   if (sendToCatalogue) setView('browse');
 });
 
 $('#steam-import-source').onchange = () => void loadSteamImport(true, true);
 $('#steam-import-unplayed').onchange = () => void loadSteamImport(true, true);
+$$('[data-steam-import-type]').forEach((input) => {
+  input.onchange = () => void loadSteamImport(true, true);
+});
 $('#steam-import-more').onclick = () => void loadSteamImport(false);
 $('#steam-import-select-all').onclick = () => selectSteamImport(() => true);
 $('#steam-import-select-none').onclick = () => selectSteamImport(() => false);
@@ -2560,7 +2778,10 @@ async function submitSteamImport() {
     $('#steam-import-dialog').close();
     if (!await reloadGroupView(slug, onboarding ? 'queue' : 'members')) return;
     toast(`Imported ${imported} game${imported === 1 ? '' : 's'} from Steam`);
-    void runPostImportMaintenance(slug, { metadataRemaining, scanAchievements: importedPlayed > 0 });
+    void runPostImportMaintenance(slug, {
+      metadataRemaining,
+      scanAchievements: state.group.mode === 'personal' && importedPlayed > 0,
+    });
   } catch (error) { $('#steam-import-status').textContent = error.message; }
   finally { buttons.forEach((button) => { button.disabled = false; }); }
 }

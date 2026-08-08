@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 161 assertions — ALWAYS before a deploy
+npm test          # 170 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -220,6 +220,22 @@ npx wrangler d1 execute g4m1ng --remote --file=migrations/023-history-nudges.sql
 
 The application reads these tables while loading every group library; deploying
 the code first would make that request fail until the migration is applied.
+
+### Migration 028: member preferences and direct invitations
+
+Apply `migrations/028-member-preferences-and-direct-invites.sql` before deploying
+the opt-in history setting or direct-invite routes:
+
+```bash
+npx wrangler d1 execute g4m1ng --remote \
+  --file=migrations/028-member-preferences-and-direct-invites.sql
+```
+
+It creates two side tables and one index with `IF NOT EXISTS`, so it is additive
+and safe to retry. Missing `member_preferences` rows deliberately mean history
+prompts are off. A `group_invites` row never grants access by itself; membership
+is inserted only after the named account accepts. The new code joins both tables
+during normal page loads, so migrate before deploying.
 
 ---
 

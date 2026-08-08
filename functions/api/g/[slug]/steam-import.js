@@ -7,6 +7,7 @@ const PAGE = 250;
 const MAX_IMPORT = 250;
 const DB_BATCH = 50;
 const ENRICH_BATCH = 8;
+const GAME_TYPES = new Set(['coop', 'multiplayer', 'solo']);
 
 const day = (timestamp) => timestamp
   ? new Date(Number(timestamp) * 1000).toISOString().slice(0, 10)
@@ -53,10 +54,57 @@ async function verifiedCatalogueApps(db, appids) {
   return rows;
 }
 
-function personalOnly(data) {
+const parseList = (value) => {
+  try { return Array.isArray(value) ? value : JSON.parse(value || '[]'); }
+  catch { return []; }
+};
+
+async function classifyApps(db, appids) {
+  const evidence = new Map();
+  for (const batch of chunks(appids)) {
+    const placeholders = batch.map(() => '?').join(',');
+    const result = await db.prepare(
+      `SELECT appid,coop_categories,NULL AS tags,NULL AS is_coop,0 AS catalogue
+         FROM steam_apps WHERE appid IN (${placeholders})
+       UNION ALL
+       SELECT appid,coop_categories,tags,is_coop,1 AS catalogue
+         FROM coop_apps WHERE appid IN (${placeholders})`
+    ).bind(...batch, ...batch).all();
+    for (const row of result.results || []) {
+      const appid = Number(row.appid);
+      const current = evidence.get(appid) || { categories: [], tags: [], catalogue: null };
+      current.categories.push(...parseList(row.coop_categories));
+      current.tags.push(...parseList(row.tags));
+      if (row.catalogue) current.catalogue = row.is_coop == null ? null : Number(row.is_coop);
+      evidence.set(appid, current);
+    }
+  }
+  return new Map(appids.map((appid) => {
+    const row = evidence.get(Number(appid)) || { categories: [], tags: [], catalogue: null };
+    const labels = [...row.categories, ...row.tags].map((label) => String(label).toLowerCase());
+    let type;
+    if (row.catalogue === 1 || (row.catalogue == null
+        && labels.some((label) => /(^|[- ])co[- ]?op($|[- ])/i.test(label)))) {
+      type = 'coop';
+    } else if (row.catalogue === 0
+        || labels.some((label) => /multiplayer|\bpvp\b|player versus player/i.test(label))) {
+      type = 'multiplayer';
+    } else {
+      // Steam does not publish categories with the owned-library response. An
+      // uncached title therefore falls into Solo until enrichment proves a
+      // multiplayer mode; personal imports include every type by default.
+      type = 'solo';
+    }
+    return [Number(appid), type];
+  }));
+}
+
+function requestedGameTypes(data, input) {
+  if (Array.isArray(input.gameTypes)) {
+    return new Set(input.gameTypes.map(String).filter((type) => GAME_TYPES.has(type)));
+  }
   return data.group.workspace_mode === 'personal'
-    ? null
-    : bad('Steam library import is available in personal workspaces', 409);
+    ? new Set(GAME_TYPES) : new Set(['coop']);
 }
 
 async function steamSources(env, data) {
@@ -99,8 +147,6 @@ function mergedGames(owned, wishlist) {
 }
 
 export async function onRequestPost({ request, env, data }) {
-  const blocked = personalOnly(data);
-  if (blocked) return blocked;
   const input = await body(request);
   if (input.action === 'enrich') return enrichImported(env, data);
   if (!['preview', 'import'].includes(input.action)) return bad('unknown import action');
@@ -124,12 +170,15 @@ async function preview(db, data, steam, input) {
   const missing = mergedGames(steam.owned, steam.wishlist)
     .filter((game) => !tracked.has(game.appid));
   const sourceFilter = ['owned', 'wishlist'].includes(input.source) ? input.source : 'all';
-  const source = missing.filter((game) => {
+  const sourceCandidates = missing.filter((game) => {
     const ownedVisible = game.owned && (input.includeUnplayed || Number(game.minutes) > 0);
     if (sourceFilter === 'owned') return ownedVisible;
     if (sourceFilter === 'wishlist') return game.wishlisted;
     return game.wishlisted || ownedVisible;
   });
+  const classifications = await classifyApps(db, sourceCandidates.map((game) => game.appid));
+  const gameTypes = requestedGameTypes(data, input);
+  const source = sourceCandidates.filter((game) => gameTypes.has(classifications.get(game.appid)));
   source.sort((a, b) => Number(Number(b.minutes) > 0) - Number(Number(a.minutes) > 0)
     || Number(b.minutes) - Number(a.minutes)
     || Number(b.wishlistedAt) - Number(a.wishlistedAt)
@@ -150,6 +199,7 @@ async function preview(db, data, steam, input) {
       owned: game.owned,
       wishlisted: game.wishlisted,
       wishlistedAt: day(game.wishlistedAt),
+      gameType: classifications.get(game.appid) || 'solo',
       image: game.iconHash
         ? `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.iconHash}.jpg`
         : summary?.image || null,
@@ -165,6 +215,9 @@ async function preview(db, data, steam, input) {
       missingOwned: missing.filter((game) => game.owned).length,
       missingWishlist: missing.filter((game) => game.wishlisted).length,
       matching: source.length,
+      types: Object.fromEntries([...GAME_TYPES].map((type) => [
+        type, sourceCandidates.filter((game) => classifications.get(game.appid) === type).length,
+      ])),
       playtimeReadable: steam.owned.some((game) => Number(game.minutes) > 0),
       ownedState: steam.ownedState, wishlistState: steam.wishlistState,
     },

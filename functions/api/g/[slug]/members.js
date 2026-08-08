@@ -23,6 +23,7 @@ export async function onRequestGet({ env, data }) {
       role: data.group.role,
       mode: data.group.workspace_mode,
       blindRating: !!data.group.blind_rating,
+      historyPrompts: !!data.group.history_prompts,
       // Only an owner needs the code, and only they can rotate it.
       inviteCode: data.group.role === 'owner' && data.group.workspace_mode === 'coop'
         ? data.group.invite_code : null,
@@ -49,6 +50,13 @@ export async function onRequestPatch({ request, env, data }) {
     if (name.length < 1) return bad('name cannot be empty');
     await env.DB.prepare('UPDATE memberships SET short_name = ? WHERE group_id = ? AND steam_id = ?')
       .bind(name, gid, data.user.steam_id).run();
+  }
+
+  if (patch.historyPrompts != null) {
+    await env.DB.prepare(
+      `INSERT INTO member_preferences (group_id,steam_id,history_prompts) VALUES (?,?,?)
+       ON CONFLICT(group_id,steam_id) DO UPDATE SET history_prompts=excluded.history_prompts`
+    ).bind(gid, data.user.steam_id, patch.historyPrompts ? 1 : 0).run();
   }
 
   if (patch.name != null) {
@@ -117,6 +125,10 @@ export async function onRequestPatch({ request, env, data }) {
                                    WHEN max_players < 2 THEN 4 ELSE max_players END,
                 invite_code = CASE WHEN ?2 = 'personal' THEN NULL ELSE invite_code END
           WHERE id = ?1`
+      ).bind(gid, mode),
+      env.DB.prepare(
+        `UPDATE group_invites SET status='cancelled', responded_at=unixepoch()
+          WHERE group_id=?1 AND status='pending' AND ?2='personal'`
       ).bind(gid, mode),
     ]);
   }
