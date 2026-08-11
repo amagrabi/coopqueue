@@ -16,7 +16,7 @@ are in [`PERSONAL_STEAM_HISTORY.md`](PERSONAL_STEAM_HISTORY.md).
 |---|---|---|
 | Cloudflare account | `amadeus.magrabi@googlemail.com` | free plan throughout |
 | Pages project | `coopqueue` | serves `public/` + `functions/` |
-| Live URL | <https://coopqueue.pages.dev> | production branch is `main` |
+| Live URL | <https://coopqueue.app> | custom domain; production branch is `main` |
 | D1 database | `g4m1ng` (`f16e7e1e-e2c3-463b-b1e4-158bc961de92`) | id is committed in `wrangler.toml` |
 | Cron Worker | `coopq-crawler` (`crawler/`) | hourly, binds the same D1 |
 

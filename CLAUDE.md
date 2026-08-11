@@ -17,10 +17,11 @@ Keep them in sync when behaviour changes. This file is the one with the numbers.
 
 ## The name
 
-The product is **CoopQueue**, live at **<https://coopqueue.pages.dev>**. The Pages
-project is `coopqueue`; the old `g4m1ng` project has been deleted and that URL is
-gone. `coopq.pages.dev` was not available — `*.pages.dev` names are globally
-unique across all Cloudflare accounts, and `coopq` is taken by someone else.
+The product is **CoopQueue**, live at **<https://coopqueue.app>**. The Pages project
+is `coopqueue`, with `coopqueue.pages.dev` retained as its deployment host; the old
+`g4m1ng` project has been deleted and that URL is gone. `coopq.pages.dev` was not
+available — `*.pages.dev` names are globally unique across all Cloudflare accounts,
+and `coopq` is taken by someone else.
 
 Every remaining `g4m1ng` in this repo is deliberate and must not be "tidied up".
 They are three unrelated identifiers that happen to share the old name:
@@ -339,7 +340,7 @@ crawler will never retry it.
 
 ## State
 
-**Live at <https://coopqueue.pages.dev>** (Cloudflare account
+**Live at <https://coopqueue.app>** (Cloudflare account
 amadeus.magrabi@googlemail.com, Pages project `coopqueue`, D1 `g4m1ng` =
 `f16e7e1e-e2c3-463b-b1e4-158bc961de92`, committed into `wrangler.toml`).
 `SESSION_SECRET` and `STEAM_API_KEY` are set on the **production** environment

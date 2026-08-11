@@ -46,7 +46,7 @@ identities; no member account, avatar, invite code or private comment is shown.
 The public landing page is also the one canonical, indexable URL. Its search and
 sharing metadata lives in `public/index.html`; `public/robots.txt` keeps API routes
 out of crawlers, and `public/sitemap.xml` lists the canonical page. Keep all three
-on `https://coopqueue.pages.dev/` unless the production domain changes, then update
+on `https://coopqueue.app/` unless the production domain changes, then update
 them together. Do not add estimated sitemap dates or review scores: search metadata
 must describe facts the app can substantiate.
 
@@ -279,7 +279,7 @@ Imported games have names but no Steam links, so the queue has no trailers for
 them yet. Sign in, open your group, and:
 
 ```bash
-curl -X POST https://coopqueue.pages.dev/api/g/g4m1ng/enrich \
+curl -X POST https://coopqueue.app/api/g/g4m1ng/enrich \
      -H "Cookie: g4_session=..."   # copy from browser devtools
 ```
 

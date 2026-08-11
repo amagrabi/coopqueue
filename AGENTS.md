@@ -17,7 +17,7 @@ A multi-tenant co-op game tracker. Cloudflare Pages + Pages Functions + D1
 edit a file and deploy. `wrangler` is the only devDependency; `public/vendor/hls.min.js`
 is the only vendored runtime dependency.
 
-Live at <https://coopqueue.pages.dev>.
+Live at <https://coopqueue.app>.
 
 ## Before you finish
 
