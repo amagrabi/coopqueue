@@ -248,6 +248,29 @@ db.exec(`INSERT INTO playtime_sync (steam_id, games, played, synced_at) VALUES
   ('${ME}',122,98,unixepoch()), ('${LEO_ACCOUNT}',455,0,unixepoch())`);
 db.exec(`INSERT INTO group_library_sync (group_id, steam_id, games, played, synced_at) VALUES
   (1,'${ME}',122,98,unixepoch()), (1,'${LEO_ACCOUNT}',455,0,unixepoch())`);
+
+/* The reported case, made visible locally: backlog games the GROUP has never
+   played that somebody has already played alone. Without this the replay question
+   has no evidence to trigger on in the co-op fixture, since no seeded game carries
+   a Steam appid. The appids are synthetic — the harness never calls Steam. */
+db.exec(`UPDATE games SET steam_appid=990043 WHERE id=43 AND group_id=1`);   // Dune Awakening
+db.exec(`UPDATE games SET steam_appid=990077 WHERE id=77 AND group_id=1`);   // Baldurs Gate 3
+db.exec(`INSERT OR REPLACE INTO playtime (steam_id, appid, minutes, fetched_at) VALUES
+  ('${ME}',990043,4200,unixepoch()),
+  ('seed:1:pat',990077,9000,unixepoch())`);
+// One answer already given, so Play next has both chips to render.
+db.exec(`INSERT INTO ratings (game_id, steam_id, score, replay) VALUES (77,'seed:1:pat',9,'no')
+         ON CONFLICT(game_id, steam_id) DO UPDATE SET replay='no'`);
+
+/* Seeded games carry no price — enrichment writes it in production — so the budget
+   filter would have nothing to filter locally. A deterministic spread in Steam's
+   own `cc=de` format, including a free game and a seventh left unpriced so the
+   "no price on file" path is visible too. */
+db.exec(`UPDATE games SET price = CASE id % 7
+           WHEN 0 THEN '59,99€' WHEN 1 THEN '39,99€' WHEN 2 THEN '29,99€'
+           WHEN 3 THEN '19,99€' WHEN 4 THEN '9,99€'  WHEN 5 THEN 'Free'
+           ELSE NULL END
+         WHERE group_id=1 AND price IS NULL`);
 if (SCENARIO === 'member') {
   // Ama has already claimed their imported identity.
   db.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (1,'${ME}','Ama','owner')`);
@@ -337,7 +360,7 @@ function libraryFor(gid, need) {
        FROM games g LEFT JOIN coop_apps c ON c.appid = g.steam_appid
       WHERE g.group_id=? ORDER BY g.name COLLATE NOCASE`, gid);
   const ratings = q(
-    'SELECT r.game_id, r.steam_id, r.score, r.comment FROM ratings r JOIN games g ON g.id=r.game_id WHERE g.group_id=?', gid);
+    'SELECT r.game_id, r.steam_id, r.score, r.comment, r.replay FROM ratings r JOIN games g ON g.id=r.game_id WHERE g.group_id=?', gid);
   const members = q(
     `SELECT m.steam_id, m.short_name, m.is_seed, u.avatar, u.display_name
        FROM memberships m JOIN users u ON u.steam_id=m.steam_id
@@ -350,9 +373,12 @@ function libraryFor(gid, need) {
        LEFT JOIN group_library_sync s
               ON s.group_id=m.group_id AND s.steam_id=COALESCE(a.steam_id,m.steam_id)
       WHERE m.group_id=?`, gid);
-  const owned = new Set(q(
-    `SELECT p.steam_id, p.appid FROM playtime p
-       JOIN games g ON g.steam_appid=p.appid AND g.group_id=?`, gid)
+  const playRows = q(
+    `SELECT p.steam_id, p.appid, p.minutes FROM playtime p
+       JOIN games g ON g.steam_appid=p.appid AND g.group_id=?`, gid);
+  const owned = new Set(playRows.map((row) => `${row.steam_id}:${row.appid}`));
+  // An hour, the same floor lib/ownership.js uses. See PLAYED_MINUTES there.
+  const playedApps = new Set(playRows.filter((row) => Number(row.minutes) >= 60)
     .map((row) => `${row.steam_id}:${row.appid}`));
   const factSources = new Map();
   for (const source of q(
@@ -393,10 +419,15 @@ function libraryFor(gid, need) {
           && member.synced_at >= (g.enriched_at ?? g.created_at);
         return [member.steam_id, fresh ? false : null];
       }));
+      const playedBy = g.steam_appid
+        ? ownershipMembers.filter((m) => playedApps.has(`${m.account}:${g.steam_appid}`))
+            .map((m) => m.steam_id)
+        : [];
       return { ...g, votes: Object.fromEntries(votes.map((v) => [v.steam_id, v.score])),
                comments: [], ...scoreGame(votes), notPlayed: satOut.get(g.id) || [],
                mySkip: mySkips.get(g.id) || null, factSources: factSources.get(g.id) || {},
-               ownership, viability: viability(g, need) };
+               replay: Object.fromEntries(votes.filter((v) => v.replay).map((v) => [v.steam_id, v.replay])),
+               playedBy, ownership, viability: viability(g, need) };
     }),
   };
 }
@@ -440,9 +471,29 @@ const server = http.createServer(async (req, res) => {
     return send(res, 401, { error: 'not signed in' });
   }
 
+  if (p === '/api/me' && req.method === 'PATCH') {
+    const b = await readBody(req);
+    if (!('defaultGroup' in b)) return send(res, 400, { error: 'nothing to change' });
+    if (b.defaultGroup == null) {
+      db.prepare('UPDATE member_preferences SET default_workspace=0 WHERE steam_id=?').run(ME);
+      return send(res, 200, { ok: true, defaultGroup: null });
+    }
+    const group = one(
+      'SELECT g.id FROM groups g JOIN memberships m ON m.group_id=g.id AND m.steam_id=? WHERE g.slug=?',
+      ME, String(b.defaultGroup));
+    if (!group) return send(res, 404, { error: 'no such workspace' });
+    // Clear before set, exactly like the route: one default row per account.
+    db.prepare('UPDATE member_preferences SET default_workspace=0 WHERE steam_id=? AND group_id<>?')
+      .run(ME, group.id);
+    db.prepare(`INSERT INTO member_preferences (group_id,steam_id,default_workspace) VALUES (?,?,1)
+                ON CONFLICT(group_id,steam_id) DO UPDATE SET default_workspace=1`).run(group.id, ME);
+    return send(res, 200, { ok: true, defaultGroup: String(b.defaultGroup) });
+  }
+
   if (p === '/api/me') {
     const groups = q(
       `SELECT g.slug, g.name, m.role, m.short_name, COALESCE(w.mode,'coop') AS mode,
+              COALESCE(pr.default_workspace,0) AS is_default,
               (SELECT COUNT(*) FROM memberships mm WHERE mm.group_id=g.id) AS members,
               (SELECT COUNT(*) FROM games gg WHERE gg.group_id=g.id) AS games,
               (SELECT COUNT(*) FROM games gg WHERE gg.group_id=g.id
@@ -450,6 +501,7 @@ const server = http.createServer(async (req, res) => {
                  AND NOT EXISTS (SELECT 1 FROM skips s WHERE s.game_id=gg.id AND s.steam_id=?1)) AS unrated
          FROM groups g LEFT JOIN workspace_settings w ON w.group_id=g.id
          JOIN memberships m ON m.group_id=g.id
+         LEFT JOIN member_preferences pr ON pr.group_id=m.group_id AND pr.steam_id=m.steam_id
         WHERE m.steam_id=?1 ORDER BY g.name COLLATE NOCASE`, ME);
     return send(res, 200, {
       user: { steamId: ME, displayName: 'Amadeus', avatar: null },
@@ -987,10 +1039,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, shortName: seed.short_name });
     }
     if (sub === '/rate' && req.method === 'POST') {
-      const { gameId, score } = await readBody(req);
+      const payload = await readBody(req);
+      const { gameId, score } = payload;
       if (!one('SELECT 1 AS x FROM games WHERE id=? AND group_id=?', gameId, gid)) return send(res, 404, { error: 'no such game' });
       db.prepare(`INSERT INTO ratings (game_id, steam_id, score) VALUES (?,?,?)
                   ON CONFLICT(game_id, steam_id) DO UPDATE SET score=excluded.score`).run(gameId, ME, score);
+      // Only when sent, exactly like the route: an ordinary save must not clear it.
+      if ('replay' in payload) {
+        const replay = payload.replay == null ? null : String(payload.replay);
+        if (replay !== null && !['yes', 'maybe', 'no'].includes(replay)) {
+          return send(res, 400, { error: 'replay must be yes, maybe or no' });
+        }
+        db.prepare('UPDATE ratings SET replay=? WHERE game_id=? AND steam_id=?').run(replay, gameId, ME);
+      }
       return send(res, 200, { ok: true });
     }
     if (sub === '/skip' && req.method === 'DELETE') {

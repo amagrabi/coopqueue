@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 170 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 181 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -380,7 +380,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-170/170 assertions pass. `npm run test:ui` does **not** run on macOS: it
+181/181 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -981,6 +981,160 @@ Workspace entry still prefers Rate while its queue has work. A `/queue` entry wi
 no unrated games instead opens Library, or Find games if the active library itself is
 empty; an explicit later click on the Rate tab still exposes its completed state.
 The game detail dialog closes through its X, Escape, or a click on the backdrop.
+
+## "Would you play it again?"
+
+The queue asks two unrelated questions and stores both answers in `ratings.score`.
+Which one you are answering depends on `games.status`: a played game asks *how good
+was it*, a backlog game asks *how much do you want to play this*. That holds until
+the group's history and yours differ — somebody finished a game solo that the group
+has never played. Then rating it 9 ("it was great") reads as "keen to play", and
+rating it 3 to keep it off Play next corrupts the only quality signal there is.
+
+So the score keeps meaning quality and appetite gets `ratings.replay`
+(migration 030): `yes | maybe | no`, three states rather than a second slider,
+because the useful distinctions are enthusiasm, indifference and refusal.
+
+**NULL means never asked, and a non-NULL value is also the record that this person
+has played the game** — which is why there is no separate "I played this" column.
+
+**The question is only asked where the two answers can differ**: `modeOf(g) ===
+'want'`, i.e. the group has not played it. Rating coverage is this app's core
+problem, so a second question on every card would be the wrong trade.
+
+**Who has already played it comes from Steam, not from a person.** `playtime` is
+already synced for the hours estimate and ownership, so `ownershipForGames()`
+returns `playedByGame` off the same rows at a 60-minute floor — the hour
+`lib/history.js` already uses before counting somebody as a participant. The
+evidence is one-directional: hidden playtime is indistinguishable from never
+launching it, so an empty result is silence, and the card offers a manual
+**I've played this before** rather than treating it as "you have not". That reveal
+is also the whole story for non-Steam games.
+
+**It is spent in exactly one place: chips on Play next.** It changes no ranking and
+no coverage denominator. Silently demoting a game somebody has played would be the
+removed weighted score again — a number you cannot reconstruct from the column
+beside it. Somebody who has "had enough" is not also listed as having played it;
+the second chip says that already.
+
+`rate.js` only touches the column when the request carries the key, so an ordinary
+save from the Played tab cannot clear an answer by not mentioning it; sending
+`null` clears it on purpose. Five assertions, including that one.
+
+## Budget on Play next
+
+A slider capping the price per person, off by default (`BUDGET_STEPS`, last
+position = no cap). `games.price` is Steam's own display string for the region the
+catalogue was fetched with — `"29,99€"`, or the literal `"Free"` for a free-to-play
+app — so `priceCents()` parses it back rather than a second numeric column
+disagreeing with the chip beside it. Whichever of `,` and `.` comes last is the
+decimal separator, so both locales' formats work.
+
+**A game with no price is excluded when a cap is set, not silently kept.** Listing
+it under "up to €30" promises something the data cannot support, which is the same
+call invariant 6 makes for an unverified player cap. Both exclusions are counted
+back to the user separately — "13 over budget · 7 with no price on file" — because
+one is a decision and the other is an admission. Prices are the cached list price
+and do not track sales; the note says so.
+
+`priceCents` is defined once in `app.js` and `test/isolation.mjs` reads it out of
+the file the way `scripts/validate-palette.mjs` reads `SERIES`, for the same
+reason: a second copy of a parser is a second copy that goes stale.
+
+## Rating from the game detail panel
+
+Every other fact on that panel is editable in place; your own score used to be the
+exception, and changing it meant closing the dialog and hunting the game down in
+the Rate tab's Already rated list — 110 entries for the owner of group 1. Your row
+in `.detail-votes` is now the control: the bar becomes a slider in the same
+three-column geometry, so it stands exactly where everyone else's bar does.
+
+**This forced a blind-rating fix, and that fix matters more than the feature.** The
+panel painted every member's score unconditionally, ignoring `groups.blind_rating`.
+That was already a leak while the panel was read-only. Once you can rate from here
+it would be a *hole* — you could defeat a group setting by opening a dialog. Other
+scores are now hidden until you have voted, and the unrated slider starts neutral
+rather than on the group average, on the rate card's own rule: hiding the numbers
+while still anchoring the handle on them would defeat the point.
+
+Saving is an explicit button that appears only once the slider differs from your
+saved score. Not save-on-release: a rating takes the game out of your queue and
+clears any skip, which is too much to happen from a stray drag. And not the
+panel's "Save changes", because a score goes to `/rate` while everything else on
+that form goes to `PATCH /games/:id`, and one button hitting two endpoints can
+half-fail.
+
+Both callers go through `postRating()`. A score is not just a number on a row — it
+removes the game from your queue, clears the skip (server-side too, so a stale
+local copy strands the card in the Skipped list) and moves your coverage bar. A
+second copy of that would eventually forget one step. The panel only reopens itself
+after saving when blind rating was hiding something, so an ordinary re-rate does not
+throw away your scroll position and reload the comment thread.
+
+## The Rate tab's queue list
+
+Card and queue side by side at ≥1100px, where the list is a standing sticky panel;
+below that it stays the `<details>` disclosure it always was, because a phone has
+no column to spare. The list is **first in the DOM** so narrow screens get it above
+the card as before, and CSS places it in the second column — `syncQueuePane()`
+forces `open` on wide screens, where the summary is hidden and a toggle would be a
+control that does nothing. A queue of one hides the list entirely, so
+`.rate-layout:has(> .rate-list[hidden])` drops the column with it rather than
+pinning 300px of nothing beside the card.
+
+Search filters the current mode. **`data-i` stays the index into the unfiltered
+queue**, because that is what `state.qIndex` means; renumbering it would send a
+filtered click to the wrong game. Typing re-renders the list *only* — going through
+`renderQueue()` on every keystroke rebuilds the card and restarts its trailer.
+
+A search finding nothing while the game plainly exists is the obvious trap, since
+rated and unrated games live in different tabs and one of them usually holds nearly
+everything. So an empty result names the other tabs ("Nothing here. 2 in Already
+rated") and switching keeps the term. Shortcuts are safe: `onKey` already bails
+when focus is in an `INPUT`, so typing "s" cannot skip the card.
+
+## The two skip keys
+
+The rating card's shortcut legend used to read `S skip · N didn't play`, which made
+N look like a clumsier name for the same thing. They are the two *buttons*: **S is
+"No opinion"** and **N is "I didn't play this"** — the distinction migration 016
+exists to preserve, and only the second leaves your coverage denominator. The
+legend now names the buttons, and its two halves hide with them, so `want` mode no
+longer advertises a key for a question ("were you there?") it does not ask.
+
+The slider's hint had the same shape of bug and is fixed with it: it read off
+`state.rateMode`, so a finished game opened from **Already rated** asked "how much
+do you want to play this?". It follows `modeOf(g)` now — the question belongs to
+the game, not the tab, and Already rated and Skipped both list the two kinds
+together.
+
+## The default workspace
+
+Which workspace a hash-less visit opens. It used to be `state.groups[0]` — first by
+name, an arbitrary answer that moves when somebody renames a group. The star in the
+workspace switcher sets it; clicking the lit star clears it, so the control is its
+own undo. Hidden when you have one workspace, because there is nothing to choose.
+
+**A hash naming a workspace you are in still wins**, so a link somebody sent you
+opens what it says rather than being overridden by your default. The star only
+decides where you land with nothing in the URL.
+
+It lives on `member_preferences.default_workspace` rather than a per-account table,
+for two properties that come free with that shape:
+
+- the composite foreign key cascades from `memberships`, so **leaving a group clears
+  the default** instead of leaving a dangling id the boot path has to defend against;
+- a partial unique index (`ON member_preferences(steam_id) WHERE default_workspace =
+  1`) makes "at most one default per account" a database constraint. That index is
+  why `PATCH /api/me` clears the old row *before* setting the new one — the other
+  order trips it mid-batch.
+
+The write is `PATCH /api/me`, deliberately **above** the group middleware: the choice
+spans every workspace you belong to, so a group-scoped route would have to write
+outside its own `group_id`, and the control is account chrome rather than a group
+setting. Its membership lookup is the tenancy check and returns **404** for a slug
+you are not in, the same 404 an unknown slug gets — otherwise it becomes a probe for
+which private workspaces exist. Five assertions cover it, including that one.
 
 ## Recommendations, and the co-op filter
 

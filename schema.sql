@@ -79,10 +79,19 @@ CREATE TABLE member_preferences (
   group_id        INTEGER NOT NULL,
   steam_id        TEXT    NOT NULL,
   history_prompts INTEGER NOT NULL DEFAULT 0 CHECK (history_prompts IN (0,1)),
+  -- Which workspace a hash-less visit opens. Living here rather than in a
+  -- per-account table means leaving a group cascades the choice away, so the boot
+  -- path can never be pointed at a workspace you are no longer in.
+  default_workspace INTEGER NOT NULL DEFAULT 0 CHECK (default_workspace IN (0,1)),
   PRIMARY KEY (group_id, steam_id),
   FOREIGN KEY (group_id, steam_id) REFERENCES memberships(group_id, steam_id)
     ON DELETE CASCADE
 );
+
+-- "At most one default per account" as a constraint rather than a convention.
+-- Mirrors migrations/029-default-workspace.sql.
+CREATE UNIQUE INDEX idx_member_default_workspace
+  ON member_preferences(steam_id) WHERE default_workspace = 1;
 
 -- A direct invitation names an existing account but does not create membership.
 -- The recipient must explicitly accept before the tenancy boundary lets them in.
@@ -216,6 +225,12 @@ CREATE TABLE ratings (
   steam_id   TEXT    NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
   score      REAL    NOT NULL CHECK (score >= 1 AND score <= 10),
   comment    TEXT,
+  -- Would you play it again with this group? Only asked where the score cannot
+  -- answer it: a game the GROUP has not played but you personally have, where
+  -- "it was great" and "I want to play it again" are different statements.
+  -- NULL means never asked; any value is also the record that you have played it.
+  -- Mirrors migrations/030-replay-appetite.sql.
+  replay     TEXT    CHECK (replay IS NULL OR replay IN ('yes','maybe','no')),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   PRIMARY KEY (game_id, steam_id)
 );

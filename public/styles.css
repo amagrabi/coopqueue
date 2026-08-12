@@ -273,6 +273,15 @@ kbd {
 .rate-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; align-items: center; }
 .kbd-hint { font-size: 12px; color: var(--text-muted); margin: 14px 0 0; }
 
+/* "Would you play it again?" — sits between the group's opinions and your own
+   score, because it is context for the number you are about to give. */
+.replay-ask { display: grid; gap: 8px; margin: 4px 0 2px; }
+.replay-ask-label { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.replay-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.replay-opts .seg { border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; }
+.replay-opts .seg.is-on { border-color: rgba(57,135,229,.55); }
+.replay-reveal { justify-self: start; margin: 4px 0 2px; }
+
 /* ───────────────────────────── play next ──────────────────────────────── */
 .attendee-filter { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .attendee-filter legend {
@@ -287,6 +296,23 @@ kbd {
 }
 .attendee:has(input:checked) { border-color: rgba(57,135,229,.55); color: var(--text-primary); }
 .attendee input { margin: 0; }
+.budget-filter {
+  display: grid; grid-template-columns: auto minmax(140px, 260px) auto; gap: 12px;
+  align-items: center; margin: 0 0 18px;
+}
+.budget-filter label {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.budget-filter output { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+/* The note explains what was hidden, so it spans the row rather than squeezing
+   in beside the slider. */
+.budget-filter .view-sub { grid-column: 1 / -1; margin: 0; }
+.budget-filter .view-sub:empty { display: none; }
+@media (max-width: 560px) {
+  .budget-filter { grid-template-columns: minmax(0,1fr) auto; }
+  .budget-filter label { grid-column: 1 / -1; }
+}
 .rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rank-row {
   display: grid; grid-template-columns: 40px 92px minmax(0,1fr) auto; gap: 16px; align-items: center;
@@ -497,17 +523,48 @@ td.miss { color: #4a4a47; }
    reads as absence rather than as a very low rating. */
 .other-out { color: var(--text-muted); font-style: italic; }
 
-/* The queue, listed. Collapsed by default so the card stays the focus. */
-.rate-list { margin-top: 10px; }
+/* The queue, listed. A disclosure on narrow screens so the card stays the focus;
+   a standing panel beside the card once there is a column to spare. */
+.rate-layout { display: grid; gap: 18px; align-items: start; }
+.rate-list { margin-top: 10px; min-width: 0; }
 .rate-list > summary {
   cursor: pointer; font-size: 13px; color: var(--text-muted);
   padding: 4px 0; width: fit-content; list-style-position: inside;
 }
 .rate-list > summary:hover { color: var(--text-secondary); }
+.rate-list-body { display: grid; gap: 8px; margin-top: 8px; }
+.rate-search { font-size: 13px; padding: 7px 10px; }
 .rate-list-items {
-  list-style: none; margin: 8px 0 0; padding: 6px;
+  list-style: none; margin: 0; padding: 6px;
   max-height: 280px; overflow-y: auto;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+}
+.rate-list-items:empty { display: none; }
+.rate-list-none { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+/* A button that reads as a link: switching tab is a navigation, not a form action,
+   and a full button here would out-shout the list it sits under. */
+.linkish {
+  font: inherit; font-size: 12.5px; background: none; border: 0; padding: 0;
+  color: var(--series-1); cursor: pointer; text-decoration: underline;
+}
+.linkish:hover { color: var(--text-primary); }
+
+@media (min-width: 1100px) {
+  /* Explicit placement rather than DOM order: the list comes first in the markup so
+     a phone gets it above the card, but reads better to the right of it here. */
+  .rate-layout { grid-template-columns: minmax(0,1fr) 300px; gap: 22px; }
+  /* A queue of one hides the list entirely; without this the column it left behind
+     is 300px of nothing pinned beside the card. */
+  .rate-layout:has(> .rate-list[hidden]) { grid-template-columns: minmax(0,1fr); }
+  .rate-layout > .rate-card { grid-column: 1; grid-row: 1; }
+  .rate-layout > .rate-list { grid-column: 2; grid-row: 1; margin-top: 0; }
+  /* Forced open by syncQueuePane(), so the toggle would be a control that does
+     nothing. Sticky under the topbar: the card is tall, and a queue you have to
+     scroll back up to reach is the black box this was meant to fix. */
+  .rate-list > summary { display: none; }
+  .rate-list { position: sticky; top: 76px; }
+  .rate-list-body { margin-top: 0; }
+  .rate-list-items { max-height: calc(100vh - 190px); }
 }
 .rate-jump {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
@@ -646,6 +703,12 @@ td.miss { color: #4a4a47; }
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600;
 }
+/* Your own row is a control, so it gets the same three-column geometry as the bars
+   it sits among — the slider stands exactly where everyone else's bar does. */
+.detail-score { width: 100%; margin: 0; }
+.detail-vote-mine .detail-vote-name::after { content: ' (you)'; font-weight: 400; opacity: .6; }
+.detail-vote-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.detail-vote-actions .field-help { margin: 0; }
 .detail-field { display: grid; gap: 5px; }
 .detail-field label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); font-weight: 600; }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -849,15 +912,28 @@ td.miss { color: #4a4a47; }
 .group-btn > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .caret { color: var(--text-muted); font-size: 11px; }
 .group-menu {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 260px;
+  /* Wide enough that the star column does not push "· 15 to rate" onto a second
+     line. The mobile rule below drops the floor and lets the meta wrap instead. */
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 296px;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 6px; box-shadow: var(--shadow); display: grid; gap: 2px;
 }
+/* The star is a sibling of the switch button, never inside it: nested interactive
+   controls are invalid, and starring a workspace must not also navigate to it. */
+.group-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; }
 .group-item {
   font: inherit; text-align: left; padding: 9px 12px; border-radius: var(--radius-sm);
   background: transparent; border: 0; color: var(--text-primary); cursor: pointer; display: grid; gap: 3px;
+  min-width: 0;
 }
 .group-item:hover { background: var(--surface-2); }
+.group-pin {
+  font: inherit; font-size: 15px; line-height: 1; padding: 0 11px; border: 0; cursor: pointer;
+  background: transparent; color: var(--text-muted); opacity: .35; border-radius: var(--radius-sm);
+}
+.group-pin:hover, .group-pin:focus-visible { opacity: 1; background: var(--surface-2); }
+.group-pin:focus-visible { outline: 2px solid var(--series-1); outline-offset: -2px; }
+.group-pin[aria-checked="true"] { color: var(--series-4); opacity: 1; }
 .group-item.is-current { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--series-1); }
 .group-item-name { font-size: 14px; font-weight: 600; }
 .group-item-meta { font-size: 11.5px; color: var(--text-muted); }

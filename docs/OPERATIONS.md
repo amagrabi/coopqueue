@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 170 assertions — ALWAYS before a deploy
+npm test          # 181 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -236,6 +236,36 @@ and safe to retry. Missing `member_preferences` rows deliberately mean history
 prompts are off. A `group_invites` row never grants access by itself; membership
 is inserted only after the named account accepts. The new code joins both tables
 during normal page loads, so migrate before deploying.
+
+### Migration 029: default workspace
+
+Apply `migrations/029-default-workspace.sql` before deploying the workspace
+switcher's star:
+
+```bash
+npx wrangler d1 execute g4m1ng --remote --file=migrations/029-default-workspace.sql
+```
+
+`/api/me` joins the new column on every page load, so migrate before deploying.
+Unlike 028 this one contains an `ALTER TABLE ADD COLUMN`, which SQLite has no
+`IF NOT EXISTS` form for: a retry fails with `duplicate column name:
+default_workspace` and changes nothing. That error means it already applied.
+
+### Migration 030: replay appetite
+
+Apply `migrations/030-replay-appetite.sql` before deploying the "would you play it
+again" question:
+
+```bash
+npx wrangler d1 execute g4m1ng --remote --file=migrations/030-replay-appetite.sql
+```
+
+It adds one nullable column to `ratings`. The library route selects it on every
+group load, so migrate first. Same retry behaviour as 029: a second run fails with
+`duplicate column name: replay` and changes nothing.
+
+Both 029 and 030 are additive column adds — no table rebuild, so none of migration
+017's cascade hazards apply. Take `npm run db:backup` first anyway.
 
 ---
 

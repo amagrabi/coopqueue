@@ -1,20 +1,33 @@
 import { json, bad, body, cleanScore } from '../../../../lib/http.js';
 
+const REPLAY = new Set(['yes', 'maybe', 'no']);
+
 /** Upsert my rating. Re-rating overwrites; there is no history to keep. */
 export async function onRequestPost({ request, env, data }) {
-  const { gameId, score, comment } = await body(request);
+  const payload = await body(request);
+  const { gameId, score, comment } = payload;
   const id = Number(gameId);
   if (!Number.isInteger(id)) return bad('bad gameId');
 
   const s = cleanScore(score);
   if (s === null) return bad('score must be between 1 and 10');
 
+  /* Only touched when the caller actually sends the key. The rating card asks the
+     replay question on a minority of games, so an ordinary save must leave an
+     existing answer alone rather than clearing it as a side effect. Sending null
+     is how you clear it on purpose. */
+  const setsReplay = 'replay' in payload;
+  const replay = payload.replay == null ? null : String(payload.replay);
+  if (setsReplay && replay !== null && !REPLAY.has(replay)) {
+    return bad('replay must be yes, maybe or no');
+  }
+
   // Confirms the game exists *and* belongs to this group in one check.
   const exists = await env.DB.prepare('SELECT 1 FROM games WHERE id = ? AND group_id = ?')
     .bind(id, data.group.group_id).first();
   if (!exists) return bad('no such game', 404);
 
-  await env.DB.batch([
+  const statements = [
     env.DB.prepare(
       `INSERT INTO ratings (game_id, steam_id, score, comment, updated_at)
        VALUES (?,?,?,?,unixepoch())
@@ -23,9 +36,17 @@ export async function onRequestPost({ request, env, data }) {
     ).bind(id, data.user.steam_id, s, String(comment || '').trim().slice(0, 500) || null),
     // Rating clears any earlier skip, so the queue count stays honest.
     env.DB.prepare('DELETE FROM skips WHERE game_id = ? AND steam_id = ?').bind(id, data.user.steam_id),
-  ]);
+  ];
+  if (setsReplay) {
+    // After the upsert, so the row is guaranteed to exist on a first rating.
+    statements.push(
+      env.DB.prepare('UPDATE ratings SET replay = ? WHERE game_id = ? AND steam_id = ?')
+        .bind(replay, id, data.user.steam_id)
+    );
+  }
+  await env.DB.batch(statements);
 
-  return json({ ok: true, gameId: id, score: s });
+  return json({ ok: true, gameId: id, score: s, ...(setsReplay ? { replay } : {}) });
 }
 
 export async function onRequestDelete({ request, env, data }) {

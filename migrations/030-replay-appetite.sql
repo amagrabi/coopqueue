@@ -1,0 +1,36 @@
+-- CoopQueue migration 030 — "I already played it. Would I play it again?"
+--
+--   npm run db:migrate -- --file=./migrations/030-replay-appetite.sql
+--
+-- The rating queue asks two unrelated questions and stores both answers in the
+-- same column. Which one you are answering depends on `games.status`: a played
+-- game asks "how good was it?", a backlog game asks "how much do you want to play
+-- this?". That works right up until the group's history and YOUR history differ.
+--
+-- The reported case: somebody finished Dune Awakening solo. The group has not
+-- played it, so the queue asks about appetite — but they also have a quality
+-- opinion, and their appetite for a REPLAY is a third thing again. Rating it 9
+-- ("it was great") reads as "keen to play". Rating it 3 to keep it off Play next
+-- corrupts the only quality signal the library has.
+--
+-- So the score keeps meaning "how good was it" and appetite gets its own answer.
+-- Three states rather than a second slider: the useful distinctions are enthusiasm,
+-- indifference and refusal, and a 1-10 scale for that is false precision.
+--
+-- A column on `ratings` rather than a new table, for the reason migration 016 put
+-- `not_played` on `skips`: the row already carries the right cascade and the right
+-- tenancy path (ratings -> games.group_id), and it already travels with the library
+-- payload. One more table would need its own group-scoped delete and tenancy filter
+-- for one small enum.
+--
+-- NULL is load-bearing and means "never asked". A non-NULL value is also the record
+-- that this person has played the game — which is why there is no separate
+-- "I played this" column. Steam playtime answers that for most rows; this covers
+-- the rest (non-Steam games, and members who keep their playtime private).
+--
+-- Deliberately NOT wired into any ranking. It shows as a chip on Play next and
+-- nothing else. Silently correcting a displayed average is what the removed
+-- "weighted score" did, and it was removed for good reasons.
+
+ALTER TABLE ratings ADD COLUMN replay TEXT
+  CHECK (replay IS NULL OR replay IN ('yes','maybe','no'));

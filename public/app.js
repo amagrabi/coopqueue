@@ -18,6 +18,9 @@ const state = {
   queue: [],
   qIndex: 0,
   rateMode: 'played',   // 'played' | 'want' — see renderQueue
+  replayDraft: null,    // pending "would you play it again" answer for the open card
+  replayFor: null,      // the game id that draft belongs to
+  replayShown: false,   // revealed by hand when Steam has no playtime to prove it
   nextAttendees: null,  // selected member ids; null means everybody in the workspace
   history: null,        // current member's missing shared-history facts
   view: 'queue',
@@ -74,6 +77,45 @@ const viabilityFor = (game, need) => {
     reason: game.coop_note || `Caps out at ${cap} player${cap === 1 ? '' : 's'}, and ${need} are selected`,
   };
 };
+
+/* `games.price` is Steam's own display string for the region the catalogue was
+   fetched with (`cc=de`), so it looks like "29,99€" — or the literal "Free" for a
+   free-to-play app. Parsed back to cents here rather than stored as a number,
+   because the column is what Steam gave us and re-deriving beats a second source
+   of truth that can disagree with the chip beside it.
+
+   Returns null when there is no usable price, which the budget filter treats as
+   "cannot promise this fits" rather than as cheap — the same call invariant 6
+   makes for an unverified player cap, and for the same reason: it is the claim
+   that costs somebody money. */
+const priceCents = (text) => {
+  if (text == null) return null;
+  const s = String(text).trim();
+  if (!s) return null;
+  if (/^(free|kostenlos)/i.test(s)) return 0;
+  const digits = s.match(/\d[\d.,]*/);
+  if (!digits) return null;
+  const n = digits[0];
+  // Whichever separator comes last is the decimal point; the other groups
+  // thousands. "1.234,56" and "1,234.56" are the same number in two locales.
+  const cut = Math.max(n.lastIndexOf(','), n.lastIndexOf('.'));
+  const hasFraction = cut >= 0 && n.length - cut - 1 === 2;
+  const whole = Number((hasFraction ? n.slice(0, cut) : n).replace(/[.,]/g, ''));
+  const frac = hasFraction ? Number(n.slice(cut + 1)) : 0;
+  const cents = whole * 100 + frac;
+  return Number.isFinite(cents) ? cents : null;
+};
+
+/* Budget slider positions. Tighter where the decisions are (a €5 step matters at
+   €20 and not at €60), and the last position is "no cap" rather than a number, so
+   the default filters nothing. */
+const BUDGET_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80];
+/** The chosen cap in cents, or null for "any price". */
+const budgetCents = () => {
+  const i = Number($('#pn-budget')?.value ?? BUDGET_STEPS.length);
+  return i >= BUDGET_STEPS.length ? null : BUDGET_STEPS[i] * 100;
+};
+const euro = (cents) => `€${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
 /* ─────────────────────────────── api ─────────────────────────────────── */
 async function api(path, options = {}) {
@@ -448,11 +490,19 @@ function parseHash() {
   return m ? { slug: decodeURIComponent(m[1]), view: m[2] || 'queue' } : null;
 }
 
+/** Where a visit with no usable workspace in the URL lands: the one you starred,
+ *  otherwise the first by name — which is what this always did, and is an
+ *  arbitrary answer that moves when somebody renames a group. */
+const defaultGroupSlug = () =>
+  (state.groups.find((g) => g.is_default) || state.groups[0])?.slug;
+
 async function openFromHash() {
   const route = parseHash();
+  // A hash naming a workspace you are in always wins, so a link somebody sent you
+  // still opens what it says rather than being overridden by your default.
   const slug = route?.slug && state.groups.some((g) => g.slug === route.slug)
     ? route.slug
-    : state.groups[0]?.slug;
+    : defaultGroupSlug();
   if (!slug) return showOnboard();
 
   if (state.group?.slug !== slug) {
@@ -496,6 +546,7 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.model = lib.model;
   state.queue = q.queue;
   state.nextAttendees = null;
+  state.replayFor = null;
   state.history = null;
   historySeq++;
   invalidateViewCache();
@@ -577,13 +628,25 @@ function renderGroupMenu() {
     const key = group.name.trim().toLocaleLowerCase();
     nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
   }
-  const items = state.groups.map((g) => `
-    <button class="group-item${g.slug === state.group.slug ? ' is-current' : ''}" data-slug="${esc(g.slug)}" role="menuitem">
-      <span class="group-item-name">${esc(g.name)}</span>
-      <span class="group-item-meta">${nameCounts.get(g.name.trim().toLocaleLowerCase()) > 1 ? `${esc(g.slug)} · ` : ''}${
-        g.mode === 'personal' ? 'Personal' : `${g.members} member${g.members === 1 ? '' : 's'}`} · ${g.games} games${
-        g.unrated ? ` · <b>${g.unrated} to rate</b>` : ''}</span>
-    </button>`).join('');
+  // With one workspace there is nothing to choose between, so the star is noise.
+  const pinnable = state.groups.length > 1;
+  const items = state.groups.map((g) => {
+    const label = g.is_default
+      ? `${g.name} opens when you sign in — click to unset`
+      : `Open ${g.name} when you sign in`;
+    return `
+    <div class="group-row" role="none">
+      <button class="group-item${g.slug === state.group.slug ? ' is-current' : ''}" data-slug="${esc(g.slug)}" role="menuitem">
+        <span class="group-item-name">${esc(g.name)}</span>
+        <span class="group-item-meta">${nameCounts.get(g.name.trim().toLocaleLowerCase()) > 1 ? `${esc(g.slug)} · ` : ''}${
+          g.mode === 'personal' ? 'Personal' : `${g.members} member${g.members === 1 ? '' : 's'}`} · ${g.games} games${
+          g.unrated ? ` · <b>${g.unrated} to rate</b>` : ''}</span>
+      </button>
+      ${pinnable ? `<button class="group-pin" data-default="${esc(g.slug)}" role="menuitemradio"
+        aria-checked="${g.is_default ? 'true' : 'false'}" title="${esc(label)}" aria-label="${esc(label)}"
+      >★</button>` : ''}
+    </div>`;
+  }).join('');
   $('#group-menu').innerHTML = items + `
     <div class="group-menu-sep"></div>
     <button class="group-item" data-new role="menuitem"><span class="group-item-name">+ New workspace</span></button>
@@ -604,6 +667,24 @@ function renderGroupMenu() {
     }
     location.hash = `#/g/${b.dataset.slug}/queue`;
   }));
+
+  $$('#group-menu .group-pin').forEach((b) =>
+    b.addEventListener('click', () => void setDefaultGroup(b.dataset.default)));
+}
+
+/** Star a workspace, or unstar the one already starred. Clicking the current
+ *  default clears it rather than doing nothing, so the star is its own undo. */
+async function setDefaultGroup(slug) {
+  const wanted = state.groups.find((g) => g.is_default)?.slug === slug ? null : slug;
+  const name = state.groups.find((g) => g.slug === slug)?.name || slug;
+  try {
+    await api('/api/me', { method: 'PATCH', body: { defaultGroup: wanted } });
+    for (const g of state.groups) g.is_default = g.slug === wanted ? 1 : 0;
+    renderGroupMenu();
+    // The re-render replaced the button that was clicked, taking focus with it.
+    $(`#group-menu .group-pin[data-default="${CSS.escape(slug)}"]`)?.focus();
+    toast(wanted ? `${name} opens when you sign in` : `${name} is no longer your default`);
+  } catch (e) { toast(e.message); }
 }
 
 const closeGroupMenu = () => {
@@ -714,12 +795,31 @@ function wireOnce() {
     state.qIndex = 0;
     renderQueue();
   }));
+  /* Re-render the LIST only. Going through renderQueue on every keystroke would
+     rebuild the card and restart its trailer, which is very obvious with sound on. */
+  $('#rate-search').addEventListener('input', () => {
+    const byMode = queuesByMode();
+    renderQueueList(byMode[state.rateMode] || [], byMode);
+  });
   // The logo is the way back to useful work: rating when there is a queue, then
   // the existing library, and finally discovery for a completely empty workspace.
   $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView(workspaceHomeView()); });
   $('#btn-skip').addEventListener('click', () => skipGame(false));
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   $('#btn-unskip').addEventListener('click', unskipGame);
+  $$('#replay-opts .seg').forEach((b) => b.addEventListener('click', () => {
+    // Picking the chosen answer again clears it, so a mis-click is undoable
+    // without a fourth "actually, no answer" button.
+    state.replayDraft = state.replayDraft === b.dataset.replay ? null : b.dataset.replay;
+    const g = currentCard();
+    if (g) renderReplayAsk(g);
+  }));
+  $('#replay-reveal').addEventListener('click', () => {
+    state.replayShown = true;
+    const g = currentCard();
+    if (g) renderReplayAsk(g);
+    $('#replay-opts .seg')?.focus();
+  });
   // Unmuting one trailer means you want sound for the rest of the sitting.
   $('#rate-video').addEventListener('volumechange', (e) => { trailerMuted = e.target.muted; });
 
@@ -741,6 +841,7 @@ function wireOnce() {
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
   $('#hide-ea').addEventListener('change', renderNext);
+  $('#pn-budget').addEventListener('input', renderNext);
 
   let browseTimer;
   $('#browse-search').addEventListener('input', () => {
@@ -1012,11 +1113,14 @@ function renderQueue() {
   // Skipping something you have already scored is not an action — the score is the
   // opinion, and clearing it is what the queue would call unrated again.
   $('#btn-skip').hidden = state.rateMode === 'rated' || state.rateMode === 'skipped';
+  // The legend advertises keys, so it has to follow the buttons they press.
+  $('#kbd-skip').hidden = $('#btn-skip').hidden;
+  $('#kbd-notplayed').hidden = $('#btn-notplayed').hidden;
 
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
   $('#queue-card').hidden = empty;
-  renderQueueList(queue);
+  renderQueueList(queue, byMode);
   if (empty) {
     trailerSeq++;
     const video = $('#rate-video');
@@ -1034,7 +1138,10 @@ function renderQueue() {
     ? `${state.qIndex + 1} of ${queue.length}`
     : `${state.qIndex + 1} of ${queue.length} left`;
   $('#rate-desc').textContent = g.short_description || '';
-  $('#score-hint').textContent = state.rateMode === 'played'
+  /* The question follows the GAME, not the tab. In Already rated and Skipped both
+     kinds are listed together, and a finished game asking "how much do you want to
+     play this?" is the exact confusion the mode split exists to remove. */
+  $('#score-hint').textContent = modeOf(g) === 'played'
     ? 'how good was it?'
     : 'how much do you want to play this?';
 
@@ -1088,6 +1195,56 @@ function renderQueue() {
     : (others.length && !state.group.blindRating) ? Math.round(g.raw * 2) / 2 : 7.5;
   $('#score-range').value = start;
   $('#score-out').textContent = fmt(start, 1);
+
+  renderReplayAsk(g);
+}
+
+/**
+ * "Would you play it again?" — asked only where the score cannot answer it.
+ *
+ * The queue asks two different questions depending on the GROUP's status: played
+ * games get "how good was it", everything else gets "how much do you want to play
+ * this". Those collapse into one number right up until your history and the
+ * group's diverge — you finished it solo, they never played it. Then "it was
+ * great" and "I'd happily play it again" are separate facts, and forcing them
+ * through one slider means scoring a game you loved a 3 to keep it off Play next.
+ *
+ * Deliberately not asked of everyone. Rating coverage is this app's core problem,
+ * so a second question on every card would be the wrong trade; it appears only on
+ * the minority of games where the two answers can actually differ.
+ */
+function renderReplayAsk(g) {
+  const ask = $('#replay-ask');
+  const reveal = $('#replay-reveal');
+  if (state.replayFor !== g.id) {
+    state.replayFor = g.id;
+    state.replayDraft = g.replay?.[state.me.steamId] || null;
+    state.replayShown = false;
+  }
+
+  // Only where the group has not played it. On a game the group finished, the
+  // score already means "how good was it" and there is nothing to disentangle.
+  const relevant = modeOf(g) === 'want' && state.rateMode !== 'skipped';
+  // Steam already knows who has played what, so nobody should be typing it in.
+  // Hidden playtime looks identical to never having launched it, hence the
+  // manual reveal rather than treating silence as "you have not played this".
+  const evidence = (g.playedBy || []).includes(state.me.steamId);
+  const open = relevant && (evidence || state.replayDraft != null || state.replayShown);
+
+  ask.hidden = !open;
+  reveal.hidden = !relevant || open;
+  if (!open) return;
+
+  const personal = state.group.mode === 'personal';
+  $('#replay-ask-label').textContent = evidence
+    ? (personal ? 'You have played this already. Would you play it again?'
+                : 'You have played this already. Would you play it again with the group?')
+    : (personal ? 'Would you play it again?' : 'Would you play it again with the group?');
+  $$('#replay-opts .seg').forEach((b) => {
+    const on = b.dataset.replay === state.replayDraft;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
 }
 
 function metaChips(g, fit = g.viability, need = state.group.maxPlayers) {
@@ -1149,30 +1306,56 @@ async function saveRating() {
   if (!g) return;
   const slug = state.group.slug;
   const score = Number($('#score-range').value);
+  /* Only sent when the question was actually on screen. An ordinary save from the
+     Played tab must not carry `replay: null` and silently clear an answer given
+     back when the game was still in the backlog. */
+  const asked = !$('#replay-ask').hidden;
+  const replay = asked ? state.replayDraft : undefined;
   $('#btn-save').disabled = true;
   try {
-    await gapiFor(slug, '/rate', { method: 'POST', body: { gameId: g.id, score } });
-    if (state.group?.slug !== slug) return;
-    invalidateViewCache();
-    state.queue = state.queue.filter((id) => id !== g.id);
-    $('#queue-count').textContent = state.queue.length || '';
-    g.votes[state.me.steamId] = score;
-    // rate.js deletes any skip on the same game, so the local copy has to agree or
-    // the card lingers in the Skipped list until the next reload.
-    g.mySkip = null;
+    const saved = await postRating(slug, g, score, asked ? { replay } : {});
+    if (!saved) return;
+    if (asked) {
+      g.replay = { ...(g.replay || {}) };
+      if (replay) g.replay[state.me.steamId] = replay;
+      else delete g.replay[state.me.steamId];
+    }
     /* Revising does not shrink the list it came from, so nothing moves you along —
        step forward by hand, or the card sits there looking like it did not save. */
     if (state.rateMode === 'rated') state.qIndex++;
-    renderMyCoverage();   // the bar should move on every save, that is the point
     toast(`${g.name}: ${fmt(score, 1)}`);
     renderQueue();
-    void gapiFor(slug, '/games').then((lib) => {
-      if (state.group?.slug !== slug) return;
-      state.games = lib.games;
-      state.model = lib.model;
-    }).catch(() => { /* the optimistic score is already saved; the next reload reconciles */ });
   } catch (e) { toast(e.message); }
   finally { $('#btn-save').disabled = false; }
+}
+
+/**
+ * Write one rating and bring the local copy back into agreement.
+ *
+ * Shared by the rating card and the game detail panel rather than written twice:
+ * a score is not only a number on a row. It removes the game from your queue,
+ * clears any skip (rate.js deletes it server-side, so a stale local copy leaves
+ * the card in the Skipped list), and moves your coverage bar. A second copy of
+ * this would eventually forget one of those.
+ *
+ * Returns false when the workspace changed under a slow request, in which case the
+ * caller must not touch the UI it was about to update.
+ */
+async function postRating(slug, g, score, extra = {}) {
+  await gapiFor(slug, '/rate', { method: 'POST', body: { gameId: g.id, score, ...extra } });
+  if (state.group?.slug !== slug) return false;
+  invalidateViewCache();
+  state.queue = state.queue.filter((id) => id !== g.id);
+  $('#queue-count').textContent = state.queue.length || '';
+  g.votes[state.me.steamId] = score;
+  g.mySkip = null;
+  renderMyCoverage();   // the bar should move on every save, that is the point
+  void gapiFor(slug, '/games').then((lib) => {
+    if (state.group?.slug !== slug) return;
+    state.games = lib.games;
+    state.model = lib.model;
+  }).catch(() => { /* the optimistic score is already saved; the next reload reconciles */ });
+  return true;
 }
 
 /**
@@ -1186,32 +1369,83 @@ async function saveRating() {
  * Rebuilt on every card because the queue shrinks as you rate, and the current
  * position has to stay marked.
  */
-function renderQueueList(queue) {
-  const box = $('#rate-list');
-  box.hidden = queue.length < 2;          // a list of one is just the card again
-  if (box.hidden) return;
+const MODE_LABEL = {
+  played: 'Played', want: 'Want to play', rated: 'Already rated', skipped: 'Skipped',
+};
 
-  $('#rate-list-n').textContent = `All ${queue.length} in this queue`;
-  $('#rate-list-items').innerHTML = queue.map((id, i) => {
-    const g = gameById(id);
-    if (!g) return '';
-    return `<li><button type="button" class="rate-jump${i === state.qIndex ? ' is-current' : ''}"
-              data-i="${i}"${i === state.qIndex ? ' aria-current="true"' : ''}>
-              <span class="rate-jump-name">${esc(g.name)}</span>
-              ${state.rateMode === 'rated'
-                ? `<span class="rate-jump-meta">you: ${fmt(g.votes[state.me.steamId], 1)}</span>`
-                : state.rateMode === 'skipped'
-                ? `<span class="rate-jump-meta">${g.mySkip === 'not-played' ? "didn't play" : 'no opinion'}</span>`
-                : g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
-                      : '<span class="rate-jump-meta">no votes yet</span>'}
-            </button></li>`;
-  }).join('');
+/* Wide enough for a standing panel beside the card. Below it the list stays the
+   disclosure it has always been, because a phone has no column to spare. */
+const wideQueue = matchMedia('(min-width: 1100px)');
+const syncQueuePane = () => { if (wideQueue.matches) $('#rate-list').open = true; };
+wideQueue.addEventListener('change', syncQueuePane);
+
+/**
+ * The queue, listed and searchable.
+ *
+ * `data-i` is the index into the UNFILTERED queue, because that is what
+ * `state.qIndex` means. Filtering the display must not renumber the thing the
+ * click sets, or searching would jump you to the wrong game.
+ */
+function renderQueueList(queue, byMode = null) {
+  const box = $('#rate-list');
+  // Searching only makes sense over a list, but one entry plus a search box is
+  // still just the card again.
+  box.hidden = queue.length < 2;
+  if (box.hidden) return;
+  syncQueuePane();
+
+  const term = ($('#rate-search').value || '').trim().toLowerCase();
+  const rows = queue.map((id, i) => ({ i, g: gameById(id) })).filter((row) => row.g);
+  const shown = term ? rows.filter((row) => row.g.name.toLowerCase().includes(term)) : rows;
+
+  $('#rate-list-n').textContent = term
+    ? `${shown.length} of ${rows.length} in this queue`
+    : `All ${rows.length} in this queue`;
+  $('#rate-list-items').innerHTML = shown.map(({ i, g }) => `
+    <li><button type="button" class="rate-jump${i === state.qIndex ? ' is-current' : ''}"
+          data-i="${i}"${i === state.qIndex ? ' aria-current="true"' : ''}>
+          <span class="rate-jump-name">${esc(g.name)}</span>
+          ${state.rateMode === 'rated'
+            ? `<span class="rate-jump-meta">you: ${fmt(g.votes[state.me.steamId], 1)}</span>`
+            : state.rateMode === 'skipped'
+            ? `<span class="rate-jump-meta">${g.mySkip === 'not-played' ? "didn't play" : 'no opinion'}</span>`
+            : g.n ? `<span class="rate-jump-meta">${fmt(g.raw, 1)} · ${g.n}</span>`
+                  : '<span class="rate-jump-meta">no votes yet</span>'}
+        </button></li>`).join('');
+
+  /* A search that finds nothing here while the game plainly exists is the obvious
+     trap: your rated games and your unrated ones live in different tabs, and one of
+     them usually holds almost everything. So say where it actually is. */
+  const none = $('#rate-list-none');
+  none.hidden = !term || shown.length > 0;
+  if (!none.hidden) {
+    const all = byMode || queuesByMode();
+    const elsewhere = Object.keys(MODE_LABEL)
+      .filter((mode) => mode !== state.rateMode)
+      .map((mode) => ({
+        mode,
+        n: all[mode].filter((id) => gameById(id)?.name.toLowerCase().includes(term)).length,
+      }))
+      .filter((hit) => hit.n);
+    none.innerHTML = elsewhere.length
+      ? `Nothing here. ${elsewhere.map((hit) =>
+          `<button type="button" class="linkish" data-mode="${hit.mode}">${hit.n} in ${esc(MODE_LABEL[hit.mode])}</button>`
+        ).join(' · ')}`
+      : 'No game here matches that.';
+    $$('#rate-list-none [data-mode]').forEach((b) => b.addEventListener('click', () => {
+      // Keep the term: switching tab is how you finish the search, not restart it.
+      state.rateMode = b.dataset.mode;
+      state.qIndex = 0;
+      renderQueue();
+    }));
+  }
 
   $$('#rate-list-items .rate-jump').forEach((b) => b.addEventListener('click', () => {
     state.qIndex = Number(b.dataset.i);
-    // Collapse on the way out: you picked a game, so the list has done its job and
-    // leaving it open just buries the card you asked for.
-    box.open = false;
+    /* Collapse on the way out: you picked a game, so the list has done its job and
+       leaving it open just buries the card you asked for. Not on a wide screen,
+       where the panel stands next to the card and never covers it. */
+    if (!wideQueue.matches) box.open = false;
     renderQueue();
   }));
 }
@@ -1255,6 +1489,37 @@ async function skipGame(notPlayed = false) {
   } catch (e) { toast(e.message); }
 }
 
+/**
+ * Who among the selected crew has already played this, and who has had enough.
+ *
+ * The one place the replay answer is spent, and deliberately the only one: it is
+ * context for the argument, not an input to the ranking. Silently demoting a game
+ * because somebody has played it would be the removed weighted score all over
+ * again — a number you cannot reconstruct from the column beside it.
+ *
+ * Steam playtime and an explicit answer are both accepted as "has played it";
+ * only a person can say they have had enough.
+ */
+function replayChips(g, attendees) {
+  const answered = g.replay || {};
+  const done = attendees.filter((id) => answered[id] === 'no');
+  // "Had enough" already says they played it, so naming them twice is noise.
+  const played = attendees.filter((id) =>
+    !done.includes(id) && ((g.playedBy || []).includes(id) || answered[id]));
+  if (!played.length && !done.length) return '';
+  const names = (ids) => ids.map(nameOf).join(', ');
+  const chips = [];
+  if (played.length) {
+    chips.push(`<span class="chip">${esc(names(played))} ${
+      played.length === 1 ? 'has' : 'have'} played it</span>`);
+  }
+  if (done.length) {
+    chips.push(`<span class="chip chip-warn">${esc(names(done))} ${
+      done.length === 1 ? 'has' : 'have'} had enough</span>`);
+  }
+  return chips.join('');
+}
+
 /* ══════════════════════════════ PLAY NEXT ═════════════════════════════ */
 function renderNext() {
   if (renderEmptyLibrary('next')) return;
@@ -1293,11 +1558,34 @@ function renderNext() {
       };
     })
     .filter((g) => g.attendeeVotes > 0);
+
+  /* A price cap drops two different sets, and they are reported separately because
+     they mean different things. Over budget is a decision; no price on file is an
+     admission. An unpriced game is NOT quietly kept: listing it under "≤ €30"
+     would promise something the data cannot support, which is the same call
+     invariant 6 makes for an unverified player cap. */
+  const budget = budgetCents();
+  $('#pn-budget-out').textContent = budget == null ? 'Any price'
+    : budget === 0 ? 'Free only' : `Up to ${euro(budget)}`;
+  const affordable = budget == null ? backlog
+    : backlog.filter((g) => { const c = priceCents(g.price); return c != null && c <= budget; });
+  const overBudget = budget == null ? 0
+    : backlog.filter((g) => { const c = priceCents(g.price); return c != null && c > budget; }).length;
+  const unpriced = budget == null ? 0 : backlog.filter((g) => priceCents(g.price) == null).length;
+  const budgetNote = [
+    overBudget ? `${overBudget} over budget` : '',
+    unpriced ? `${unpriced} with no price on file` : '',
+  ].filter(Boolean).join(' · ');
+  $('#pn-budget-note').textContent = budget == null ? ''
+    : budgetNote
+      ? `Hidden: ${budgetNote}. Steam's cached list price for this catalogue's region — sales are not tracked.`
+      : "Nothing hidden. Steam's cached list price for this catalogue's region — sales are not tracked.";
+
   const hide = $('#hide-unviable').checked;
   const rank = (a, b) => b.attendeeScore - a.attendeeScore
     || b.attendeeVotes - a.attendeeVotes || a.name.localeCompare(b.name);
-  const playable = backlog.filter((g) => g.attendeeFit.ok !== false).sort(rank);
-  const blocked  = backlog.filter((g) => g.attendeeFit.ok === false).sort(rank);
+  const playable = affordable.filter((g) => g.attendeeFit.ok !== false).sort(rank);
+  const blocked  = affordable.filter((g) => g.attendeeFit.ok === false).sort(rank);
 
   $('#next-list').innerHTML = playable.map((g, i) => `
     <li class="rank-row" data-id="${g.id}">
@@ -1307,7 +1595,7 @@ function renderNext() {
         : '<span class="rank-art rank-art-none" aria-hidden="true"></span>'}
       <div class="rank-main">
         <div class="rank-name">${esc(g.name)}</div>
-        <div class="rank-meta">${metaChips(g, g.attendeeFit, need)}${
+        <div class="rank-meta">${metaChips(g, g.attendeeFit, need)}${replayChips(g, attendees)}${
           g.attendeeVotes === 1 && need > 1 ? '<span class="chip chip-warn">only 1 selected player rated it</span>' : ''}</div>
       </div>
       <div class="rank-score"><b>${fmt(g.attendeeScore, 1)}</b><span>${g.attendeeVotes} selected vote${g.attendeeVotes === 1 ? '' : 's'}</span></div>
@@ -3111,6 +3399,17 @@ function openDetail(id, focusField = null) {
   detailGameId = id;
   $('#detail-title').textContent = g.name;
 
+  const myScore = g.votes[state.me.steamId] ?? null;
+  const othersRated = Object.keys(g.votes).filter((sid) => sid !== state.me.steamId).length;
+  /* Blind rating is a group rule about not being anchored, and this panel used to
+     ignore it: it painted every score as a bar whether you had voted or not. That
+     was already a leak while the panel was read-only. Now that you can rate from
+     here it would be a hole — you could defeat the setting by opening a dialog. */
+  const blindHere = state.group.blindRating && myScore == null && state.group.mode !== 'personal';
+  // Where an unrated slider starts, on the rate card's rule: the group's average,
+  // unless showing it would anchor you on numbers this group has chosen to hide.
+  const myStart = (!blindHere && othersRated && g.raw != null) ? Math.round(g.raw * 2) / 2 : 7.5;
+
   $('#detail-body').innerHTML = `
     <div class="detail-grid">
       ${g.header_image ? `<img src="${esc(g.header_image)}" alt="" style="width:100%;border-radius:8px">` : ''}
@@ -3120,12 +3419,36 @@ function openDetail(id, focusField = null) {
       <div class="detail-votes">
         ${state.members.map((m) => {
           const score = g.votes[m.steam_id];
+          /* Your own row is the control, not a readout. Every other fact on this
+             panel is editable in place; the one number that is actually yours used
+             to be the exception, and changing it meant closing this and hunting the
+             game down in the Rate tab's "Already rated" list. */
+          if (m.steam_id === state.me.steamId) {
+            return `<div class="detail-vote detail-vote-mine">
+              <span class="detail-vote-name" title="${esc(m.short_name)}" style="color:${colorOf(m.steam_id)}">${esc(m.short_name)}</span>
+              <input id="d-score" class="slider detail-score" type="range" min="1" max="10" step="0.5"
+                     value="${myScore ?? myStart}" aria-label="Your score from 1 to 10"
+                     style="--track-accent:${colorOf(m.steam_id)}">
+              <span class="bar-val" id="d-score-out">${myScore == null ? '–' : fmt(myScore, 1)}</span>
+            </div>`;
+          }
+          if (blindHere) return '';
           return `<div class="detail-vote">
             <span class="detail-vote-name" title="${esc(m.short_name)}" style="color:${colorOf(m.steam_id)}">${esc(m.short_name)}</span>
             <div class="bar-track"><div class="bar-fill" style="width:${score ? (score / 10) * 100 : 0}%;background:${colorOf(m.steam_id)}"></div></div>
             <span class="bar-val">${score == null ? '–' : fmt(score, 1)}</span>
           </div>`;
         }).join('')}
+        ${blindHere ? `<p class="panel-sub" style="margin:0">${
+          othersRated
+            ? `${othersRated} other ${othersRated === 1 ? 'rating' : 'ratings'} hidden`
+            : 'Nobody else has rated this yet'} — this group rates blind, so scores appear once you have given yours.</p>` : ''}
+        <div class="detail-vote-actions">
+          <button class="btn btn-sm btn-primary" id="d-rate" hidden>Save rating</button>
+          <span class="field-help" id="d-rate-hint">${myScore == null
+            ? 'Move the slider to rate this without leaving the page.'
+            : 'Move the slider to change your rating.'}</span>
+        </div>
       </div>
 
       ${g.steam_appid && g.ownership ? `
@@ -3256,6 +3579,36 @@ function openDetail(id, focusField = null) {
       $('#detail-dialog').close();
       toast('Saved');
     } catch (e) { toast(e.message); }
+  });
+
+  /* Explicit button rather than saving on release: a rating takes the game out of
+     your queue and clears any skip, which is too much to happen from a stray drag.
+     It appears only once the slider actually differs from your saved score, so it
+     is never a second permanently-lit Save competing with "Save changes". */
+  const scoreInput = $('#d-score');
+  const rateBtn = $('#d-rate');
+  let savedScore = myScore;      // moves with each save, or the button never hides again
+  const syncRateBtn = () => {
+    const value = Number(scoreInput.value);
+    $('#d-score-out').textContent = fmt(value, 1);
+    rateBtn.hidden = savedScore != null && value === savedScore;
+  };
+  scoreInput.addEventListener('input', syncRateBtn);
+  rateBtn.addEventListener('click', async () => {
+    const score = Number(scoreInput.value);
+    rateBtn.disabled = true;
+    try {
+      if (!await postRating(slug, g, score)) return;
+      savedScore = score;
+      $('#d-rate-hint').textContent = 'Move the slider to change your rating.';
+      rateBtn.hidden = true;
+      toast(`${g.name}: ${fmt(score, 1)}`);
+      // Only reopen when there is something new to show: this group hides other
+      // scores until you have voted, and you just did. Otherwise stay put rather
+      // than throwing away the scroll position and reloading the comment thread.
+      if (blindHere) openDetail(id);
+    } catch (e) { toast(e.message); }
+    finally { rateBtn.disabled = false; }
   });
 
   $('#d-linkbtn')?.addEventListener('click', async () => {

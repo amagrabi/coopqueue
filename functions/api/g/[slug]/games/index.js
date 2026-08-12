@@ -42,7 +42,7 @@ export async function onRequestGet({ env, data }) {
         WHERE g.group_id = ? ORDER BY g.name COLLATE NOCASE`
     ).bind(gid).all(),
     env.DB.prepare(
-      `SELECT r.game_id, r.steam_id, r.score, r.comment
+      `SELECT r.game_id, r.steam_id, r.score, r.comment, r.replay
          FROM ratings r JOIN games g ON g.id = r.game_id
         WHERE g.group_id = ?`
     ).bind(gid).all(),
@@ -146,6 +146,11 @@ export async function onRequestGet({ env, data }) {
       ...scoreGame(votes),
       notPlayed: satOut.get(g.id) || [],
       mySkip: mine.get(g.id) || null,
+      /* Group-visible, like notPlayed and for the same reason: "Ama has already
+         played this" is exactly the context the rest of the group needs when
+         deciding what to start. Sparse — only answered rows travel. */
+      replay: Object.fromEntries(votes.filter((v) => v.replay).map((v) => [v.steam_id, v.replay])),
+      playedBy: ownership.playedByGame.get(g.id) || [],
       factSources: factSources.get(g.id) || {},
       ownership: ownership.byGame.get(g.id) || {},
       completionSuggestion,

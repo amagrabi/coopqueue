@@ -2330,6 +2330,154 @@ await check('presence updates are scheduled off the /api/me response path', asyn
   return true;
 });
 
+console.log('\nDefault workspace');
+
+// A second workspace for Alice, so "replaces the first" has something to replace.
+sqlite.exec("INSERT INTO groups (id, slug, name, max_players) VALUES (900,'alices-other','Alices Other',4)");
+sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role) VALUES (900,'${ALICE}','Ama','owner')`);
+
+const defaultsFor = (steamId) => sqlite.prepare(
+  `SELECT g.slug FROM member_preferences p JOIN groups g ON g.id = p.group_id
+    WHERE p.steam_id = ? AND p.default_workspace = 1`
+).all(steamId).map((r) => r.slug);
+
+const setDefault = (steamId, defaultGroup) => meRoute.onRequestPatch({
+  request: req({ defaultGroup }), env, data: { user: user(steamId) },
+});
+
+await check('starring a workspace comes back on /api/me', async () => {
+  const patched = await setDefault(ALICE, 'g4m1ng');
+  if (patched.status !== 200) return `patch returned ${patched.status}`;
+  const me = await (await meRoute.onRequestGet({
+    env, data: { user: user(ALICE) }, waitUntil: () => {},
+  })).json();
+  const flagged = me.groups.filter((g) => g.is_default).map((g) => g.slug);
+  return (flagged.length === 1 && flagged[0] === 'g4m1ng') || `flagged ${JSON.stringify(flagged)}`;
+});
+
+await check('a workspace you are not in is starrable-404, exactly like one that does not exist', async () => {
+  // Mallory has joined g4m1ng by code further up, so the outsider here is a fresh
+  // account in nothing at all — otherwise this would assert nothing.
+  const OUTSIDER = '76561198000000009';
+  sqlite.exec(`INSERT INTO users (steam_id, display_name) VALUES ('${OUTSIDER}','Outsider')`);
+  const real = await setDefault(OUTSIDER, 'g4m1ng');
+  const fake = await setDefault(OUTSIDER, 'does-not-exist');
+  const wrote = defaultsFor(OUTSIDER);
+  return (real.status === 404 && fake.status === 404 && wrote.length === 0)
+    || `real ${real.status}, fake ${fake.status}, wrote ${JSON.stringify(wrote)}`;
+});
+
+await check('starring a second workspace replaces the first', async () => {
+  const out = await setDefault(ALICE, 'alices-other');
+  const defaults = defaultsFor(ALICE);
+  return (out.status === 200 && defaults.length === 1 && defaults[0] === 'alices-other')
+    || `status ${out.status}, defaults ${JSON.stringify(defaults)}`;
+});
+
+await check('clearing the default leaves none', async () => {
+  const out = await setDefault(ALICE, null);
+  const defaults = defaultsFor(ALICE);
+  return (out.status === 200 && defaults.length === 0)
+    || `status ${out.status}, defaults ${JSON.stringify(defaults)}`;
+});
+
+await check('leaving a workspace clears it as your default', async () => {
+  await setDefault(ALICE, 'alices-other');
+  if (defaultsFor(ALICE)[0] !== 'alices-other') return 'could not set up the default';
+  sqlite.prepare('DELETE FROM memberships WHERE group_id = 900 AND steam_id = ?').run(ALICE);
+  // Cascade, not cleanup code: the boot path must never be pointed at a
+  // workspace the caller has left.
+  return defaultsFor(ALICE).length === 0 || 'a default survived leaving the group';
+});
+
+console.log('\nReplay appetite');
+
+const replayOf = (gameId, steamId) =>
+  sqlite.prepare('SELECT score, replay FROM ratings WHERE game_id=? AND steam_id=?').get(gameId, steamId);
+
+await check('a replay answer round-trips and travels with the library', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const out = await rateRoute.onRequestPost({
+    request: req({ gameId: 7003, score: 8, replay: 'no' }), env, data,
+  });
+  if (out.status !== 200) return `rate returned ${out.status}`;
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const game = lib.games.find((g) => g.id === 7003);
+  return game?.replay?.[ALICE] === 'no' || `library says ${JSON.stringify(game?.replay)}`;
+});
+
+await check('an ordinary save leaves an answer given earlier alone', async () => {
+  // The card only asks this on a minority of games; a later save from the Played
+  // tab must not clear it as a side effect of not mentioning it.
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  await rateRoute.onRequestPost({ request: req({ gameId: 7003, score: 9 }), env, data });
+  const row = replayOf(7003, ALICE);
+  return (row.score === 9 && row.replay === 'no') || `score ${row.score}, replay ${row.replay}`;
+});
+
+await check('an invented replay value is rejected, and takes the score down with it', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const out = await rateRoute.onRequestPost({
+    request: req({ gameId: 7003, score: 4, replay: 'never ever' }), env, data,
+  });
+  const row = replayOf(7003, ALICE);
+  return (out.status === 400 && row.score === 9 && row.replay === 'no')
+    || `status ${out.status}, score ${row.score}, replay ${row.replay}`;
+});
+
+await check('sending null clears the answer on purpose', async () => {
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  await rateRoute.onRequestPost({ request: req({ gameId: 7003, score: 9, replay: null }), env, data });
+  return replayOf(7003, ALICE).replay === null || `got ${replayOf(7003, ALICE).replay}`;
+});
+
+await check('who has already played it comes from Steam, with an hour floor', async () => {
+  /* Its own fixture: an earlier test deletes two players' playtime to check the
+     estimate degrades, so reusing those rows would assert the floor while actually
+     measuring the deletion. */
+  sqlite.exec("INSERT INTO games (id, group_id, name, steam_appid, status) VALUES (7500,1,'Floor Test',900500,'backlog')");
+  mins(PLAYERS[0], 900500, 600);   // ten hours: played it
+  mins(PLAYERS[1], 900500, 30);    // half an hour: a look, not a play
+  mins(PLAYERS[2], 900500, 0);     // owns it, never launched it
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const lib = await (await gamesRoute.onRequestGet({ env, data })).json();
+  const game = lib.games.find((g) => g.id === 7500);
+  const played = new Set(game?.playedBy || []);
+  const owns = game?.ownership || {};
+  return (played.has(PLAYERS[0]) && !played.has(PLAYERS[1]) && !played.has(PLAYERS[2])
+          // …while all three still count as owning it: the two are different facts.
+          && owns[PLAYERS[1]] === true && owns[PLAYERS[2]] === true)
+    || `playedBy ${JSON.stringify([...played])}, ownership ${JSON.stringify(owns)}`;
+});
+
+console.log('\nPrice parsing');
+
+/* Read the parser out of public/app.js rather than restating it here, the same way
+   scripts/validate-palette.mjs reads SERIES: a second copy of a parser is a second
+   copy that goes stale, and a test passing against a version the site does not use
+   is worse than no test. */
+const appSource = fs.readFileSync(path.join(SITE, 'public', 'app.js'), 'utf8');
+const priceBlock = /const priceCents = \(text\) => \{[\s\S]*?\n\};/.exec(appSource);
+if (!priceBlock) throw new Error('could not find priceCents in public/app.js');
+const priceCents = new Function(`${priceBlock[0]}\nreturn priceCents;`)();
+
+await check('Steam price strings parse to cents, and an unknown price stays unknown', async () => {
+  const cases = [
+    ['29,99€', 2999],        // what Steam actually returns for cc=de
+    ['9,75€', 975],
+    ['Free', 0],             // lib/steam.js writes this literal for is_free
+    ['19.99', 1999],         // the same number in the other locale
+    ['1.234,56 €', 123456],  // thousands separator on the far side of the decimal
+    ['1.234', 123400],       // no decimals: that dot groups thousands
+    [null, null],
+    ['', null],
+    ['TBA', null],
+  ];
+  const wrong = cases.filter(([input, want]) => priceCents(input) !== want);
+  return !wrong.length
+    || `wrong: ${JSON.stringify(wrong.map(([input]) => [input, priceCents(input)]))}`;
+});
+
 console.log('\nScoring & viability');
 const { viability } = await import(path.join(SITE, 'lib/score.js'));
 

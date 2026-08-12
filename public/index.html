@@ -323,13 +323,6 @@
           </button>
         </div>
         <p class="rate-ask" id="rate-ask"></p>
-
-        <!-- The queue is otherwise a black box: you get whatever is next and cannot
-             see what is coming or reach for the one you actually remember. -->
-        <details id="rate-list" class="rate-list">
-          <summary><span id="rate-list-n"></span></summary>
-          <ol id="rate-list-items" class="rate-list-items"></ol>
-        </details>
       </div>
 
       <div id="queue-empty" class="empty" hidden>
@@ -337,6 +330,23 @@
         <p id="queue-empty-copy">You've rated or skipped everything in this group. Add a game, or go argue on the Play next tab.</p>
         <button class="btn btn-primary" data-open-add>+ Add a game</button>
       </div>
+
+      <!-- Card and queue side by side where there is room. The list is first in the
+           DOM so a phone gets it above the card, as it always has, and CSS places it
+           in the second column on wide screens. -->
+      <div class="rate-layout">
+        <!-- The queue is otherwise a black box: you get whatever is next and cannot
+             see what is coming or reach for the one you actually remember. A
+             disclosure on narrow screens, a standing panel where it fits. -->
+        <details id="rate-list" class="rate-list">
+          <summary><span id="rate-list-n"></span></summary>
+          <div class="rate-list-body">
+            <input type="search" id="rate-search" class="input rate-search" autocomplete="off"
+                   placeholder="Find a game…" aria-label="Find a game in this list">
+            <ol id="rate-list-items" class="rate-list-items"></ol>
+            <p id="rate-list-none" class="rate-list-none" hidden></p>
+          </div>
+        </details>
 
       <article id="queue-card" class="rate-card" hidden>
         <div class="rate-media">
@@ -358,6 +368,21 @@
           <div id="rate-notes" class="callout" hidden></div>
           <div id="rate-others" class="others"></div>
 
+          <!-- Only shown for a game the group has not played but you personally
+               have, where the score and "would you play it again" are genuinely
+               different answers. See migrations/030-replay-appetite.sql. -->
+          <div id="replay-ask" class="replay-ask" hidden>
+            <p class="replay-ask-label" id="replay-ask-label"></p>
+            <div class="replay-opts" id="replay-opts" role="group" aria-labelledby="replay-ask-label">
+              <button type="button" class="seg" data-replay="yes">Happy to</button>
+              <button type="button" class="seg" data-replay="maybe">Only if you want</button>
+              <button type="button" class="seg" data-replay="no">I've had enough</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm replay-reveal" id="replay-reveal" hidden>
+            I've played this before
+          </button>
+
           <div class="rate-controls">
             <div class="score-display">
               <output id="score-out">7.5</output>
@@ -374,10 +399,17 @@
               <button class="btn btn-ghost" id="btn-unskip" hidden>Put back in my queue</button>
               <a class="btn btn-ghost" id="btn-store" target="_blank" rel="noopener" hidden>Steam page ↗</a>
             </div>
-            <p class="kbd-hint"><kbd>1</kbd>–<kbd>9</kbd> <kbd>0</kbd>=10 to rate · <kbd>←</kbd><kbd>→</kbd> nudge · <kbd>Enter</kbd> save · <kbd>S</kbd> skip · <kbd>N</kbd> didn't play</p>
+            <!-- The two skip keys must read as the two BUTTONS they press. "S skip"
+                 described the mechanism and left N looking like a duplicate of it,
+                 when the pair is actually "no opinion" vs "I wasn't in that
+                 session" — a distinction migration 016 exists to preserve. -->
+            <p class="kbd-hint"><kbd>1</kbd>–<kbd>9</kbd> <kbd>0</kbd>=10 to rate · <kbd>←</kbd><kbd>→</kbd> nudge · <kbd>Enter</kbd> save<span
+              id="kbd-skip"> · <kbd>S</kbd> no opinion</span><span
+              id="kbd-notplayed"> · <kbd>N</kbd> I didn't play this</span></p>
           </div>
         </div>
       </article>
+      </div>
     </section>
 
     <!-- ══════════════ PLAY NEXT ══════════════ -->
@@ -412,6 +444,13 @@
         <legend>Who's playing?</legend>
         <div id="pn-attendees" class="attendee-list"></div>
       </fieldset>
+      <div class="budget-filter">
+        <label for="pn-budget">Budget per person</label>
+        <input type="range" id="pn-budget" class="slider" min="0" max="13" step="1" value="13"
+               aria-describedby="pn-budget-note">
+        <output id="pn-budget-out" for="pn-budget">Any price</output>
+        <p class="view-sub" id="pn-budget-note"></p>
+      </div>
       <ol id="next-list" class="rank-list"></ol>
       <div id="unviable-block" class="unviable-block"></div>
     </section>
