@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 186 assertions — ALWAYS before a deploy
+npm test          # 190 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -290,6 +290,20 @@ only picks rows where `tags IS NULL`, and the emitted UPDATEs are idempotent.
 
 Ongoing maintenance needs no manual step: the cron crawler now tags four library
 rows per run, on the same "NULL means nobody looked" rule as the catalogue.
+
+### Migration 034: "not interested"
+
+Apply `migrations/034-coop-dismissals.sql` before deploying the Find games dismiss
+button:
+
+```bash
+npx wrangler d1 execute g4m1ng --remote --file=migrations/034-coop-dismissals.sql
+```
+
+One `CREATE TABLE IF NOT EXISTS` plus an index, so it is additive and safe to
+retry. The browse view calls `GET /api/g/:slug/dismissals` on entry, so migrate
+before deploying or that request 500s and the grid falls back to showing
+everything.
 
 ---
 

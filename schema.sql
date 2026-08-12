@@ -7,6 +7,7 @@
 -- groups; their display name and role are per-group, held on memberships.
 
 DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS coop_dismissals;
 DROP TABLE IF EXISTS history_nudges;
 DROP TABLE IF EXISTS game_fact_sources;
 DROP TABLE IF EXISTS achievement_progress;
@@ -347,6 +348,23 @@ CREATE TABLE comments (
 
 CREATE INDEX idx_comments_game  ON comments(game_id, created_at);
 CREATE INDEX idx_comments_group ON comments(group_id);
+
+-- "Not interested": catalogue games this group has rejected, hidden from Find
+-- games until somebody undoes it. Group-scoped rather than personal, on the same
+-- reasoning as games.archived_at — it is a shared decision, it destroys nothing,
+-- and steam_id records who so the others know whom to argue with. `name` is a
+-- snapshot because the crawler deletes coop_apps rows it later rejects, and an
+-- undo list full of unlabelled appids would be useless. Mirrors
+-- migrations/034-coop-dismissals.sql.
+CREATE TABLE coop_dismissals (
+  group_id   INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  appid      INTEGER NOT NULL,
+  name       TEXT    NOT NULL,
+  steam_id   TEXT REFERENCES users(steam_id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (group_id, appid)
+);
+CREATE INDEX idx_coop_dismissals_group ON coop_dismissals(group_id, created_at DESC);
 
 -- Pre-assigned identities: an owner can decide in advance that a SteamID64 is
 -- "Leo", so that friend signs in and lands as Leo without seeing the claim

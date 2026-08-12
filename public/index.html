@@ -576,6 +576,12 @@
       </div>
       <p id="browse-status" class="add-status"></p>
       <p id="browse-why" class="browse-why" hidden></p>
+      <!-- The way back from "Not interested". Hidden until the group has rejected
+           something, and collapsed by default so it never competes with the grid. -->
+      <details id="browse-dismissed" class="dismissed" hidden>
+        <summary><span id="browse-dismissed-n"></span></summary>
+        <ul id="browse-dismissed-list" class="dismissed-list"></ul>
+      </details>
       <div id="browse-grid" class="browse-grid"></div>
       <div class="browse-foot">
         <button class="btn" id="browse-more" hidden>Load more</button>

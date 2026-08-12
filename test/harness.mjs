@@ -909,6 +909,34 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // "Not interested" and its undo list. Group-scoped; see migration 034.
+    if (sub === '/dismissals' && req.method === 'GET') {
+      return send(res, 200, { dismissals: q(
+        `SELECT d.appid, d.name, d.created_at AS at, d.steam_id AS bySteamId,
+                COALESCE(m.short_name, u.display_name) AS by
+           FROM coop_dismissals d
+           LEFT JOIN memberships m ON m.group_id=d.group_id AND m.steam_id=d.steam_id
+           LEFT JOIN users u ON u.steam_id=d.steam_id
+          WHERE d.group_id=? ORDER BY d.created_at DESC, d.appid DESC`, gid) });
+    }
+    if (sub === '/dismissals' && req.method === 'POST') {
+      const b = await readBody(req);
+      const appid = Number(b.appid);
+      if (!Number.isInteger(appid) || appid <= 0) return send(res, 400, { error: 'bad appid' });
+      const known = one('SELECT name FROM coop_apps WHERE appid=?', appid);
+      const label = known?.name || String(b.name || '').trim().slice(0, 200);
+      if (!label) return send(res, 400, { error: 'no such game in the catalogue' });
+      db.prepare(`INSERT INTO coop_dismissals (group_id,appid,name,steam_id) VALUES (?,?,?,?)
+                  ON CONFLICT(group_id,appid) DO UPDATE SET name=excluded.name,
+                    steam_id=excluded.steam_id, created_at=unixepoch()`).run(gid, appid, label, ME);
+      return send(res, 200, { ok: true, appid, name: label });
+    }
+    if (sub === '/dismissals' && req.method === 'DELETE') {
+      const b = await readBody(req);
+      db.prepare('DELETE FROM coop_dismissals WHERE group_id=? AND appid=?').run(gid, Number(b.appid));
+      return send(res, 200, { ok: true, appid: Number(b.appid) });
+    }
+
     if (sub.startsWith('/comments')) {
       const inGroup = (id) => one('SELECT id FROM games WHERE id=? AND group_id=?', id, gid);
       if (req.method === 'GET') {

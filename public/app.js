@@ -557,6 +557,7 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   browse.page = 0;
   browse.items = [];
   browse.hasMore = false;
+  dismissed = { rows: [], loaded: false };
 
   // Offer the imported identity before showing the app, once per group.
   if (claim.canClaim && claim.unclaimed.length) {
@@ -3271,6 +3272,11 @@ async function enrichSteamMetadata() {
  * client already holds — no group data crosses that endpoint.
  */
 const browse = { page: 0, items: [], hasMore: false };
+/* Games this group has said "not interested" to. Loaded once per workspace and
+   held here because every browse render filters against it, and the undo panel
+   reads the same rows. */
+let dismissed = { rows: [], loaded: false };
+const dismissedIds = () => new Set(dismissed.rows.map((d) => d.appid));
 
 // Latest request wins. Refusing to start a new fetch while one is in flight
 // looks like a safe guard but silently drops keystrokes — type during a slow
@@ -3281,6 +3287,15 @@ let browseSeq = 0;
 async function renderBrowse(reset) {
   const slug = state.group.slug;
   if (reset) { browse.page = 0; browse.items = []; browse.hasMore = false; }
+  // Needed before the first grid paint, or dismissed games flash into view and
+  // then vanish. Once per workspace; every later render reuses it.
+  if (!dismissed.loaded) {
+    try {
+      const d = await gapiFor(slug, '/dismissals');
+      if (state.group?.slug !== slug) return;
+      dismissed = { rows: d.dismissals || [], loaded: true };
+    } catch { dismissed = { rows: [], loaded: true }; }
+  }
 
   const q = $('#browse-search').value.trim();
   const sort = $('#browse-sort').value;
@@ -3334,12 +3349,20 @@ async function renderBrowse(reset) {
   // come back shorter, so the count says how many were hidden instead of leaving
   // you wondering where they went.
   const hideOwned = $('#browse-hide-owned').checked;
-  const shown = hideOwned ? browse.items.filter((g) => !owned.has(g.appid)) : browse.items;
-  const hiddenCount = browse.items.length - shown.length;
+  /* Dismissals filter here too, and unconditionally: there is no toggle, because
+     the undo panel below is the way back and a second control saying the same
+     thing would be one too many. */
+  const gone = dismissedIds();
+  const afterDismissed = browse.items.filter((g) => !gone.has(g.appid));
+  const dismissedCount = browse.items.length - afterDismissed.length;
+  const shown = hideOwned ? afterDismissed.filter((g) => !owned.has(g.appid)) : afterDismissed;
+  const ownedCount = afterDismissed.length - shown.length;
 
   $('#browse-status').textContent =
     `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}`
-    + (hiddenCount ? `, ${hiddenCount} on this page already in your library` : '') + '.';
+    + (ownedCount ? `, ${ownedCount} on this page already in your library` : '')
+    + (dismissedCount ? `, ${dismissedCount} you said no to` : '') + '.';
+  renderDismissed();
 
   /* Say what the ranking is doing. A list claiming to be "recommended" without
      showing its reasoning asks people to trust a number they cannot check — and
@@ -3409,13 +3432,82 @@ async function renderBrowse(reset) {
              aria-label="Open ${esc(g.name)} on Steam (new tab)">Steam page ↗</a>` : ''}
           ${inLibrary
             ? '<span class="chip chip-good">in your library</span>'
-            : `<button class="btn btn-sm btn-primary" data-add="${g.appid}">+ Add to library</button>`}
+            : `<button class="btn btn-sm btn-primary" data-add="${g.appid}">+ Add to library</button>
+               <button class="btn btn-sm btn-ghost" data-dismiss="${g.appid}"
+                 aria-label="Not interested in ${esc(g.name)} — hides it for the whole group">Not interested</button>`}
         </div>
       </article>`;
   }).join('');
 
   $$('#browse-grid [data-add]').forEach((b) => b.addEventListener('click', () => addFromCatalogue(b)));
+  $$('#browse-grid [data-dismiss]').forEach((b) => b.addEventListener('click', () => dismissGame(b)));
   $('#browse-more').hidden = !browse.hasMore;
+}
+
+/**
+ * The undo list for "Not interested".
+ *
+ * Hiding a game for the whole group is only reasonable because getting it back is
+ * one click away and visible from the same screen — the same bargain archiving a
+ * game makes. It names who said no, so a game does not silently disappear on
+ * three other people with no way to tell who to argue with.
+ */
+function renderDismissed() {
+  const box = $('#browse-dismissed');
+  box.hidden = !dismissed.rows.length;
+  if (box.hidden) return;
+  const n = dismissed.rows.length;
+  $('#browse-dismissed-n').textContent =
+    `${n} game${n === 1 ? '' : 's'} ${state.group.mode === 'personal' ? 'you are' : 'this group is'} not interested in`;
+  $('#browse-dismissed-list').innerHTML = dismissed.rows.map((row) => `
+    <li>
+      <span class="dismissed-name">${esc(row.name)}</span>
+      <span class="dismissed-by">${state.group.mode === 'personal'
+        ? when(row.at)
+        : `${esc(row.by || 'Someone')} · ${when(row.at)}`}</span>
+      <button class="btn btn-sm btn-ghost" data-restore="${row.appid}"
+        aria-label="Put ${esc(row.name)} back in the catalogue">Put back</button>
+    </li>`).join('');
+  $$('#browse-dismissed-list [data-restore]').forEach((b) =>
+    b.addEventListener('click', () => restoreDismissed(b)));
+}
+
+/** Hide a catalogue game for the whole group. Destroys nothing — see migration 034. */
+async function dismissGame(btn) {
+  const slug = state.group.slug;
+  const appid = Number(btn.dataset.dismiss);
+  const entry = browse.items.find((g) => g.appid === appid);
+  btn.disabled = true;
+  try {
+    const r = await gapiFor(slug, '/dismissals', {
+      method: 'POST', body: { appid, name: entry?.name },
+    });
+    if (state.group?.slug !== slug) return;
+    /* Update locally instead of refetching: the grid has to lose the card now, and
+       a round trip would leave it sitting there looking like the click missed. */
+    dismissed.rows = [{
+      appid, name: r.name, by: nameOf(state.me.steamId), bySteamId: state.me.steamId,
+      at: Math.floor(Date.now() / 1000),
+    }, ...dismissed.rows.filter((d) => d.appid !== appid)];
+    void renderBrowse();
+    toast(`Hid ${r.name}. Undo it under "not interested" below.`);
+  } catch (e) { toast(e.message); btn.disabled = false; }
+}
+
+async function restoreDismissed(btn) {
+  const slug = state.group.slug;
+  const appid = Number(btn.dataset.restore);
+  const row = dismissed.rows.find((d) => d.appid === appid);
+  btn.disabled = true;
+  try {
+    await gapiFor(slug, '/dismissals', { method: 'DELETE', body: { appid } });
+    if (state.group?.slug !== slug) return;
+    dismissed.rows = dismissed.rows.filter((d) => d.appid !== appid);
+    // Reset to page 0: the restored game belongs wherever the ranking puts it, and
+    // appending it to whatever is already loaded would put it in the wrong place.
+    void renderBrowse(true);
+    toast(`${row?.name || 'That game'} is back in the catalogue`);
+  } catch (e) { toast(e.message); btn.disabled = false; }
 }
 
 /** Add a catalogue game to this group's library, carrying any verified player cap. */

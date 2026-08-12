@@ -50,7 +50,7 @@ const env = { DB, SESSION_SECRET: 'test', STEAM_API_KEY: '' };
 const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, membersRoute, groupRoute,
        commentsRoute, rootRoute, meRoute, exportRoute, playNightRoute, achievementsRoute,
        historyRoute, statsRoute, steamImportRoute, achievementScanRoute, directInvitesRoute,
-       incomingInvitesRoute] = await Promise.all([
+       incomingInvitesRoute, dismissalsRoute] = await Promise.all([
   import(path.join(SITE, 'functions/api/g/[slug]/games/index.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/games/[id].js')),
   import(path.join(SITE, 'functions/api/g/[slug]/rate.js')),
@@ -71,6 +71,7 @@ const [gamesRoute, gameIdRoute, rateRoute, groupMw, joinRoute, groupsRoute, memb
   import(path.join(SITE, 'functions/api/g/[slug]/achievement-scan.js')),
   import(path.join(SITE, 'functions/api/g/[slug]/invites.js')),
   import(path.join(SITE, 'functions/api/invites.js')),
+  import(path.join(SITE, 'functions/api/g/[slug]/dismissals.js')),
 ]);
 const { makeSessionCookie } = await import(path.join(SITE, 'lib/auth.js'));
 const { body: readBody } = await import(path.join(SITE, 'lib/http.js'));
@@ -2498,6 +2499,64 @@ await check('presence updates are scheduled off the /api/me response path', asyn
   if (response.status !== 200 || !pending?.then) return 'response or waitUntil promise missing';
   await pending;
   return true;
+});
+
+console.log('\n"Not interested"');
+
+/* Its own second group: the shared `mallorys` fixture is deleted further up by the
+   group-deletion test, so anything reaching for it here gets no membership row. */
+sqlite.exec("INSERT INTO groups (id, slug, name, max_players) VALUES (910,'other-crew','Other Crew',4)");
+sqlite.exec(`INSERT INTO memberships (group_id, steam_id, short_name, role)
+             VALUES (910,'${MALLORY}','Mallory','owner')`);
+sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, is_coop, tags)
+             VALUES (9500,'Nobody Wants This',1,1,'["Survival"]')`);
+const dismissalRows = () =>
+  sqlite.prepare('SELECT group_id, name, steam_id FROM coop_dismissals WHERE appid=9500 ORDER BY group_id').all();
+
+await check('a dismissal is group-scoped and never leaks across the boundary', async () => {
+  const alice = await ctxFor(ALICE, 'g4m1ng');
+  const other = await ctxFor(MALLORY, 'other-crew');
+  const posted = await dismissalsRoute.onRequestPost({ request: req({ appid: 9500 }), env, data: alice.data });
+  const mine = await (await dismissalsRoute.onRequestGet({ env, data: alice.data })).json();
+  const theirs = await (await dismissalsRoute.onRequestGet({ env, data: other.data })).json();
+  const rows = dismissalRows();
+  return (posted.status === 200
+          && mine.dismissals.length === 1 && mine.dismissals[0].appid === 9500
+          && theirs.dismissals.length === 0
+          && rows.length === 1 && rows[0].group_id === 1 && rows[0].steam_id === ALICE)
+    || `posted ${posted.status}, mine ${mine.dismissals.length}, theirs ${theirs.dismissals.length}, rows ${JSON.stringify(rows)}`;
+});
+
+await check('the undo list names who said no, and survives losing the catalogue row', async () => {
+  // The crawler DELETEs coop_apps rows it later rejects as DLC or too thin. The
+  // stored name is what keeps the undo list from becoming a column of appids.
+  sqlite.exec('DELETE FROM coop_apps WHERE appid=9500');
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const out = await (await dismissalsRoute.onRequestGet({ env, data })).json();
+  const row = out.dismissals.find((d) => d.appid === 9500);
+  return (row?.name === 'Nobody Wants This' && row.by === 'Ama') || `got ${JSON.stringify(row)}`;
+});
+
+await check('any member can undo one, and it clears only their own group', async () => {
+  sqlite.exec(`INSERT INTO coop_dismissals (group_id, appid, name, steam_id)
+               VALUES (910, 9500, 'Nobody Wants This', '${MALLORY}')`);
+  // Bob did not dismiss it and is not an owner. Undo is still his to do, exactly
+  // like restoring an archived game.
+  const bob = await ctxFor(BOB, 'g4m1ng');
+  const out = await dismissalsRoute.onRequestDelete({ request: req({ appid: 9500 }), env, data: bob.data });
+  const rows = dismissalRows();
+  return (out.status === 200 && rows.length === 1 && rows[0].group_id === 910)
+    || `status ${out.status}, left ${JSON.stringify(rows)}`;
+});
+
+await check('a game the catalogue never had, and a junk appid, are both refused', async () => {
+  sqlite.exec('DELETE FROM coop_dismissals');
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const noName = await dismissalsRoute.onRequestPost({ request: req({ appid: 999111 }), env, data });
+  const junk = await dismissalsRoute.onRequestPost({ request: req({ appid: 'not-a-number' }), env, data });
+  const n = sqlite.prepare('SELECT COUNT(*) AS n FROM coop_dismissals').get().n;
+  return (noName.status === 400 && junk.status === 400 && n === 0)
+    || `noName ${noName.status}, junk ${junk.status}, rows ${n}`;
 });
 
 console.log('\nDefault workspace');

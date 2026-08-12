@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 186 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 190 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -380,7 +380,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-186/186 assertions pass. `npm run test:ui` does **not** run on macOS: it
+190/190 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -1430,6 +1430,34 @@ the top few and hid Terraria, Elden Ring, Stardew Valley and Baldur's Gate 3, al
 which carry Multiplayer or Online Co-Op further down (Elden Ring has both, at 7 and
 11). Measured across the catalogue it reclassifies exactly one game and leaves the
 29 others with Singleplayer high up untouched.
+
+## "Not interested", and the way back
+
+Find games shows a few hundred catalogue rows, and without a way to say no the ones
+a group has already rejected sit at the top of the list forever. `coop_dismissals`
+(migration 034) hides them.
+
+**Group-scoped, not personal**, on the same reasoning as `games.archived_at`: Find
+games is a shared decision about what to add, so one person saying no hides it for
+everybody rather than four people each rejecting the same game separately. That is
+only safe because it destroys nothing — the catalogue row is untouched, and undo is
+one click from the same screen. `steam_id` records who, so a game does not silently
+vanish on the other three with no way to tell whom to argue with, and **any member
+can undo**, exactly like restoring an archived game.
+
+`name` is stored rather than joined. The crawler DELETEs `coop_apps` rows that turn
+out to be DLC or fall under the review floor, so a dismissal joined against a
+vanished row would render as an unlabelled orphan in the very list built for
+undoing it. For the same reason there is no foreign key to `coop_apps`.
+
+**The filtering is client-side, and has to be.** The grid is fed by `/api/coop`,
+which is deliberately group-blind — teaching it about dismissals would put group
+state behind an endpoint with no tenancy check. `renderBrowse()` already filters
+owned games this way and reports how many it hid; dismissals join that count. The
+route below the boundary only stores and lists.
+
+There is no "show dismissed" toggle. The undo panel is the way back, and a second
+control saying the same thing would be one too many.
 
 ## Archiving, not deleting
 
