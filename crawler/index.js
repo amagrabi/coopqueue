@@ -27,10 +27,15 @@ import {
   parseSearchItems, shapeDetails, parseReviews, parseStoreTags, OBVIOUS_NON_GAME,
 } from '../lib/coop.js';
 
-/** Games refreshed per run. 3 subrequests each, +2 for discovery. Cap is 50. */
+/**
+ * Total games upserted per run, discovery and refresh together. 3 subrequests each,
+ * +2 search pages, +LIBRARY_TAG_BATCH store pages. Cap is 50, so 9 leaves room.
+ */
 const BATCH = 9;
 /** Library games tagged per run. One store page each, inside the same 50 cap. */
 const LIBRARY_TAG_BATCH = 4;
+/** Tracked-but-uncatalogued games pulled in per run. 3 subrequests each. */
+const TRACKED_DISCOVERY = 3;
 /** Search pages to rotate through for discovery, one per run. */
 const DISCOVERY_PAGES = 8;
 /** Below this many reviews a game is abandoned shovelware; not worth listing. */
@@ -106,8 +111,29 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
 
   // Leave most of the subrequest budget for refreshing; discovery is the smaller
   // half of the job once the catalogue exists.
+  /* A third source, and on measurement the most valuable one: games that groups
+     have actually put in a library and the catalogue has never heard of.
+     Discovery is otherwise `globaltopsellers` plus recent releases, and both are
+     biased toward what is selling *now* — so the catalogue systematically misses
+     older co-op staples. Measured against group 1's Play next: six of its top ten
+     picks were absent, including Overcooked, Broforce, Dark Souls III and Keep
+     Talking and Nobody Explodes, and 42 of its 97 linked games could not have been
+     recommended to anybody. Across all groups here it is 117 co-op games.
+
+     They go through the same `upsert` as anything else, so the type check still
+     rejects DLC and expansions and the review floor still applies — the lenient
+     one, because a game a real group chose to track has passed a filter a search
+     page has not. Self-limiting: once the backlog is absorbed this returns nothing. */
+  const tracked = await db.prepare(
+    `SELECT DISTINCT g.steam_appid AS appid FROM games g
+      WHERE g.steam_appid IS NOT NULL AND g.archived_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM coop_apps c WHERE c.appid = g.steam_appid)
+      ORDER BY g.steam_appid LIMIT ?`
+  ).bind(TRACKED_DISCOVERY).all();
+
   const fresh = [...pick(sellers, MIN_REVIEWS).slice(0, 3),
-                 ...pick(newest, NEW_RELEASE_MIN_REVIEWS).slice(0, 2)];
+                 ...pick(newest, NEW_RELEASE_MIN_REVIEWS).slice(0, 2),
+                 ...(tracked.results || []).map((r) => ({ appid: r.appid, floor: NEW_RELEASE_MIN_REVIEWS }))];
   for (const c of fresh) {
     if (await upsert(db, c.appid, out, c.floor)) out.discovered++;
   }
@@ -117,8 +143,12 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = unixepoch()`
   ).bind(String((page + 1) % DISCOVERY_PAGES)).run();
 
-  // ── refresh: oldest crawled_at first, so the whole table converges ─────────
-  const remaining = Math.max(0, batch - out.discovered);
+  /* ── refresh: oldest crawled_at first, so the whole table converges ─────────
+     Budgeted against ATTEMPTS, not successes. A discovery upsert costs its three
+     subrequests whether or not it produces a row, and with three sources feeding
+     `fresh` the old `batch - out.discovered` could authorise nine refreshes on top
+     of eight failed discoveries — 51 subrequests against a hard cap of 50. */
+  const remaining = Math.max(0, batch - fresh.length);
   if (remaining) {
     const stale = await db.prepare(
       'SELECT appid, review_count FROM coop_apps ORDER BY crawled_at ASC LIMIT ?').bind(remaining).all();

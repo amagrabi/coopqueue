@@ -1231,6 +1231,54 @@ The practical consequence: **judge this ranking on whether its likes are backed 
 real evidence, and use the correlation only to catch a change that makes things
 clearly worse.** That is how `TAG_MIN_GAMES` moved 3 → 4 — see the constant.
 
+### The check that matters: would it have found what they chose?
+
+Correlation says whether the ordering tracks taste. It does not say whether the
+list is *useful*. The sharper test: take the top of Play next — backlog games the
+group ranked with its own scores, about as close to a revealed preference as this
+data gets — and ask where each would rank in Find games if it were not already in
+the library. Hold it out of the history too, or its own rating leaks into the
+preferences used to score it. Measured on group 1's top ten:
+
+| | |
+|---|---|
+| Would have been on the first page | **1** (Big Walk, #17 of 304) |
+| In the catalogue but ranked too low | 3 (Dune Awakening #162, Enshrouded #102, Barotrauma #239) |
+| **Absent from the catalogue entirely** | **6** |
+
+**The dominant failure is reach, not ranking.** Overcooked, Broforce, Keep Talking
+and Nobody Explodes, Lovers in a Dangerous Spacetime, Dark Souls III and Back 4
+Blood are not in `coop_apps`, so they could not be recommended to anybody — and 42
+of group 1's 97 linked games are in the same position. Discovery was
+`globaltopsellers` plus recent releases, and both are biased toward what sells
+*now*, which structurally misses co-op staples from 2015–2021. The crawler now has
+a third source: games groups actually track. 117 co-op titles across the workspaces
+here, absorbed a few an hour through the same vetted `upsert`, so DLC and
+expansions are still rejected and the review floor still applies.
+
+**The ranking is genuinely weak too, and worth being honest about.** Holding out
+every rated game in turn and recording where it lands:
+
+```
+  loved 8.5+     median top 28%   on the first page: 2/6
+  liked 7.5-8.4  median top 48%                      1/15
+  ok    6.5-7.4  median top 40%                      0/24
+  meh   <6.5     median top 46%                      1/7
+```
+
+Loved games place better than the rest, but not by much, and only 4 of 52 land on
+a first page at all.
+
+One structural cause is visible in the per-tag breakdown and is worth naming,
+because it is not a tuning problem: **IDF and `TAG_MIN_GAMES` pull against each
+other.** IDF weights a tag by rarity, so the most informative tags are the rare
+ones — but a rare tag is exactly what `TAG_MIN_GAMES` refuses to learn a preference
+for. Barotrauma's most distinctive tags are Submarine (idf 5.98) and Underwater
+(idf 5.29); the model has a preference for neither, so it ranked the game on
+Strategy (−0.45) and Horror (−0.15) and buried it at #239 while the group scored it
+7.5. Fixing that means a model that can generalise between tags rather than
+treating each as independent, which is a redesign, not a constant.
+
 ### Everything above was measured on ONE group
 
 `g4m1ng` is the only workspace here with ratings. The others have imported Steam
