@@ -1986,6 +1986,55 @@ await check('the co-op filter is on by default and can be turned off', async () 
   return (!has(on) && has(off)) || `default showed it: ${has(on)}; coopOnly=0 hid it: ${!has(off)}`;
 });
 
+await check('taste is learned from library games the catalogue does not list', async () => {
+  /* The bug this covers cost group 1 45 of its 103 rated games: tags were read from
+     coop_apps only, so anything the crawler had never listed taught the recommender
+     nothing. Measured leave-one-out correlation with the group's own scores went
+     from 0.03 to 0.25 once the gap was filled. */
+  sqlite.exec(`INSERT INTO steam_apps (appid, name, tags)
+               VALUES (9200,'Not In The Catalogue','["Dwarves","Base Building"]')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES
+               (9201,1,'Uncatalogued A',9200)`);
+  sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (9201,'${ALICE}',10)`);
+  // Two more so the tag clears TAG_MIN_GAMES, sharing one appid's tags is enough
+  // because preference counts rated GAMES, not distinct apps.
+  sqlite.exec(`INSERT INTO steam_apps (appid, name, tags) VALUES
+               (9202,'Also Missing','["Dwarves","Base Building"]'),
+               (9203,'Missing Too','["Dwarves","Base Building"]')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES
+               (9204,1,'Uncatalogued B',9202), (9205,1,'Uncatalogued C',9203)`);
+  sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES
+               (9204,'${ALICE}',10), (9205,'${ALICE}',10)`);
+
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const d = await (await recommendRoute.onRequestGet({
+    request: recReq('?coopOnly=0'), env, data })).json();
+  const learned = (d.likes || []).some((l) => l.tag === 'Dwarves');
+
+  for (const sql of [
+    'DELETE FROM ratings WHERE game_id IN (9201,9204,9205)',
+    'DELETE FROM games WHERE id IN (9201,9204,9205)',
+    'DELETE FROM steam_apps WHERE appid IN (9200,9202,9203)',
+  ]) sqlite.exec(sql);
+  return learned || `likes were ${JSON.stringify((d.likes || []).map((l) => l.tag))}`;
+});
+
+await check('a game already in the library is not recommended, but is still findable', async () => {
+  sqlite.exec(`INSERT INTO coop_apps (appid, name, popularity_rank, is_coop, tags)
+               VALUES (9300,'Already Ours',1,1,'["Survival"]')`);
+  sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES (9301,1,'Already Ours',9300)`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const listed = await (await recommendRoute.onRequestGet({ request: recReq('?coopOnly=0'), env, data })).json();
+  // A search is a lookup, not a recommendation: hiding what you typed reads as broken.
+  const found = await (await recommendRoute.onRequestGet({
+    request: recReq('?coopOnly=0&q=Already%20Ours'), env, data })).json();
+  const has = (d) => (d.games || []).some((g) => g.appid === 9300);
+  sqlite.exec('DELETE FROM games WHERE id=9301');
+  sqlite.exec('DELETE FROM coop_apps WHERE appid=9300');
+  return (!has(listed) && has(found))
+    || `recommended it: ${has(listed)}; search found it: ${has(found)}`;
+});
+
 console.log('\nPersonal Steam import');
 
 sqlite.exec(`INSERT INTO groups (id,slug,name,max_players,created_by)

@@ -125,6 +125,12 @@ CREATE TABLE steam_apps (
   release_date      TEXT,
   metacritic        INTEGER,
   coop_categories   TEXT,                     -- JSON array, Steam's own co-op tags
+  -- Steam user tags for games the co-op catalogue does not list. The recommender
+  -- learns a group's taste from these, and reading them only from `coop_apps` threw
+  -- away 44% of group 1's evidence. NULL means nobody has looked, never "no tags",
+  -- or the crawler stops retrying the row. Mirrors migrations/031-steam-app-tags.sql.
+  tags              TEXT,
+  tags_at           INTEGER,
   fetched_at        INTEGER NOT NULL DEFAULT (unixepoch())
 );
 

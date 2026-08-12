@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 181 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 183 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -380,7 +380,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-181/181 assertions pass. `npm run test:ui` does **not** run on macOS: it
+183/183 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -1197,6 +1197,44 @@ only that it is self-consistent.
 The response carries `why` (the two tags that drove each card), `likes` and
 `dislikes`, and the UI shows all of them: a list labelled "recommended" that will
 not say why is asking for trust it has not earned.
+
+### It was starving, not misconfigured
+
+Measured in August 2026 and worth not rediscovering. Tags were read from
+`coop_apps` alone, so a rated game the crawler had never listed taught the ranking
+nothing — **45 of group 1's 103 rated games**, and the most characteristic ones
+(Monster Hunter: World, Elden Ring: Shadow of the Erdtree, Ark, The Division 2,
+Trine 4 and 5). What survived was thin enough that three casually-rated puzzle
+games outvoted the group's actual taste, and the top of the list was party games.
+
+**Use leave-one-out to judge a change here, not your own reading of the top ten.**
+Learn preferences from every rated game but one, predict the held-out game's score,
+correlate predictions with real scores, and hold the evaluation set fixed so only
+the evidence differs. Measured that way the shipped ranking had *no positive
+relationship* with what this group liked: r = 0.025 on a snapshot, −0.109 on live
+data. Reading both tag homes takes it to 0.253 and 0.144. The sample is ~55 games
+and 0.14 is weak — do not oversell it — but the sign is consistent.
+
+**Every tuning knob tried made it worse**, which is why they are all still at their
+documented values: SHRINK 8 → 0.236, TAG_MIN_GAMES 4 → 0.211, shrinking a
+candidate's fit by how many of its tags matched → 0.210. The most plausible-sounding
+fix was the worst: restricting history to played games, so backlog "how much do you
+want to play this" scores stop being read as quality judgements, scored **0.005**.
+That idea is intuitive, wrong on this data, and will occur to somebody again.
+`NON_TASTE` is roughly neutral on this metric (0.248 vs 0.253) and stays because it
+was added for output quality, which correlation does not measure. IDF is still
+load-bearing: removing it costs 0.253 → 0.174.
+
+Tags for library games the catalogue does not list live in `steam_apps.tags`
+(migration 031), filled by `scripts/backfill-tags.mjs --library` and kept up by the
+crawler four an hour. **Not in `coop_apps`** — that is the browsable co-op
+catalogue, and inserting a group's singleplayer and PvP games would change what
+everyone else sees. The route prefers the catalogue's copy where both exist, since
+that is the row candidates are compared against.
+
+Games already in the library are dropped from the ranking, **except when there is a
+search term**: then it is a lookup, and hiding what somebody typed because they
+already own it reads as a broken search.
 
 **`POP_WEIGHT` is 0.02 and the magnitude is load-bearing.** Raw
 `1/log10(10 + reviews)` spans ~0.14–0.50 while fit spans roughly ±0.4, so

@@ -1,0 +1,53 @@
+-- CoopQueue migration 031 — tags for library games the catalogue does not cover.
+--
+--   npm run db:migrate -- --file=./migrations/031-steam-app-tags.sql
+--
+-- "Recommended for us" learns a group's taste from Steam user tags on the games it
+-- has rated. Those tags were only ever read from `coop_apps`, the crawled global
+-- co-op catalogue — so a rated game the crawler has never listed contributes
+-- nothing at all.
+--
+-- Measured on group 1: **45 of its 103 rated games had no tags**, and they are the
+-- most characteristic ones — Monster Hunter: World, Elden Ring: Shadow of the
+-- Erdtree, Ark: Survival Evolved, The Division 2, Trine 4 and 5, Tiny Tina's
+-- Wonderlands. 44% of the evidence was being discarded, and what survived was
+-- thin enough that three casually-rated puzzle games outvoted the group's actual
+-- taste.
+--
+-- The effect was not subtle. Leave-one-out over the group's own ratings — learn
+-- preferences from every game but one, predict the held-out game's score, correlate
+-- the predictions with the real scores — measured twice, on the same fixed
+-- evaluation set both times:
+--
+--   snapshot of 2026-08-12   r = 0.025 -> 0.253   (58 games evaluated)
+--   live data after backfill r = -0.109 -> 0.144  (55 games evaluated)
+--
+-- The magnitudes differ because the sample is small and the library moved between
+-- the two runs; 0.14 is a weak correlation and should not be oversold. What is
+-- consistent is the sign: the shipped ranking had NO positive relationship with
+-- what this group liked, and now it has one.
+--
+-- It was not the algorithm. Tuning was tried against the same measurement and every
+-- knob made it worse: SHRINK 8 (0.236), TAG_MIN_GAMES 4 (0.211), shrinking a
+-- candidate's fit by how many tags matched (0.210), and restricting history to
+-- played games so backlog "how much do you want this" scores stop being read as
+-- quality (0.005 — the most plausible-sounding fix and the worst one). IDF, by
+-- contrast, still earns its place: removing it costs 0.253 -> 0.174. The ranking
+-- was starving, not misconfigured.
+--
+-- `steam_apps` is the right home. It is already the shared per-app metadata cache,
+-- keyed by appid and read by every group, so one fetch serves everyone — exactly
+-- the property invariant 3 exists to protect. `coop_apps` is deliberately NOT the
+-- home: it is the browsable co-op catalogue, and inserting a group's PvP or
+-- singleplayer games into it would change what everyone else sees.
+--
+-- No `is_coop` column here, unlike `coop_apps`. That flag decides what the
+-- catalogue shows and is the catalogue's business; this table only needs to
+-- remember what a game plays like.
+--
+-- NULL still means "nobody has looked", never "no tags" — the crawler picks
+-- untagged rows up on that basis, so recording an empty array would retire a row
+-- from ever being retried. Mirrored in schema.sql.
+
+ALTER TABLE steam_apps ADD COLUMN tags TEXT;
+ALTER TABLE steam_apps ADD COLUMN tags_at INTEGER;

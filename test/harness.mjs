@@ -875,14 +875,27 @@ const server = http.createServer(async (req, res) => {
                            FROM games g JOIN ratings r ON r.game_id=g.id
                           WHERE g.group_id=? AND g.archived_at IS NULL
                             AND g.steam_appid IS NOT NULL GROUP BY g.id`, gid);
+      // Both tag homes, like the route: the catalogue covers only games the crawler
+      // has listed, and a group rates plenty it has not.
       const tagsFor = new Map();
-      for (const r of q(`SELECT c.appid, c.tags FROM coop_apps c
-                           JOIN games g ON g.steam_appid=c.appid AND g.group_id=?
-                          WHERE c.tags IS NOT NULL`, gid)) {
+      for (const r of q(`SELECT g.steam_appid AS appid, COALESCE(c.tags, s.tags) AS tags
+                           FROM games g
+                           LEFT JOIN coop_apps  c ON c.appid=g.steam_appid
+                           LEFT JOIN steam_apps s ON s.appid=g.steam_appid
+                          WHERE g.group_id=? AND g.steam_appid IS NOT NULL
+                            AND COALESCE(c.tags, s.tags) IS NOT NULL`, gid)) {
         try {
           const t = JSON.parse(r.tags);
           if (Array.isArray(t)) tagsFor.set(r.appid, t);
         } catch { /* ignore a malformed row */ }
+      }
+
+      // A discovery list should not spend its best slots on games you already have,
+      // but a search is a lookup and must still find them.
+      if (!term) {
+        const own = new Set(q('SELECT steam_appid AS appid FROM games WHERE group_id=? AND steam_appid IS NOT NULL', gid)
+          .map((r) => r.appid));
+        rows = rows.filter((g) => !own.has(g.appid));
       }
 
       const out = recommend(rows, history, tagsFor);

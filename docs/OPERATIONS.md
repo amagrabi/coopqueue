@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 181 assertions — ALWAYS before a deploy
+npm test          # 183 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -266,6 +266,30 @@ group load, so migrate first. Same retry behaviour as 029: a second run fails wi
 
 Both 029 and 030 are additive column adds — no table rebuild, so none of migration
 017's cascade hazards apply. Take `npm run db:backup` first anyway.
+
+### Migrations 031 and 032: tags for library games
+
+`031-steam-app-tags.sql` adds `tags` and `tags_at` to `steam_apps`, which the
+recommender now reads alongside `coop_apps`. Apply it before deploying, since the
+library route joins the column on every group load.
+
+```bash
+npx wrangler d1 execute g4m1ng --remote --file=migrations/031-steam-app-tags.sql
+```
+
+`032-library-tags.sql` is the generated backfill — 131 rows, produced by:
+
+```bash
+node scripts/backfill-tags.mjs --library --out migrations/032-library-tags.sql
+```
+
+That reads one Steam store page per row at ~1.7s spacing, so 135 rows took about
+four minutes. It writes **no `is_coop`**: that flag decides what the browsable
+catalogue shows and belongs to `coop_apps`. Re-running the generator is safe — it
+only picks rows where `tags IS NULL`, and the emitted UPDATEs are idempotent.
+
+Ongoing maintenance needs no manual step: the cron crawler now tags four library
+rows per run, on the same "NULL means nobody looked" rule as the catalogue.
 
 ---
 

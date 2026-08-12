@@ -29,6 +29,8 @@ import {
 
 /** Games refreshed per run. 3 subrequests each, +2 for discovery. Cap is 50. */
 const BATCH = 9;
+/** Library games tagged per run. One store page each, inside the same 50 cap. */
+const LIBRARY_TAG_BATCH = 4;
 /** Search pages to rotate through for discovery, one per run. */
 const DISCOVERY_PAGES = 8;
 /** Below this many reviews a game is abandoned shovelware; not worth listing. */
@@ -126,6 +128,35 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
       const lenient = (row.review_count ?? 0) < MIN_REVIEWS ? NEW_RELEASE_MIN_REVIEWS : MIN_REVIEWS;
       if (await upsert(db, row.appid, out, lenient)) out.refreshed++;
     }
+  }
+
+  /* ── library tags: what the catalogue does not cover ──────────────────────
+     The recommender learns a group's taste from tags on the games it has rated,
+     and those only ever came from `coop_apps`. A rated game the crawler has never
+     listed therefore taught it nothing — 45 of group 1's 103 rated games, and the
+     most characteristic ones. See migration 031 for the measurement.
+
+     One store page each and no `appdetails` call, so this is the cheapest pass
+     here; kept small anyway because BATCH already sizes the run against the
+     50-subrequest cap. Rows already tagged in the catalogue are skipped, since the
+     route prefers that copy. */
+  for (const row of (await db.prepare(
+    `SELECT s.appid FROM steam_apps s
+      WHERE s.tags IS NULL
+        AND EXISTS (SELECT 1 FROM games g WHERE g.steam_appid = s.appid)
+        AND NOT EXISTS (SELECT 1 FROM coop_apps c WHERE c.appid = s.appid AND c.tags IS NOT NULL)
+      ORDER BY s.appid LIMIT ?`
+  ).bind(LIBRARY_TAG_BATCH).all()).results || []) {
+    try {
+      const parsed = parseStoreTags(await getStoreHtml(storeTagsUrl(row.appid)));
+      out.subrequests++;
+      // No tag block means an age gate or a delisted app. Leaving it NULL is what
+      // makes it eligible again next run; writing [] would retire it forever.
+      if (!parsed) continue;
+      await db.prepare('UPDATE steam_apps SET tags = ?, tags_at = unixepoch() WHERE appid = ?')
+        .bind(JSON.stringify(parsed.tags), row.appid).run();
+      out.libraryTagged = (out.libraryTagged || 0) + 1;
+    } catch { out.failed++; }
   }
 
   await db.prepare(
