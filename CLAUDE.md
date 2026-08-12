@@ -1215,15 +1215,21 @@ relationship* with what this group liked: r = 0.025 on a snapshot, −0.109 on l
 data. Reading both tag homes takes it to 0.253 and 0.144. The sample is ~55 games
 and 0.14 is weak — do not oversell it — but the sign is consistent.
 
-**Every tuning knob tried made it worse**, which is why they are all still at their
-documented values: SHRINK 8 → 0.236, TAG_MIN_GAMES 4 → 0.211, shrinking a
-candidate's fit by how many of its tags matched → 0.210. The most plausible-sounding
-fix was the worst: restricting history to played games, so backlog "how much do you
-want to play this" scores stop being read as quality judgements, scored **0.005**.
-That idea is intuitive, wrong on this data, and will occur to somebody again.
-`NON_TASTE` is roughly neutral on this metric (0.248 vs 0.253) and stays because it
-was added for output quality, which correlation does not measure. IDF is still
-load-bearing: removing it costs 0.253 → 0.174.
+**Put an interval on that number before believing a difference in it.** Bootstrapped
+over 93 evaluation games, r ≈ 0.19 carries a 95% interval of about **[−0.02, 0.39]**
+— so the tuning table this file first recorded (SHRINK 8 → 0.236, TAG_MIN_GAMES 4 →
+0.211, candidate-side shrinkage → 0.210, against 0.253) was reading noise as
+signal. Those knobs are not measurably worse; they are indistinguishable. Only
+differences that clear the interval mean anything, and two do: restricting history
+to played games so backlog "how much do you want to play this" scores stop being
+read as quality judgements scored **0.005**, and removing IDF costs 0.253 → **0.174**.
+The played-only idea is intuitive, wrong on this data, and will occur to somebody
+again. `NON_TASTE` is neutral here (0.248 vs 0.253) and stays because it was added
+for output quality, which correlation does not measure.
+
+The practical consequence: **judge this ranking on whether its likes are backed by
+real evidence, and use the correlation only to catch a change that makes things
+clearly worse.** That is how `TAG_MIN_GAMES` moved 3 → 4 — see the constant.
 
 Tags for library games the catalogue does not list live in `steam_apps.tags`
 (migration 031), filled by `scripts/backfill-tags.mjs --library` and kept up by the

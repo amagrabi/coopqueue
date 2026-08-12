@@ -1801,16 +1801,19 @@ await check('a thin history is reported as popularity, not dressed up as taste',
 });
 
 await check('tags the group rates highly rank above tags it rates poorly', async () => {
-  // Three games per tag: TAG_MIN_GAMES is 3, because at 2 a coincidence reads as
-  // a taste — "Early Access" scored +0.51 off three games on real data.
+  // Four games per tag: TAG_MIN_GAMES is 4, because at 3 a coincidence still reads
+  // as a taste — "Pirates" scored +0.70 off three games on real data and put a
+  // pirate MMO at number one.
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },  // Survival: loved
-    { appid: 14, score: 3 }, { appid: 15, score: 3 }, { appid: 16, score: 3 },  // Racing: disliked
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
+    { appid: 18, score: 9 },                                                    // Survival: loved
+    { appid: 14, score: 3 }, { appid: 15, score: 3 }, { appid: 16, score: 3 },
+    { appid: 19, score: 3 },                                                    // Racing: disliked
     { appid: 17, score: 6 },
   ];
   const tagsFor = new Map([
-    [11, ['Survival']], [12, ['Survival']], [13, ['Survival']],
-    [14, ['Racing']], [15, ['Racing']], [16, ['Racing']], [17, ['Puzzle']],
+    [11, ['Survival']], [12, ['Survival']], [13, ['Survival']], [18, ['Survival']],
+    [14, ['Racing']], [15, ['Racing']], [16, ['Racing']], [19, ['Racing']], [17, ['Puzzle']],
   ]);
   const out = recommend(
     [{ appid: 1, name: 'a racer', review_count: 5e5, tags: '["Racing"]' },
@@ -1823,7 +1826,7 @@ await check('tags the group rates highly rank above tags it rates poorly', async
     || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
 });
 
-await check('a tag on fewer than three games cannot define a taste', async () => {
+await check('a tag on fewer than four games cannot define a taste', async () => {
   // Two games is a coincidence, not a preference — see TAG_MIN_GAMES.
   const history = [
     { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
@@ -1867,12 +1870,14 @@ await check('a rare tag outweighs several common ones', async () => {
      by commonness. On real data "Exploration" and "Open World" outvoted
      "Souls-like" and put four driving simulators in group 1's top ten. */
   const history = [
-    { appid: 11, score: 10 }, { appid: 12, score: 10 }, { appid: 13, score: 10 },  // Souls-like: adored
+    { appid: 11, score: 10 }, { appid: 12, score: 10 }, { appid: 13, score: 10 },
+    { appid: 18, score: 10 },                                                      // Souls-like: adored
     { appid: 14, score: 7 }, { appid: 15, score: 7 }, { appid: 16, score: 7 },     // Open World: mildly warm
     { appid: 17, score: 5 },
   ];
   const tagsFor = new Map([
-    [11, ['Souls-like', 'Open World']], [12, ['Souls-like', 'Open World']], [13, ['Souls-like', 'Open World']],
+    [11, ['Souls-like', 'Open World']], [12, ['Souls-like', 'Open World']],
+    [13, ['Souls-like', 'Open World']], [18, ['Souls-like', 'Open World']],
     [14, ['Open World']], [15, ['Open World']], [16, ['Open World']], [17, ['Puzzle']],
   ]);
   // "Open World" is on almost every candidate, so it says nothing; "Souls-like" is
@@ -1932,16 +1937,16 @@ await check('the order never contradicts the fit it displays', async () => {
 
 await check('untasted candidates sort below every ranked one', async () => {
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
-    { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 },
+    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 }, { appid: 18, score: 9 },
+    { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 }, { appid: 19, score: 5 },
   ];
   const out = recommend(
     // The unknown game is hugely more popular, and must still lose to a match.
     [{ appid: 1, review_count: 5e6, tags: '["Nothing We Have Played"]' },
      { appid: 2, review_count: 1, tags: '["Survival"]' }],
     history,
-    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Survival']],
-             [14, ['Y']], [15, ['Y']], [16, ['Y']]]),
+    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Survival']], [18, ['Survival']],
+             [14, ['Y']], [15, ['Y']], [16, ['Y']], [19, ['Y']]]),
   );
   return out.games[0].appid === 2 || `popularity beat a taste match: first ${out.games[0]?.appid}`;
 });
@@ -1996,15 +2001,16 @@ await check('taste is learned from library games the catalogue does not list', a
   sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES
                (9201,1,'Uncatalogued A',9200)`);
   sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (9201,'${ALICE}',10)`);
-  // Two more so the tag clears TAG_MIN_GAMES, sharing one appid's tags is enough
-  // because preference counts rated GAMES, not distinct apps.
+  // Three more so the tag clears TAG_MIN_GAMES, which counts rated GAMES.
   sqlite.exec(`INSERT INTO steam_apps (appid, name, tags) VALUES
                (9202,'Also Missing','["Dwarves","Base Building"]'),
-               (9203,'Missing Too','["Dwarves","Base Building"]')`);
+               (9203,'Missing Too','["Dwarves","Base Building"]'),
+               (9206,'Missing As Well','["Dwarves","Base Building"]')`);
   sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid) VALUES
-               (9204,1,'Uncatalogued B',9202), (9205,1,'Uncatalogued C',9203)`);
+               (9204,1,'Uncatalogued B',9202), (9205,1,'Uncatalogued C',9203),
+               (9207,1,'Uncatalogued D',9206)`);
   sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES
-               (9204,'${ALICE}',10), (9205,'${ALICE}',10)`);
+               (9204,'${ALICE}',10), (9205,'${ALICE}',10), (9207,'${ALICE}',10)`);
 
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const d = await (await recommendRoute.onRequestGet({
@@ -2012,9 +2018,9 @@ await check('taste is learned from library games the catalogue does not list', a
   const learned = (d.likes || []).some((l) => l.tag === 'Dwarves');
 
   for (const sql of [
-    'DELETE FROM ratings WHERE game_id IN (9201,9204,9205)',
-    'DELETE FROM games WHERE id IN (9201,9204,9205)',
-    'DELETE FROM steam_apps WHERE appid IN (9200,9202,9203)',
+    'DELETE FROM ratings WHERE game_id IN (9201,9204,9205,9207)',
+    'DELETE FROM games WHERE id IN (9201,9204,9205,9207)',
+    'DELETE FROM steam_apps WHERE appid IN (9200,9202,9203,9206)',
   ]) sqlite.exec(sql);
   return learned || `likes were ${JSON.stringify((d.likes || []).map((l) => l.tag))}`;
 });
