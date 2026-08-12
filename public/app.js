@@ -3349,7 +3349,7 @@ async function renderBrowse(reset) {
                      catch { return false; } })()
             ? '<p class="browse-ea">Early access — still unfinished</p>' : ''}
           ${g.why?.length
-            ? `<p class="browse-fit">Matches your taste for ${g.why.map(esc).join(' and ')}</p>`
+            ? `<p class="browse-fit">Similar to ${g.why.map(esc).join(' and ')}, which you rated well</p>`
             : ''}
           ${g.short_description ? `<p>${esc(g.short_description)}</p>` : ''}
         </div>

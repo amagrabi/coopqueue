@@ -871,7 +871,7 @@ const server = http.createServer(async (req, res) => {
       if (minPlayers) rows = rows.filter((g) => g.max_players != null && g.max_players >= minPlayers);
       if (url.searchParams.get('coopOnly') !== '0') rows = rows.filter((g) => g.is_coop !== 0);
 
-      const history = q(`SELECT g.steam_appid AS appid, AVG(r.score) AS score
+      const history = q(`SELECT g.steam_appid AS appid, g.name, AVG(r.score) AS score
                            FROM games g JOIN ratings r ON r.game_id=g.id
                           WHERE g.group_id=? AND g.archived_at IS NULL
                             AND g.steam_appid IS NOT NULL GROUP BY g.id`, gid);

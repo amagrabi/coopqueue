@@ -1779,7 +1779,7 @@ await check('the tag list is capped, so one page cannot bloat a row', async () =
 console.log('\nRecommendations');
 
 const recommendRoute = await import(path.join(SITE, 'functions/api/g/[slug]/recommend.js'));
-const { recommend } = await import(path.join(SITE, 'lib/recommend.js'));
+const { recommend, REVIEW_PRIOR } = await import(path.join(SITE, 'lib/recommend.js'));
 const DAN = '76561198000000555';
 const recReq = (qs = '') => new Request(`https://x/api/g/g4m1ng/recommend${qs}`);
 
@@ -1791,7 +1791,7 @@ const recReq = (qs = '') => new Request(`https://x/api/g/g4m1ng/recommend${qs}`)
 const pad = (n, score, tagsFor, from = 8900) => {
   const out = [];
   for (let i = 0; i < n; i++) {
-    out.push({ appid: from + i, score });
+    out.push({ appid: from + i, name: `Filler ${i}`, score });
     tagsFor.set(from + i, [`Filler ${i}`]);
   }
   return out;
@@ -1819,11 +1819,11 @@ await check('tags the group rates highly rank above tags it rates poorly', async
   // as a taste — "Pirates" scored +0.70 off three games on real data and put a
   // pirate MMO at number one.
   const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 },
-    { appid: 18, score: 9 },                                                    // Survival: loved
-    { appid: 14, score: 3 }, { appid: 15, score: 3 }, { appid: 16, score: 3 },
-    { appid: 19, score: 3 },                                                    // Racing: disliked
-    { appid: 17, score: 6 },
+    { appid: 11, name: 'Survival A', score: 9 }, { appid: 12, name: 'Survival B', score: 9 },
+    { appid: 13, name: 'Survival C', score: 9 }, { appid: 18, name: 'Survival D', score: 9 },
+    { appid: 14, name: 'Racer A', score: 3 }, { appid: 15, name: 'Racer B', score: 3 },
+    { appid: 16, name: 'Racer C', score: 3 }, { appid: 19, name: 'Racer D', score: 3 },
+    { appid: 17, name: 'A Puzzle', score: 6 },
   ];
   const tagsFor = new Map([
     [11, ['Survival']], [12, ['Survival']], [13, ['Survival']], [18, ['Survival']],
@@ -1836,24 +1836,35 @@ await check('tags the group rates highly rank above tags it rates poorly', async
   );
   // Note the review counts: the racer is far more popular, so this also asserts
   // popularity cannot overturn a real taste signal.
-  return (out.basis === 'taste' && out.games[0].appid === 2 && out.games[0].why[0] === 'Survival')
+  /* The reason names the game it resembles, not the tag they share — the ranking is
+     built on whole-game similarity now, and "because you rated Survival A" is a
+     claim somebody can check. */
+  return (out.basis === 'taste' && out.games[0].appid === 2 && /^Survival /.test(out.games[0].why[0]))
     || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
 });
 
-await check('a tag on fewer than four games cannot define a taste', async () => {
-  // Two games is a coincidence, not a preference — see TAG_MIN_GAMES.
-  const history = [
-    { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
-    { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 },
-  ];
+await check('a thin tag stays out of the likes summary', async () => {
+  /* This used to assert that a two-game tag could not score a candidate at all.
+     The ranking no longer works per tag — it compares whole games — so a shared
+     rare tag IS legitimate evidence there, weighted by overall resemblance and
+     shrunk when the resemblance is faint. TAG_MIN_GAMES now governs only the
+     likes/dislikes summary the UI prints, which is a claim about the group
+     ("you rate Survival above your average") and still needs real backing. */
   const tagsFor = new Map([[11, ['Roguelike']], [12, ['Roguelike']],
                            [13, ['X']], [14, ['X']], [15, ['X']], [16, ['X']]]);
+  const history = [
+    { appid: 11, name: 'Rogue A', score: 9 }, { appid: 12, name: 'Rogue B', score: 9 },
+    { appid: 13, name: 'Other A', score: 5 }, { appid: 14, name: 'Other B', score: 5 },
+    { appid: 15, name: 'Other C', score: 5 }, { appid: 16, name: 'Other D', score: 5 },
+  ];
   const out = recommend(
     [{ appid: 1, tags: '["Roguelike"]' }],
     [...history, ...pad(15, 6, tagsFor)],
     tagsFor,
   );
-  return out.games[0].fit === null || `scored a two-game tag: ${out.games[0].fit}`;
+  const named = [...out.likes, ...out.dislikes].map((l) => l.tag);
+  return !named.includes('Roguelike')
+    || `a two-game tag reached the summary: ${JSON.stringify(named)}`;
 });
 
 await check('release state and price model are not tastes', async () => {
@@ -1886,10 +1897,10 @@ await check('a rare tag outweighs several common ones', async () => {
      by commonness. On real data "Exploration" and "Open World" outvoted
      "Souls-like" and put four driving simulators in group 1's top ten. */
   const history = [
-    { appid: 11, score: 10 }, { appid: 12, score: 10 }, { appid: 13, score: 10 },
-    { appid: 18, score: 10 },                                                      // Souls-like: adored
-    { appid: 14, score: 7 }, { appid: 15, score: 7 }, { appid: 16, score: 7 },     // Open World: mildly warm
-    { appid: 17, score: 5 },
+    { appid: 11, name: 'Souls A', score: 10 }, { appid: 12, name: 'Souls B', score: 10 },
+    { appid: 13, name: 'Souls C', score: 10 }, { appid: 18, name: 'Souls D', score: 10 },
+    { appid: 14, name: 'Open A', score: 7 }, { appid: 15, name: 'Open B', score: 7 },
+    { appid: 16, name: 'Open C', score: 7 }, { appid: 17, name: 'A Puzzle', score: 5 },
   ];
   const tagsFor = new Map([
     [11, ['Souls-like', 'Open World']], [12, ['Souls-like', 'Open World']],
@@ -1901,7 +1912,7 @@ await check('a rare tag outweighs several common ones', async () => {
   const common = Array.from({ length: 12 }, (_, i) => ({ appid: 100 + i, tags: '["Open World"]' }));
   const out = recommend([...common, { appid: 1, tags: '["Souls-like","Open World"]' }],
     [...history, ...pad(13, 8.25, tagsFor)], tagsFor);
-  return (out.games[0].appid === 1 && out.games[0].why[0] === 'Souls-like')
+  return (out.games[0].appid === 1 && /^Souls /.test(out.games[0].why[0]))
     || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
 });
 
@@ -2081,21 +2092,23 @@ await check('a weak Steam verdict loses a tie, and never touches popularity orde
   const tagsFor = new Map();
   const history = pad(24, 7, tagsFor);
   // Two identical matches, so only the verdict can separate them.
-  history.push({ appid: 500, score: 10 }, { appid: 501, score: 10 },
-               { appid: 502, score: 10 }, { appid: 503, score: 10 });
+  history.push({ appid: 500, name: 'Liked A', score: 10 }, { appid: 501, name: 'Liked B', score: 10 },
+               { appid: 502, name: 'Liked C', score: 10 }, { appid: 503, name: 'Liked D', score: 10 });
   for (const a of [500, 501, 502, 503]) tagsFor.set(a, ['Survival']);
   const cands = [
     { appid: 1, name: 'mixed', review_count: 5000, review_hint: 'Mixed', tags: '["Survival"]', popularity_rank: 1 },
     { appid: 2, name: 'loved', review_count: 5000, review_hint: 'Very Positive', tags: '["Survival"]', popularity_rank: 2 },
   ];
   const ranked = recommend(cands, history, tagsFor);
-  // Same fit — the prior is what orders them.
-  const sameFit = ranked.games[0].fit === ranked.games[1].fit;
+  /* Identical tags, so identical resemblance: the whole gap between them is the
+     prior, and it is inside the displayed number rather than applied invisibly. */
   const goodFirst = ranked.games[0].appid === 2;
+  const gap = Math.round((ranked.games[0].fit - ranked.games[1].fit) * 100) / 100;
+  const sameFit = gap === REVIEW_PRIOR.Mixed;
   // Below MIN_HISTORY the label promises popularity order, so it must be exactly that.
   const popular = recommend(cands, pad(3, 7, new Map()), new Map());
   return (sameFit && goodFirst && popular.basis === 'popularity' && popular.games[0].appid === 1)
-    || `sameFit ${sameFit}, first ${ranked.games[0].appid} (fits ${ranked.games[0].fit}/${ranked.games[1].fit}), popularity first ${popular.games[0].appid}`;
+    || `gap ${gap} (expected ${REVIEW_PRIOR.Mixed}), first ${ranked.games[0].appid}, popularity first ${popular.games[0].appid}`;
 });
 
 await check('a game already in the library is not recommended, but is still findable', async () => {

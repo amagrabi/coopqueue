@@ -50,7 +50,7 @@ export async function onRequestGet({ request, env, data }) {
     // The group's own history. Archived games are excluded: they are no longer what
     // this group is choosing between, so they should not shape its suggestions.
     env.DB.prepare(
-      `SELECT g.steam_appid AS appid, AVG(r.score) AS score
+      `SELECT g.steam_appid AS appid, g.name, AVG(r.score) AS score
          FROM games g JOIN ratings r ON r.game_id = g.id
         WHERE g.group_id = ? AND g.archived_at IS NULL AND g.steam_appid IS NOT NULL
         GROUP BY g.id`

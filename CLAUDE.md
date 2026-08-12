@@ -1157,10 +1157,43 @@ data behind an endpoint with no tenancy check at all. Both routes select
 `CATALOGUE_COLS` and apply the same filters, so the card shape and the eligible set
 do not change when you switch sort order.
 
-How it ranks: per-tag preference is the group's mean score for library games
-carrying that tag minus the group's overall mean, shrunk by `n/(n+3)`. Below five
-rated games it does not pretend — it returns `basis: 'popularity'` and the UI says
-so.
+How it ranks: **a candidate is scored by how much the group liked the games it most
+resembles.** Every game is an IDF-weighted vector over its tags, similarity is the
+cosine of two such vectors, and a candidate's fit is the similarity-weighted mean of
+its `NEIGHBOURS` nearest rated games' scores relative to the group's own average,
+shrunk when even the nearest are faint matches. Below `MIN_HISTORY` rated games it
+does not pretend — it returns `basis: 'popularity'` and the UI says so.
+
+**This replaced a per-tag average, and the reason is the failure that model could
+not fix.** It learned one number per tag and could not use a tag seen fewer than
+`TAG_MIN_GAMES` times — precisely the rare, informative ones IDF weights highest.
+Barotrauma was ranked on Strategy (−0.45) and Horror (−0.15) and buried at #259
+while its real signal, Submarine (idf 5.98) and Underwater (idf 5.29), carried no
+preference at all; the group had scored it 7.5. Comparing whole games needs no
+threshold — one rated submarine game recognises another — and it now ranks #80.
+
+Measured on group 1, holding each rated game out in turn:
+
+```
+                      leave-one-out r      where held-out games land (median)
+                                          loved   liked    ok    meh   1st page
+  per-tag average   0.193 [-0.02, 0.39]    28%     50%    43%    49%    4 / 52
+  nearest games     0.270 [ 0.04, 0.46]    15%     21%    40%    41%    8 / 52
+```
+
+The correlations overlap, so that is not the argument. Two things are: this is the
+first configuration measured here whose interval **excludes zero**, and the
+retrieval order is finally monotonic, where the old model placed "liked" (50%)
+*below* "meh" (49%).
+
+`why` names games now, not tags — "Similar to Elden Ring and Monster Hunter: World"
+rather than "matches your taste for Survival". That is a better explanation because
+it is checkable. `TAG_MIN_GAMES` and the per-tag preferences survive, but **only for
+the likes/dislikes summary**; they decide no ranking.
+
+**The cost is `candidates × rated games` cosines**, measured at 17 ms for 303 × 97.
+The library cap of 2000 games bounds the worst case at roughly half a second; no
+group is close, but that is the number to watch if one gets there.
 
 **Two guards, both added because the first run against real data was bad.** With
 `TAG_MIN_GAMES = 2` and no stoplist, group 1's second-strongest "preference" came
@@ -1329,6 +1362,15 @@ displayed column is descending.
 The **Co-op only** toggle is on by default and filters on `is_coop` — see invariant
 7 for why that flag is computed by excluding PvP genres, and why untagged rows stay
 visible rather than being hidden.
+
+That exclusion rule has **one narrow exception**, added because Ghost of Tsushima
+DIRECTOR'S CUT came back under the filter: a game whose top six tags include
+`Singleplayer` and whose *whole* tag list contains no multiplayer tag at all is not
+co-op. This is not the rejected "require a co-op tag" rule — that asked for one in
+the top few and hid Terraria, Elden Ring, Stardew Valley and Baldur's Gate 3, all of
+which carry Multiplayer or Online Co-Op further down (Elden Ring has both, at 7 and
+11). Measured across the catalogue it reclassifies exactly one game and leaves the
+29 others with Singleplayer high up untouched.
 
 ## Archiving, not deleting
 
