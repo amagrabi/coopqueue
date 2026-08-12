@@ -226,7 +226,23 @@ kbd {
 .rate-body { padding: 22px 26px 26px; }
 .rate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .rate-head h2 { font-size: 26px; letter-spacing: -.02em; }
-.rate-progress { font-size: 13px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rate-progress {
+  font-size: 13px; color: var(--text-muted); white-space: nowrap;
+  font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px;
+}
+/* Sits beside the queue position because going back IS queue navigation, not one
+   of the answers — keeping it out of the action row means a stray click cannot
+   undo the rating you just gave. */
+.rate-back {
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  /* Sized as a tap target rather than to the glyph: at 3px padding it came out
+     33x23, which is a miss waiting to happen on a phone. */
+  min-height: 32px; min-width: 38px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-secondary);
+}
+.rate-back:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.rate-back:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
 .meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
 .chip {
   font-size: 12px; font-weight: 550; padding: 3px 9px; border-radius: 999px;

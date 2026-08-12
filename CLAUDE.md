@@ -1093,6 +1093,25 @@ everything. So an empty result names the other tabs ("Nothing here. 2 in Already
 rated") and switching keeps the term. Shortcuts are safe: `onKey` already bails
 when focus is in an `INPUT`, so typing "s" cannot skip the card.
 
+## Going back to the one you just answered
+
+Rating or skipping takes the card off the list it came from, so changing your mind
+meant switching tab and hunting the game down — Already rated is 110 entries for
+the owner of group 1. The `↩` beside the queue position goes straight to it.
+
+It **navigates rather than undoing**. Both destinations already let you change the
+answer — the slider in Already rated opens on your own score, Skipped offers "Put
+back in my queue" — and silently reversing a write nobody asked to reverse is a
+worse failure than one extra click. It sits by the position indicator rather than
+in the action row for the same reason: going back is queue navigation, and a stray
+click next to Save should not be able to touch the rating you just gave.
+
+`state.lastAction` records which list the game landed in (`rated` for a score,
+`skipped` for either skip, and back to its own mode for an unskip), and the button
+hides when the game is not actually there any more or when it is already the card
+on screen. One step, not a history stack: going back is not itself something to
+undo.
+
 ## The two skip keys
 
 The rating card's shortcut legend used to read `S skip · N didn't play`, which made

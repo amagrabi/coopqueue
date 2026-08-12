@@ -361,7 +361,13 @@
               <h2 id="rate-title"></h2>
               <div class="meta-row" id="rate-meta"></div>
             </div>
-            <div class="rate-progress"><span id="rate-pos"></span></div>
+            <div class="rate-progress">
+              <!-- Rating or skipping takes the card off the list it came from, so
+                   the game you just answered for is several clicks away in another
+                   tab. This goes straight back to it. -->
+              <button type="button" class="rate-back" id="rate-back" hidden>↩</button>
+              <span id="rate-pos"></span>
+            </div>
           </div>
 
           <p id="rate-desc" class="rate-desc"></p>

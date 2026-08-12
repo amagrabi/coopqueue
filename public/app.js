@@ -21,6 +21,8 @@ const state = {
   replayDraft: null,    // pending "would you play it again" answer for the open card
   replayFor: null,      // the game id that draft belongs to
   replayShown: false,   // revealed by hand when Steam has no playtime to prove it
+  lastAction: null,     // { gameId, mode } — the card just answered for, so the
+                        // back button can return to it; see goBack()
   nextAttendees: null,  // selected member ids; null means everybody in the workspace
   history: null,        // current member's missing shared-history facts
   view: 'queue',
@@ -547,6 +549,7 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.queue = q.queue;
   state.nextAttendees = null;
   state.replayFor = null;
+  state.lastAction = null;
   state.history = null;
   historySeq++;
   invalidateViewCache();
@@ -807,6 +810,7 @@ function wireOnce() {
   $('#btn-skip').addEventListener('click', () => skipGame(false));
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   $('#btn-unskip').addEventListener('click', unskipGame);
+  $('#rate-back').addEventListener('click', goBack);
   $$('#replay-opts .seg').forEach((b) => b.addEventListener('click', () => {
     // Picking the chosen answer again clears it, so a mis-click is undoable
     // without a fourth "actually, no answer" button.
@@ -1197,6 +1201,48 @@ function renderQueue() {
   $('#score-out').textContent = fmt(start, 1);
 
   renderReplayAsk(g);
+  renderBackButton(g, byMode);
+}
+
+/**
+ * "Go back to the one I just answered."
+ *
+ * Rating or skipping takes the card off the list it came from, so changing your
+ * mind meant finding the game again in Already rated or Skipped — a tab switch and
+ * a hunt through a list that is 110 entries long for the owner of group 1.
+ *
+ * It navigates rather than undoing. Both destinations already let you change the
+ * answer (the slider opens on your own score; Skipped offers "Put back in my
+ * queue"), and silently reversing a write nobody asked to reverse is a worse
+ * failure than one extra click.
+ */
+function renderBackButton(current, byMode) {
+  const back = $('#rate-back');
+  const act = state.lastAction;
+  const game = act && gameById(act.gameId);
+  // Hide it once the target is the card you are already looking at, and if the
+  // game has moved on since — re-rating from another tab, say — rather than
+  // offering a jump that would land nowhere.
+  const reachable = game && byMode[act.mode]?.includes(act.gameId)
+    && !(state.rateMode === act.mode && current.id === act.gameId);
+  back.hidden = !reachable;
+  if (!reachable) return;
+  const label = `Back to ${game.name}`;
+  back.title = label;
+  back.setAttribute('aria-label', `${label} to change your answer`);
+}
+
+function goBack() {
+  const act = state.lastAction;
+  if (!act) return;
+  const byMode = queuesByMode();
+  const at = (byMode[act.mode] || []).indexOf(act.gameId);
+  if (at < 0) return;
+  state.rateMode = act.mode;
+  state.qIndex = at;
+  // One step back, not a history stack: going back is itself not something to undo.
+  state.lastAction = null;
+  renderQueue();
 }
 
 /**
@@ -1323,6 +1369,8 @@ async function saveRating() {
     /* Revising does not shrink the list it came from, so nothing moves you along —
        step forward by hand, or the card sits there looking like it did not save. */
     if (state.rateMode === 'rated') state.qIndex++;
+    // A rating moves the game to Already rated; that is where "back" has to look.
+    state.lastAction = { gameId: g.id, mode: 'rated' };
     toast(`${g.name}: ${fmt(score, 1)}`);
     renderQueue();
   } catch (e) { toast(e.message); }
@@ -1462,6 +1510,7 @@ async function unskipGame() {
     g.mySkip = null;
     if (!state.queue.includes(g.id)) state.queue.push(g.id);
     $('#queue-count').textContent = state.queue.length || '';
+    state.lastAction = { gameId: g.id, mode: modeOf(g) };
     renderMyCoverage();
     toast(`${g.name} is back in your queue`);
     renderQueue();
@@ -1484,6 +1533,7 @@ async function skipGame(notPlayed = false) {
     g.mySkip = notPlayed ? 'not-played' : 'no-opinion';
     state.queue = state.queue.filter((id) => id !== g.id);
     $('#queue-count').textContent = state.queue.length || '';
+    state.lastAction = { gameId: g.id, mode: 'skipped' };
     renderMyCoverage();
     renderQueue();
   } catch (e) { toast(e.message); }
