@@ -29,9 +29,15 @@ import {
 
 /**
  * Total games upserted per run, discovery and refresh together. 3 subrequests each,
- * +2 search pages, +LIBRARY_TAG_BATCH store pages. Cap is 50, so 9 leaves room.
+ * +2 search pages, +LIBRARY_TAG_BATCH store pages, against a hard cap of 50:
+ * 12 x 3 + 2 + 4 = 42, leaving eight spare.
+ *
+ * Raised 9 -> 12 when the third discovery source landed. Discovery is budgeted
+ * first, so with eight candidates queued a batch of 9 left exactly one refresh per
+ * run and the catalogue stopped converging; a run measured 23 subrequests against
+ * a cap of 50, so the headroom was there.
  */
-const BATCH = 9;
+const BATCH = 12;
 /** Library games tagged per run. One store page each, inside the same 50 cap. */
 const LIBRARY_TAG_BATCH = 4;
 /** Tracked-but-uncatalogued games pulled in per run. 3 subrequests each. */
@@ -124,16 +130,37 @@ async function crawlOnce(env, { batch = BATCH } = {}) {
      rejects DLC and expansions and the review floor still applies — the lenient
      one, because a game a real group chose to track has passed a filter a search
      page has not. Self-limiting: once the backlog is absorbed this returns nothing. */
-  const tracked = await db.prepare(
+  /* A cursor, not just `ORDER BY appid LIMIT 3`, because some of these can never
+     succeed: Steam answers `success: false` for a delisted app (Plants vs. Zombies
+     GOTY, here), and `upsert` rejects DLC and anything under the review floor. Such
+     a row stays absent from `coop_apps` forever, so a plain ordered query would
+     re-attempt it every hour and permanently occupy one of the three slots — three
+     of them and the pass makes no progress at all, silently.
+
+     The cursor guarantees forward motion and wraps at the end of the list, which
+     also gives the failures one retry per lap in case Steam changes its mind. Same
+     idiom as `discovery_page` above, for the same reason: a Worker invocation is a
+     cold start with no memory of the last one. */
+  const trackedFrom = Number(
+    (await db.prepare("SELECT value FROM crawl_state WHERE key = 'tracked_cursor'").first())?.value ?? 0);
+  const trackedQuery = (after) => db.prepare(
     `SELECT DISTINCT g.steam_appid AS appid FROM games g
       WHERE g.steam_appid IS NOT NULL AND g.archived_at IS NULL
+        AND g.steam_appid > ?
         AND NOT EXISTS (SELECT 1 FROM coop_apps c WHERE c.appid = g.steam_appid)
       ORDER BY g.steam_appid LIMIT ?`
-  ).bind(TRACKED_DISCOVERY).all();
+  ).bind(after, TRACKED_DISCOVERY).all();
+  let tracked = await trackedQuery(trackedFrom);
+  if (!(tracked.results || []).length && trackedFrom > 0) tracked = await trackedQuery(0);
+  const trackedIds = (tracked.results || []).map((r) => r.appid);
+  await db.prepare(
+    `INSERT INTO crawl_state (key, value, updated_at) VALUES ('tracked_cursor', ?, unixepoch())
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = unixepoch()`
+  ).bind(String(trackedIds.length ? trackedIds[trackedIds.length - 1] : 0)).run();
 
   const fresh = [...pick(sellers, MIN_REVIEWS).slice(0, 3),
                  ...pick(newest, NEW_RELEASE_MIN_REVIEWS).slice(0, 2),
-                 ...(tracked.results || []).map((r) => ({ appid: r.appid, floor: NEW_RELEASE_MIN_REVIEWS }))];
+                 ...trackedIds.map((appid) => ({ appid, floor: NEW_RELEASE_MIN_REVIEWS }))];
   for (const c of fresh) {
     if (await upsert(db, c.appid, out, c.floor)) out.discovered++;
   }
