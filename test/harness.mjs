@@ -903,7 +903,8 @@ const server = http.createServer(async (req, res) => {
         games: out.games.slice(page * PAGE, page * PAGE + PAGE),
         page, total: out.games.length,
         hasMore: out.games.length > page * PAGE + PAGE,
-        basis: out.basis, ratedGames: out.ratedGames, needed: out.needed,
+        basis: out.basis, settled: out.settled,
+        ratedGames: out.ratedGames, needed: out.needed,
         likes: out.likes, dislikes: out.dislikes,
       });
     }

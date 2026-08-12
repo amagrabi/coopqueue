@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 183 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 185 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -380,7 +380,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-183/183 assertions pass. `npm run test:ui` does **not** run on macOS: it
+185/185 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -1230,6 +1230,34 @@ for output quality, which correlation does not measure.
 The practical consequence: **judge this ranking on whether its likes are backed by
 real evidence, and use the correlation only to catch a change that makes things
 clearly worse.** That is how `TAG_MIN_GAMES` moved 3 → 4 — see the constant.
+
+### Everything above was measured on ONE group
+
+`g4m1ng` is the only workspace here with ratings. The others have imported Steam
+libraries and rated nothing, so every figure in this section describes one taste
+profile. Two consequences worth holding onto:
+
+**The ranking is noise on a thin history, and that is a general finding.** Train on
+k of group 1's rated games and predict the rest: r is −0.01 at 10 rated games, −0.03
+at 15, −0.01 at 20, 0.01 at 30, 0.07 at 45, 0.12 at 60. `MIN_HISTORY` was **5** — a
+group with six ratings was shown a fit column and told it was ranked against what
+they like. It is 20 now, and `SETTLED_HISTORY` (45) is the point past which the UI
+stops calling the order provisional. Both are one group's curve; re-measure when a
+second workspace has a history.
+
+**A null result on group 1's ratings can be range restriction rather than absence.**
+They have rated 37 Very Positive games, 11 Overwhelmingly Positive, 8 Mostly
+Positive, 6 Mixed and nothing worse — so "Steam's verdict does not predict our
+scores, r = 0.019" was measured where the predictor has almost no spread. It is not
+evidence that a badly-reviewed game is a fine suggestion. `REVIEW_PRIOR` exists for
+that end of the scale and is explicitly a prior, not a fitted parameter.
+
+**`REVIEW_PRIOR` is inside the displayed `fit`, unlike `POP_WEIGHT`.** It is large
+enough to reorder the list, so leaving it out of the column printed 0.22 above 0.26
+— the precise failure `POP_WEIGHT` is sized to avoid. So the number on the card is
+the number that ranked it, the tag chips explain the positive half, and the Steam
+verdict beside it explains the rest. An assertion covers the column staying
+descending with the prior active.
 
 Tags for library games the catalogue does not list live in `steam_apps.tags`
 (migration 031), filled by `scripts/backfill-tags.mjs --library` and kept up by the

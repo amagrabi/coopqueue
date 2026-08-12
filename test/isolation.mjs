@@ -1783,6 +1783,20 @@ const { recommend } = await import(path.join(SITE, 'lib/recommend.js'));
 const DAN = '76561198000000555';
 const recReq = (qs = '') => new Request(`https://x/api/g/g4m1ng/recommend${qs}`);
 
+/* MIN_HISTORY is 20: below that `recommend` returns the popularity order and says
+   so, because the taste ranking measures as noise on a thin history. These fixtures
+   are about the tag arithmetic, not the threshold, so they are padded up to it —
+   with games that score the fixture's own mean, so the group average does not move,
+   and a tag unique to each, so no new preference can qualify. */
+const pad = (n, score, tagsFor, from = 8900) => {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ appid: from + i, score });
+    tagsFor.set(from + i, [`Filler ${i}`]);
+  }
+  return out;
+};
+
 await check('recommendations are group-scoped: a non-member never reaches them', async () => {
   // Same 404-not-403 boundary as everything else below /api/g/:slug.
   const { passed, out } = await ctxFor(MALLORY, 'carols');
@@ -1818,7 +1832,7 @@ await check('tags the group rates highly rank above tags it rates poorly', async
   const out = recommend(
     [{ appid: 1, name: 'a racer', review_count: 5e5, tags: '["Racing"]' },
      { appid: 2, name: 'a survival game', review_count: 10, tags: '["Survival"]' }],
-    history, tagsFor,
+    [...history, ...pad(12, 6, tagsFor)], tagsFor,
   );
   // Note the review counts: the racer is far more popular, so this also asserts
   // popularity cannot overturn a real taste signal.
@@ -1832,11 +1846,12 @@ await check('a tag on fewer than four games cannot define a taste', async () => 
     { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 5 },
     { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 },
   ];
+  const tagsFor = new Map([[11, ['Roguelike']], [12, ['Roguelike']],
+                           [13, ['X']], [14, ['X']], [15, ['X']], [16, ['X']]]);
   const out = recommend(
     [{ appid: 1, tags: '["Roguelike"]' }],
-    history,
-    new Map([[11, ['Roguelike']], [12, ['Roguelike']],
-             [13, ['X']], [14, ['X']], [15, ['X']], [16, ['X']]]),
+    [...history, ...pad(15, 6, tagsFor)],
+    tagsFor,
   );
   return out.games[0].fit === null || `scored a two-game tag: ${out.games[0].fit}`;
 });
@@ -1850,11 +1865,12 @@ await check('release state and price model are not tastes', async () => {
     { appid: 14, score: 4 }, { appid: 15, score: 4 }, { appid: 16, score: 4 },
   ];
   const tags = ['Early Access', 'Free to Play'];
+  const tagsFor = new Map([[11, tags], [12, tags], [13, tags], [17, tags],
+                           [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']], [18, ['Puzzle']]]);
   const out = recommend(
     [{ appid: 1, tags: JSON.stringify(tags) }],
-    history,
-    new Map([[11, tags], [12, tags], [13, tags],
-             [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']]]),
+    [...history, { appid: 17, score: 9 }, { appid: 18, score: 4 }, ...pad(14, 6.5, tagsFor)],
+    tagsFor,
   );
   // "Puzzle" legitimately appears — it is a real tag on three rated games. The
   // assertion is that the two shipping-state tags do not, and that a candidate
@@ -1883,7 +1899,8 @@ await check('a rare tag outweighs several common ones', async () => {
   // "Open World" is on almost every candidate, so it says nothing; "Souls-like" is
   // on one and is the whole signal. The specific match must win.
   const common = Array.from({ length: 12 }, (_, i) => ({ appid: 100 + i, tags: '["Open World"]' }));
-  const out = recommend([...common, { appid: 1, tags: '["Souls-like","Open World"]' }], history, tagsFor);
+  const out = recommend([...common, { appid: 1, tags: '["Souls-like","Open World"]' }],
+    [...history, ...pad(13, 8.25, tagsFor)], tagsFor);
   return (out.games[0].appid === 1 && out.games[0].why[0] === 'Souls-like')
     || `first ${out.games[0]?.appid}, why ${JSON.stringify(out.games[0]?.why)}`;
 });
@@ -1897,11 +1914,12 @@ await check('camera angle and PvP are not tastes', async () => {
     { appid: 14, score: 4 }, { appid: 15, score: 4 }, { appid: 16, score: 4 },
   ];
   const tags = ['Third Person', 'PvP'];
+  const tagsFor = new Map([[11, tags], [12, tags], [13, tags], [17, tags],
+                           [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']], [18, ['Puzzle']]]);
   const out = recommend(
     [{ appid: 1, tags: JSON.stringify(tags) }],
-    history,
-    new Map([[11, tags], [12, tags], [13, tags],
-             [14, ['Puzzle']], [15, ['Puzzle']], [16, ['Puzzle']]]),
+    [...history, { appid: 17, score: 9 }, { appid: 18, score: 4 }, ...pad(14, 6.5, tagsFor)],
+    tagsFor,
   );
   const leaked = [...out.likes, ...out.dislikes].map((l) => l.tag).filter((t) => tags.includes(t));
   return (out.games[0].fit === null && !leaked.length)
@@ -1928,6 +1946,10 @@ await check('the order never contradicts the fit it displays', async () => {
     { appid: 3, review_count: 500, tags: '["Crafting","Action"]' },
     { appid: 4, review_count: 900_000, tags: '["Shooter"]' },
     { appid: 5, review_count: 50, tags: '["Shooter","Action"]' },
+    // A weak verdict on a strong match: the prior is large enough to reorder, so
+    // it has to be inside the displayed number or the column stops descending.
+    { appid: 6, review_count: 400, review_hint: 'Mixed', tags: '["Survival","Co-op"]' },
+    { appid: 7, review_count: 400, review_hint: 'Overwhelmingly Negative', tags: '["Survival"]' },
   ], history, tagsFor);
 
   const fits = out.games.map((g) => g.fit);
@@ -1940,13 +1962,15 @@ await check('untasted candidates sort below every ranked one', async () => {
     { appid: 11, score: 9 }, { appid: 12, score: 9 }, { appid: 13, score: 9 }, { appid: 18, score: 9 },
     { appid: 14, score: 5 }, { appid: 15, score: 5 }, { appid: 16, score: 5 }, { appid: 19, score: 5 },
   ];
+  const untastedTags = new Map([
+    [11, ['Survival']], [12, ['Survival']], [13, ['Survival']], [18, ['Survival']],
+    [14, ['Y']], [15, ['Y']], [16, ['Y']], [19, ['Y']]]);
   const out = recommend(
     // The unknown game is hugely more popular, and must still lose to a match.
     [{ appid: 1, review_count: 5e6, tags: '["Nothing We Have Played"]' },
      { appid: 2, review_count: 1, tags: '["Survival"]' }],
-    history,
-    new Map([[11, ['Survival']], [12, ['Survival']], [13, ['Survival']], [18, ['Survival']],
-             [14, ['Y']], [15, ['Y']], [16, ['Y']], [19, ['Y']]]),
+    [...history, ...pad(13, 7, untastedTags)],
+    untastedTags,
   );
   return out.games[0].appid === 2 || `popularity beat a taste match: first ${out.games[0]?.appid}`;
 });
@@ -2011,6 +2035,16 @@ await check('taste is learned from library games the catalogue does not list', a
                (9207,1,'Uncatalogued D',9206)`);
   sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES
                (9204,'${ALICE}',10), (9205,'${ALICE}',10), (9207,'${ALICE}',10)`);
+  /* Clear MIN_HISTORY. Group 1's seeded games carry no steam_appid, so they are
+     invisible to the recommender's history query — padding with linked rows is the
+     only way to reach the threshold. Unique tags each, so none can qualify. */
+  for (let i = 0; i < 20; i++) {
+    sqlite.exec(`INSERT INTO steam_apps (appid, name, tags)
+                 VALUES (${9400 + i},'Pad ${i}','["Pad Tag ${i}"]')`);
+    sqlite.exec(`INSERT INTO games (id, group_id, name, steam_appid)
+                 VALUES (${9400 + i},1,'Pad ${i}',${9400 + i})`);
+    sqlite.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (${9400 + i},'${ALICE}',7)`);
+  }
 
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const d = await (await recommendRoute.onRequestGet({
@@ -2018,11 +2052,50 @@ await check('taste is learned from library games the catalogue does not list', a
   const learned = (d.likes || []).some((l) => l.tag === 'Dwarves');
 
   for (const sql of [
-    'DELETE FROM ratings WHERE game_id IN (9201,9204,9205,9207)',
-    'DELETE FROM games WHERE id IN (9201,9204,9205,9207)',
-    'DELETE FROM steam_apps WHERE appid IN (9200,9202,9203,9206)',
+    'DELETE FROM ratings WHERE game_id IN (9201,9204,9205,9207) OR game_id BETWEEN 9400 AND 9419',
+    'DELETE FROM games WHERE id IN (9201,9204,9205,9207) OR id BETWEEN 9400 AND 9419',
+    'DELETE FROM steam_apps WHERE appid IN (9200,9202,9203,9206) OR appid BETWEEN 9400 AND 9419',
   ]) sqlite.exec(sql);
   return learned || `likes were ${JSON.stringify((d.likes || []).map((l) => l.tag))}`;
+});
+
+await check('a taste ranking says when it has not settled yet', async () => {
+  /* Measured: this ranking does not track taste until roughly 45 rated games, so
+     between MIN_HISTORY and there it is shown with a caveat rather than presented
+     as though the fit means what it eventually will. */
+  const tagsFor = new Map();
+  const cands = [{ appid: 1, tags: '["Survival"]', popularity_rank: 1 }];
+  const thin = recommend(cands, pad(19, 7, tagsFor), tagsFor);
+  const middling = recommend(cands, pad(30, 7, tagsFor), tagsFor);
+  const settled = recommend(cands, pad(50, 7, tagsFor), tagsFor);
+  return (thin.basis === 'popularity' && thin.settled === false
+          && middling.basis === 'taste' && middling.settled === false
+          && settled.basis === 'taste' && settled.settled === true)
+    || `19:${thin.basis}/${thin.settled} 30:${middling.basis}/${middling.settled} 50:${settled.basis}/${settled.settled}`;
+});
+
+await check('a weak Steam verdict loses a tie, and never touches popularity order', async () => {
+  /* A prior, not a fitted signal: group 1 has rated nothing below Mixed, so the
+     correlation cannot speak to the bad end of the scale. What is observable is
+     that weak-verdict games reached the top — Mixed at 5th and 13th. */
+  const tagsFor = new Map();
+  const history = pad(24, 7, tagsFor);
+  // Two identical matches, so only the verdict can separate them.
+  history.push({ appid: 500, score: 10 }, { appid: 501, score: 10 },
+               { appid: 502, score: 10 }, { appid: 503, score: 10 });
+  for (const a of [500, 501, 502, 503]) tagsFor.set(a, ['Survival']);
+  const cands = [
+    { appid: 1, name: 'mixed', review_count: 5000, review_hint: 'Mixed', tags: '["Survival"]', popularity_rank: 1 },
+    { appid: 2, name: 'loved', review_count: 5000, review_hint: 'Very Positive', tags: '["Survival"]', popularity_rank: 2 },
+  ];
+  const ranked = recommend(cands, history, tagsFor);
+  // Same fit — the prior is what orders them.
+  const sameFit = ranked.games[0].fit === ranked.games[1].fit;
+  const goodFirst = ranked.games[0].appid === 2;
+  // Below MIN_HISTORY the label promises popularity order, so it must be exactly that.
+  const popular = recommend(cands, pad(3, 7, new Map()), new Map());
+  return (sameFit && goodFirst && popular.basis === 'popularity' && popular.games[0].appid === 1)
+    || `sameFit ${sameFit}, first ${ranked.games[0].appid} (fits ${ranked.games[0].fit}/${ranked.games[1].fit}), popularity first ${popular.games[0].appid}`;
 });
 
 await check('a game already in the library is not recommended, but is still findable', async () => {

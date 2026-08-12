@@ -45,7 +45,7 @@ export async function onRequestGet({ request, env, data }) {
     // payload only for the final page, so descriptions and image URLs are not
     // copied through Worker memory for the entire catalogue on every request.
     env.DB.prepare(
-      `SELECT appid, popularity_rank, review_count, tags FROM coop_apps ${filter}`
+      `SELECT appid, popularity_rank, review_count, review_hint, tags FROM coop_apps ${filter}`
     ).bind(...args).all(),
     // The group's own history. Archived games are excluded: they are no longer what
     // this group is choosing between, so they should not shape its suggestions.
@@ -118,6 +118,7 @@ export async function onRequestGet({ request, env, data }) {
     total: out.games.length,
     hasMore: out.games.length > page * PAGE + PAGE,
     basis: out.basis,
+    settled: out.settled,
     ratedGames: out.ratedGames,
     needed: out.needed,
     likes: out.likes,

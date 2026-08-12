@@ -3306,7 +3306,14 @@ async function renderBrowse(reset) {
     const chips = (list, cls) => (list || [])
       .map((t) => `<span class="chip ${cls}">${esc(t.tag)} ${t.points > 0 ? '+' : ''}${t.points}</span>`)
       .join('');
-    why.innerHTML = `Ranked against ${d.ratedGames} games you have rated. `
+    /* Say when the ordering has not earned confidence yet. Measured on real data,
+       this ranking does not track taste until somewhere around 45 rated games — so
+       between the minimum and that, it is shown but labelled provisional rather
+       than presented as though the number means what it eventually will. */
+    why.innerHTML = (d.settled === false
+      ? `<b>Still settling.</b> Ranked against only ${d.ratedGames} rated games, and the order
+         does not reliably follow taste until around 45. `
+      : `Ranked against ${d.ratedGames} games you have rated. `)
       + `${state.group.mode === 'personal' ? 'You rate' : 'This group rates'} these higher than ${
         state.group.mode === 'personal' ? 'your' : 'its own'} average: ${chips(d.likes, 'chip-good') || '—'}`
       + (d.dislikes?.length ? ` and lower: ${chips(d.dislikes, 'chip-bad')}` : '');
