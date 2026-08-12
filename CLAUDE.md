@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 185 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 186 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -380,7 +380,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-185/185 assertions pass. `npm run test:ui` does **not** run on macOS: it
+186/186 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -1194,6 +1194,46 @@ the likes/dislikes summary**; they decide no ranking.
 **The cost is `candidates × rated games` cosines**, measured at 17 ms for 303 × 97.
 The library cap of 2000 games bounds the worst case at roughly half a second; no
 group is close, but that is the number to watch if one gets there.
+
+**A neighbourhood model clusters, so the head of the list is diversified.** Every
+game near one beloved cluster scores well, and group 1's top 20 had 7 games whose
+nearest rated game was Elden Ring and 5 whose nearest was Big Walk. `DIVERSITY`
+applies standard greedy re-selection over the first `DIVERSITY_WINDOW` entries:
+mean pairwise similarity inside the top 10 falls 0.105 → 0.086 and inside the top
+24 0.084 → 0.073, for a 7% cost in mean top-10 fit. The penalty goes **inside the
+displayed fit**, for the third time in this file — diversification reorders by
+construction, so leaving it out prints a higher number below a lower one.
+
+### Played ratings are not better evidence than want-to-play ratings
+
+Tested, because it is the obvious thing to assume and it is wrong here. A rating
+given in Played mode is a quality judgement; one given in Want-to-play mode is
+appetite. Weighting the former up makes the ranking worse at every strength tried:
+
+```
+                                 all targets            played targets only
+  equal weight (shipped)   0.270 [ 0.06, 0.45]      0.308 [-0.05, 0.58]
+  played x2                0.162 [-0.05, 0.36]      0.237 [-0.15, 0.53]
+  finished x2, played x1.5  0.227 [-0.01, 0.41]      0.269 [-0.11, 0.58]
+  played only              0.120 [-0.07, 0.31]      0.241 [-0.12, 0.53]
+```
+
+The right-hand column is the fair test: most of group 1's ratings *are* appetite
+ratings (59 of 97), so a model trained on appetite would predict them better by
+construction. Restricting the targets to quality judgements removes that advantage
+— and equal weight still wins. Only 38 of 97 rated games have a played status, so
+down-weighting the rest costs more in evidence volume than it gains in evidence
+quality. There is also a conceptual reason not to: for a recommender, "we want to
+play this" is not noise, it is the exact decision being predicted.
+
+### The standing check: would it find what they chose?
+
+Re-run against the nearest-games model, the in-catalogue picks all moved up sharply
+— Barotrauma #259 → #31, Dune Awakening #176 → #73, Enshrouded #107 → #65, Big Walk
+#15 → #6 — but the headline is still **1 of 10 on the first page**, because six of
+those ten are not in the catalogue at all. That is the crawler's backlog, not the
+ranking's fault. Re-run this check once the tracked-games discovery has caught up;
+it is the measurement that actually reflects the product.
 
 **Two guards, both added because the first run against real data was bad.** With
 `TAG_MIN_GAMES = 2` and no stoplist, group 1's second-strongest "preference" came

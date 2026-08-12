@@ -1779,7 +1779,7 @@ await check('the tag list is capped, so one page cannot bloat a row', async () =
 console.log('\nRecommendations');
 
 const recommendRoute = await import(path.join(SITE, 'functions/api/g/[slug]/recommend.js'));
-const { recommend, REVIEW_PRIOR } = await import(path.join(SITE, 'lib/recommend.js'));
+const { recommend, REVIEW_PRIOR, DIVERSITY } = await import(path.join(SITE, 'lib/recommend.js'));
 const DAN = '76561198000000555';
 const recReq = (qs = '') => new Request(`https://x/api/g/g4m1ng/recommend${qs}`);
 
@@ -2070,6 +2070,33 @@ await check('taste is learned from library games the catalogue does not list', a
   return learned || `likes were ${JSON.stringify((d.likes || []).map((l) => l.tag))}`;
 });
 
+await check('the list does not repeat one beloved game five times', async () => {
+  /* The neighbourhood model gives everything near one beloved cluster a high fit,
+     so without diversification the first page is the same game over and over —
+     7 of group 1's top 20 had Elden Ring as their nearest rated game. */
+  const tagsFor = new Map();
+  const history = pad(24, 7, tagsFor);
+  // Two things they love equally, so fit cannot be what separates the candidates.
+  for (const [i, a] of [600, 601, 602, 603].entries()) {
+    history.push({ appid: a, name: `Souls ${i}`, score: 10 });
+    tagsFor.set(a, ['Souls-like', 'Dark Fantasy']);
+  }
+  for (const [i, a] of [610, 611, 612, 613].entries()) {
+    history.push({ appid: a, name: `Farm ${i}`, score: 10 });
+    tagsFor.set(a, ['Farming Sim', 'Cozy']);
+  }
+  // Five interchangeable matches of the first kind, one of the second.
+  const clones = Array.from({ length: 5 }, (_, i) => ({
+    appid: 700 + i, name: `Clone ${i}`, review_count: 1000, tags: '["Souls-like","Dark Fantasy"]',
+  }));
+  const other = { appid: 800, name: 'Different', review_count: 1000, tags: '["Farming Sim","Cozy"]' };
+  const out = recommend([...clones, other], history, tagsFor);
+  const at = out.games.findIndex((g) => g.appid === 800) + 1;
+  /* One of each kind should lead. In plain fit order the five clones are
+     indistinguishable and fill the whole head of the list before anything else. */
+  return at <= 2 || `the second kind ranked ${at} of ${out.games.length}, behind the clones`;
+});
+
 await check('a taste ranking says when it has not settled yet', async () => {
   /* Measured: this ranking does not track taste until roughly 45 rated games, so
      between MIN_HISTORY and there it is shown with a caveat rather than presented
@@ -2100,15 +2127,17 @@ await check('a weak Steam verdict loses a tie, and never touches popularity orde
     { appid: 2, name: 'loved', review_count: 5000, review_hint: 'Very Positive', tags: '["Survival"]', popularity_rank: 2 },
   ];
   const ranked = recommend(cands, history, tagsFor);
-  /* Identical tags, so identical resemblance: the whole gap between them is the
-     prior, and it is inside the displayed number rather than applied invisibly. */
+  /* Identical tags, so identical resemblance to the group's history — every point
+     of difference between them is a deliberate adjustment, and both live inside the
+     displayed number rather than being applied invisibly: the Mixed prior, plus the
+     full duplicate penalty the second one takes for repeating the first exactly. */
   const goodFirst = ranked.games[0].appid === 2;
   const gap = Math.round((ranked.games[0].fit - ranked.games[1].fit) * 100) / 100;
-  const sameFit = gap === REVIEW_PRIOR.Mixed;
+  const sameFit = gap === Math.round((REVIEW_PRIOR.Mixed + DIVERSITY) * 100) / 100;
   // Below MIN_HISTORY the label promises popularity order, so it must be exactly that.
   const popular = recommend(cands, pad(3, 7, new Map()), new Map());
   return (sameFit && goodFirst && popular.basis === 'popularity' && popular.games[0].appid === 1)
-    || `gap ${gap} (expected ${REVIEW_PRIOR.Mixed}), first ${ranked.games[0].appid}, popularity first ${popular.games[0].appid}`;
+    || `gap ${gap} (expected ${REVIEW_PRIOR.Mixed} + ${DIVERSITY}), first ${ranked.games[0].appid}, popularity first ${popular.games[0].appid}`;
 });
 
 await check('a game already in the library is not recommended, but is still findable', async () => {
