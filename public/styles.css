@@ -1222,6 +1222,14 @@ tr.is-archived td { opacity: .55; }
   .personal-stat-callouts, .personal-records { grid-template-columns: 1fr; }
 }
 
+/* A dismissed card, shown only when the toggle asks for it. Greyed rather than
+   hidden so it reads as "we said no to this" instead of looking like a loading
+   glitch; the art carries most of a card's weight, so that is what desaturates. */
+.browse-card.is-dismissed { opacity: .55; }
+.browse-card.is-dismissed img { filter: grayscale(1); }
+.browse-card.is-dismissed:hover, .browse-card.is-dismissed:focus-within { opacity: 1; }
+.browse-card.is-dismissed:hover img { filter: grayscale(.4); }
+
 /* ── "not interested", and the way back ─────────────────────────────────── */
 .dismissed { margin: 0 0 16px; }
 .dismissed > summary {

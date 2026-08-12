@@ -857,7 +857,11 @@ function wireOnce() {
   $('#browse-fits').addEventListener('change', () => renderBrowse(true));
   $('#browse-coop').addEventListener('change', () => renderBrowse(true));
   // Re-render only; the server result is unchanged, this filter is client-side.
-  $('#browse-hide-owned').addEventListener('change', () => renderBrowse(false));
+  // Both are display choices over games already loaded, so they repaint rather
+  // than refetch — the old hide-owned listener refetched the current page and,
+  // past page 0, concatenated it into the list a second time.
+  $('#browse-hide-owned').addEventListener('change', paintBrowse);
+  $('#browse-show-dismissed').addEventListener('change', paintBrowse);
   $('#browse-more').addEventListener('click', () => { browse.page++; renderBrowse(false); });
 
   const detailDialog = $('#detail-dialog');
@@ -3331,6 +3335,17 @@ async function renderBrowse(reset) {
   const got = d.games || [];   // never let a malformed page turn into a hard crash
   browse.items = browse.page ? browse.items.concat(got) : got;
   browse.hasMore = !!d.hasMore;
+  /* Keep the response so the grid can be repainted without asking for it again.
+     Dismissing used to call renderBrowse(), which refetches the CURRENT page and
+     concatenates — fine on page 0, and a duplicated 24 cards on any page after it. */
+  browse.last = { d, q, sort };
+  paintBrowse();
+}
+
+/** Repaint from what is already loaded. No network, no pagination arithmetic. */
+function paintBrowse() {
+  if (!browse.last) return;
+  const { d, q, sort } = browse.last;
 
   if (!browse.items.length) {
     $('#browse-grid').innerHTML = '';
@@ -3349,19 +3364,26 @@ async function renderBrowse(reset) {
   // come back shorter, so the count says how many were hidden instead of leaving
   // you wondering where they went.
   const hideOwned = $('#browse-hide-owned').checked;
-  /* Dismissals filter here too, and unconditionally: there is no toggle, because
-     the undo panel below is the way back and a second control saying the same
-     thing would be one too many. */
+  /* Dismissed games are hidden by default and shown greyed out on request. The
+     toggle only appears once there is something to show, so it is not a control
+     that does nothing for a group that has never dismissed anything. */
   const gone = dismissedIds();
-  const afterDismissed = browse.items.filter((g) => !gone.has(g.appid));
-  const dismissedCount = browse.items.length - afterDismissed.length;
+  const showDismissed = $('#browse-show-dismissed').checked;
+  $('#browse-dismissed-label').hidden = !dismissed.rows.length;
+  const afterDismissed = showDismissed
+    ? browse.items
+    : browse.items.filter((g) => !gone.has(g.appid));
+  const dismissedCount = showDismissed
+    ? browse.items.filter((g) => gone.has(g.appid)).length
+    : browse.items.length - afterDismissed.length;
   const shown = hideOwned ? afterDismissed.filter((g) => !owned.has(g.appid)) : afterDismissed;
   const ownedCount = afterDismissed.length - shown.length;
 
   $('#browse-status').textContent =
     `${d.total} game${d.total === 1 ? '' : 's'} in the catalogue${q ? ' matching that search' : ''}`
     + (ownedCount ? `, ${ownedCount} on this page already in your library` : '')
-    + (dismissedCount ? `, ${dismissedCount} you said no to` : '') + '.';
+    + (dismissedCount ? `, ${dismissedCount} ${showDismissed ? 'marked not interested' : 'you said no to'}` : '')
+    + '.';
   renderDismissed();
 
   /* Say what the ranking is doing. A list claiming to be "recommended" without
@@ -3401,14 +3423,16 @@ async function renderBrowse(reset) {
     return;
   }
 
+  const dismissedBy = new Map(dismissed.rows.map((row) => [row.appid, row]));
   $('#browse-grid').innerHTML = shown.map((g) => {
     const inLibrary = owned.has(g.appid);
+    const rejected = dismissedBy.get(g.appid);
     const storeUrl = steamStoreUrl(g.appid);
     const cap = g.max_players
       ? `${g.max_players}p co-op`
       : '<span class="chip">player count unverified</span>';
     return `
-      <article class="browse-card">
+      <article class="browse-card${rejected ? ' is-dismissed' : ''}">
         ${g.header_image ? `<img src="${esc(g.header_image)}" alt="" loading="lazy">` : '<div class="browse-noart"></div>'}
         <div class="browse-body">
           <h3>${esc(g.name)}</h3>
@@ -3430,7 +3454,16 @@ async function renderBrowse(reset) {
           ${storeUrl ? `<a class="btn btn-sm btn-ghost" href="${storeUrl}"
              target="_blank" rel="noopener"
              aria-label="Open ${esc(g.name)} on Steam (new tab)">Steam page ↗</a>` : ''}
-          ${inLibrary
+          ${rejected
+            /* A dismissed card offers only the way back. Leaving "Add to library"
+               on it would let one click undo a decision the group made without
+               ever saying that is what happened. */
+            ? `<span class="chip">${state.group.mode === 'personal'
+                 ? 'Not interested'
+                 : `${esc(rejected.by || 'Someone')} said no`}</span>
+               <button class="btn btn-sm btn-ghost" data-restore="${g.appid}"
+                 aria-label="Put ${esc(g.name)} back in the catalogue">Put back</button>`
+            : inLibrary
             ? '<span class="chip chip-good">in your library</span>'
             : `<button class="btn btn-sm btn-primary" data-add="${g.appid}">+ Add to library</button>
                <button class="btn btn-sm btn-ghost" data-dismiss="${g.appid}"
@@ -3441,6 +3474,7 @@ async function renderBrowse(reset) {
 
   $$('#browse-grid [data-add]').forEach((b) => b.addEventListener('click', () => addFromCatalogue(b)));
   $$('#browse-grid [data-dismiss]').forEach((b) => b.addEventListener('click', () => dismissGame(b)));
+  $$('#browse-grid [data-restore]').forEach((b) => b.addEventListener('click', () => restoreDismissed(b)));
   $('#browse-more').hidden = !browse.hasMore;
 }
 
@@ -3489,7 +3523,7 @@ async function dismissGame(btn) {
       appid, name: r.name, by: nameOf(state.me.steamId), bySteamId: state.me.steamId,
       at: Math.floor(Date.now() / 1000),
     }, ...dismissed.rows.filter((d) => d.appid !== appid)];
-    void renderBrowse();
+    paintBrowse();
     toast(`Hid ${r.name}. Undo it under "not interested" below.`);
   } catch (e) { toast(e.message); btn.disabled = false; }
 }
@@ -3503,9 +3537,10 @@ async function restoreDismissed(btn) {
     await gapiFor(slug, '/dismissals', { method: 'DELETE', body: { appid } });
     if (state.group?.slug !== slug) return;
     dismissed.rows = dismissed.rows.filter((d) => d.appid !== appid);
-    // Reset to page 0: the restored game belongs wherever the ranking puts it, and
-    // appending it to whatever is already loaded would put it in the wrong place.
-    void renderBrowse(true);
+    /* Repaint rather than refetch. The game is already in `browse.items` — it was
+       only filtered out of the display — so it returns to the exact rank it held,
+       which a refetch of the current page could not guarantee. */
+    paintBrowse();
     toast(`${row?.name || 'That game'} is back in the catalogue`);
   } catch (e) { toast(e.message); btn.disabled = false; }
 }

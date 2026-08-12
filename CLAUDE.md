@@ -1456,8 +1456,20 @@ state behind an endpoint with no tenancy check. `renderBrowse()` already filters
 owned games this way and reports how many it hid; dismissals join that count. The
 route below the boundary only stores and lists.
 
-There is no "show dismissed" toggle. The undo panel is the way back, and a second
-control saying the same thing would be one too many.
+**Show dismissed** puts them back in the grid, greyed, in the rank they held, with
+"Ama said no" and a Put back button where Add and Not interested would be. The Add
+button is deliberately absent there: letting one click undo a decision the group
+made, without saying that is what happened, is the thing the whole feature exists
+to avoid. The toggle only appears once the group has dismissed something, so it is
+never a control that does nothing. The undo panel stays too — it lists everything
+at once, where the grid only shows what the current page and filters reach.
+
+**Both display toggles repaint, they do not refetch,** and that is a correctness
+requirement rather than an optimisation. `renderBrowse()` concatenates when
+`browse.page > 0`, so refetching the current page duplicated all 24 cards on every
+page after the first — which the old `hide-owned` listener did. `paintBrowse()`
+renders from `browse.items` and the stored last response, so a toggle, a dismiss
+and an undo all cost nothing and keep every card in its ranked position.
 
 ## Archiving, not deleting
 
