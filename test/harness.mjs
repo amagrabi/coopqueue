@@ -212,6 +212,12 @@ db.exec(`UPDATE games SET hours=NULL, hours_estimated=21.5, hours_participants=3
 db.exec(`UPDATE games SET finished=NULL, finished_estimated=date('now','-2 months')
           WHERE id = (SELECT id FROM games WHERE group_id=1 AND status='finished' ORDER BY id LIMIT 1 OFFSET 2)`);
 
+// Play next hides this by default, but the switch remains useful when the group
+// wants to plan an upcoming release.
+db.exec(`INSERT INTO games (id, group_id, name, status, release_date)
+         VALUES (899, 1, 'Exterminauts', 'backlog', 'Coming soon')`);
+db.exec(`INSERT INTO ratings (game_id, steam_id, score) VALUES (899, '${ME}', 9)`);
+
 /* Imported spreadsheet notes now live in the comment thread under an `import:<group>`
    identity with no membership — mirror migration 019 so the local thread shows what
    production shows, including the display-name fallback for a non-member author. */

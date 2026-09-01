@@ -66,7 +66,9 @@ Forty unrated games takes about three minutes.
 who is playing immediately recomputes the score from only those people's ratings
 and checks verified player caps against that crew. Unknown caps stay visibly
 unknown instead of emptying the list; verified games that are too small move to a
-separate block. Steam header art keeps both lists recognizable at a glance.
+separate block. Unreleased and Early Access games are hidden by default, but can
+be included when the group is planning ahead. Steam header art keeps both lists
+recognizable at a glance.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.

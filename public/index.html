@@ -445,6 +445,13 @@
           <input type="checkbox" id="hide-ea" checked>
           <span>Hide early access games</span>
         </label>
+        <!-- A Steam release date in the future (or “Coming soon”) is not a game
+             the group can start. Keep it in the Library, with an escape hatch for
+             planning ahead. -->
+        <label class="toggle">
+          <input type="checkbox" id="hide-unreleased" checked>
+          <span>Hide unreleased games</span>
+        </label>
       </div>
       <fieldset class="attendee-filter">
         <legend>Who's playing?</legend>

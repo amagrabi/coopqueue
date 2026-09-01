@@ -846,6 +846,7 @@ function wireOnce() {
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
   $('#hide-ea').addEventListener('change', renderNext);
+  $('#hide-unreleased').addEventListener('change', renderNext);
   $('#pn-budget').addEventListener('input', renderNext);
 
   let browseTimer;
@@ -1576,6 +1577,32 @@ function replayChips(g, attendees) {
 }
 
 /* ══════════════════════════════ PLAY NEXT ═════════════════════════════ */
+const RELEASE_MONTH = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+/* Steam gives us a display string rather than a release timestamp on group games.
+   Parse its documented shapes explicitly instead of trusting each browser's date
+   parser. Missing dates stay visible: unknown is not evidence that a game is not
+   available. */
+function isUnreleased(g) {
+  if (!g.release_date) return false;
+  const date = String(g.release_date).trim();
+  if (/^(coming soon|to be announced|tba)$/i.test(date)) return true;
+
+  let match = /^(\d{1,2})\s+([A-Za-z]{3})[a-z]*,?\s+(\d{4})$/.exec(date);
+  if (match && RELEASE_MONTH[match[2].toLowerCase()] != null) {
+    return Date.UTC(+match[3], RELEASE_MONTH[match[2].toLowerCase()], +match[1]) > Date.now();
+  }
+  match = /^([A-Za-z]{3})[a-z]*\s+(\d{4})$/.exec(date);
+  if (match && RELEASE_MONTH[match[1].toLowerCase()] != null) {
+    return Date.UTC(+match[2], RELEASE_MONTH[match[1].toLowerCase()] + 1, 1) > Date.now();
+  }
+  match = /^Q([1-4])\s+(\d{4})$/i.exec(date);
+  if (match) return Date.UTC(+match[2], +match[1] * 3, 1) > Date.now();
+  match = /^(\d{4})$/.exec(date);
+  return !!match && Date.UTC(+match[1] + 1, 0, 1) > Date.now();
+}
+
 function renderNext() {
   if (renderEmptyLibrary('next')) return;
   renderAttendeeFilter();
@@ -1594,13 +1621,15 @@ function renderNext() {
     return;
   }
 
-  /* Early access is filtered here rather than merely flagged: Play next answers
-     "what should we start", and starting something unfinished is usually the wrong
-     answer however much the group wants it. Off this list, not out of the library. */
+  /* These are filtered here rather than merely flagged: Play next answers "what
+     should we start", and something unfinished or not out yet is usually the
+     wrong answer however much the group wants it. Off this list, not the Library. */
   const hideEa = $('#hide-ea').checked;
+  const hideUnreleased = $('#hide-unreleased').checked;
   const backlog = activeGames()
     .filter((g) => g.status === 'backlog')
     .filter((g) => !(hideEa && g.early_access))
+    .filter((g) => !(hideUnreleased && isUnreleased(g)))
     .map((g) => {
       const votes = Object.entries(g.votes || {})
         .filter(([steamId]) => selected.has(steamId))
