@@ -570,10 +570,10 @@ const server = http.createServer(async (req, res) => {
     if (minPlayers) rows = rows.filter((g) => g.max_players != null && g.max_players >= minPlayers);
     if (url.searchParams.get('coopOnly') !== '0') rows = rows.filter((g) => g.is_coop !== 0);
     rows.sort({
-      rank: (a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9),
+      rank: (a, b) => (b.review_count ?? -1) - (a.review_count ?? -1),
       name: (a, b) => a.name.localeCompare(b.name),
       new:  (a, b) => (b.release_ts ?? -1) - (a.release_ts ?? -1),
-    }[sort] || ((a, b) => (a.popularity_rank ?? 1e9) - (b.popularity_rank ?? 1e9)));
+    }[sort] || ((a, b) => (b.review_count ?? -1) - (a.review_count ?? -1)));
 
     const slice = rows.slice(page * PAGE, page * PAGE + PAGE + 1);
     return send(res, 200, {
@@ -588,7 +588,7 @@ const server = http.createServer(async (req, res) => {
     const term = (url.searchParams.get('q') || '').trim().toLowerCase();
     if (term.length < 2) return send(res, 200, { results: [] });
     const rows = q(`SELECT appid, name, header_image, price, release_date FROM coop_apps
-                     WHERE name LIKE ? ORDER BY popularity_rank LIMIT 8`, `%${term}%`);
+                     WHERE name LIKE ? ORDER BY review_count DESC LIMIT 8`, `%${term}%`);
     return send(res, 200, {
       results: rows.map((r) => ({
         appid: r.appid, name: r.name, image: r.header_image,

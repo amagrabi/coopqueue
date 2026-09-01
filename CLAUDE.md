@@ -364,9 +364,10 @@ automatically the first time they sign in — no prompt.
 The catalogue holds 337 games with real review counts, **all 337 tagged** from
 Steam store pages, of which 9 classify as PvP-primary and are hidden by the default
 co-op filter: Rainbow Six Siege, Apex Legends, Marvel Rivals, Overwatch, THE FINALS,
-SMITE 2, Enlisted, F1 25 and PvZ Garden Warfare 2. The crawler re-ranks only
-once every row has a `review_count`; a handful are still NULL, so the seeded ranks
-stand until the cron fills them in, then re-ranking takes over by itself. `/enrich`
+SMITE 2, Enlisted, F1 25 and PvZ Garden Warfare 2. Browse and thin-history
+recommendations order directly by `review_count`; do not refresh the legacy
+`popularity_rank` column after crawls, because ranking the whole catalogue hourly
+is a quadratic D1 read workload. `/enrich`
 has been run to completion: **87 of 114 games linked, all 87 with a trailer and
 header art**; the remaining 27 were too ambiguous to auto-match and need linking
 by hand from the Library.

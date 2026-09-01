@@ -14,7 +14,7 @@ import { json } from '../../../lib/http.js';
  */
 const PAGE = 24;
 /** Shared with the group-scoped recommender so both return identical card shapes. */
-export const CATALOGUE_COLS = `appid, name, popularity_rank, review_hint, review_count,
+export const CATALOGUE_COLS = `appid, name, review_hint, review_count,
     header_image, short_description, genre, price, release_date, release_ts, metacritic,
     tags, is_coop, max_players, max_players_src, coop_note`;
 const MAX_PAGE = 500;   // a bound so a hand-edited page param cannot walk forever
@@ -52,12 +52,14 @@ export async function onRequestGet({ request, env }) {
   const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const order = {
-    rank: 'popularity_rank ASC',
+    // review_count is the source of truth for popularity. Do not materialise a
+    // rank: recalculating it across the catalogue after every crawl is quadratic.
+    rank: 'review_count DESC',
     name: 'name COLLATE NOCASE ASC',
     // release_date is a display string ('9 Sep, 2025'); ordering it as text
     // groups by day-of-month instead of by date. release_ts is the real thing.
     new:  'release_ts DESC',
-  }[sort] || 'popularity_rank ASC';
+  }[sort] || 'review_count DESC';
 
   const COLS = CATALOGUE_COLS;
 

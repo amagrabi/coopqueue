@@ -1806,8 +1806,8 @@ await check('recommendations are group-scoped: a non-member never reaches them',
 
 await check('a thin history is reported as popularity, not dressed up as taste', async () => {
   const out = recommend(
-    [{ appid: 1, popularity_rank: 2, tags: '["Survival"]' },
-     { appid: 2, popularity_rank: 1, tags: '["RPG"]' }],
+    [{ appid: 1, review_count: 2, tags: '["Survival"]' },
+     { appid: 2, review_count: 3, tags: '["RPG"]' }],
     [{ appid: 9, score: 8 }],                       // one rated game, below MIN_HISTORY
     new Map([[9, ['Survival']]]),
   );
@@ -2103,7 +2103,7 @@ await check('a taste ranking says when it has not settled yet', async () => {
      between MIN_HISTORY and there it is shown with a caveat rather than presented
      as though the fit means what it eventually will. */
   const tagsFor = new Map();
-  const cands = [{ appid: 1, tags: '["Survival"]', popularity_rank: 1 }];
+  const cands = [{ appid: 1, tags: '["Survival"]', review_count: 1 }];
   const thin = recommend(cands, pad(19, 7, tagsFor), tagsFor);
   const middling = recommend(cands, pad(30, 7, tagsFor), tagsFor);
   const settled = recommend(cands, pad(50, 7, tagsFor), tagsFor);
@@ -2124,8 +2124,8 @@ await check('a weak Steam verdict loses a tie, and never touches popularity orde
                { appid: 502, name: 'Liked C', score: 10 }, { appid: 503, name: 'Liked D', score: 10 });
   for (const a of [500, 501, 502, 503]) tagsFor.set(a, ['Survival']);
   const cands = [
-    { appid: 1, name: 'mixed', review_count: 5000, review_hint: 'Mixed', tags: '["Survival"]', popularity_rank: 1 },
-    { appid: 2, name: 'loved', review_count: 5000, review_hint: 'Very Positive', tags: '["Survival"]', popularity_rank: 2 },
+    { appid: 1, name: 'mixed', review_count: 5000, review_hint: 'Mixed', tags: '["Survival"]' },
+    { appid: 2, name: 'loved', review_count: 5000, review_hint: 'Very Positive', tags: '["Survival"]' },
   ];
   const ranked = recommend(cands, history, tagsFor);
   /* Identical tags, so identical resemblance to the group's history — every point

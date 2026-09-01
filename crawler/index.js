@@ -264,8 +264,9 @@ async function upsert(db, appid, out, floor = MIN_REVIEWS) {
   out.subrequests++;
   if (tags) out.tagged = (out.tagged || 0) + 1;
 
-  // popularity_rank is recomputed table-wide after the batch, not here — a rank
-  // is a position among all rows and cannot be known from one game.
+  // Browse and recommendation order use review_count directly. Keeping a derived
+  // rank in sync here used a table-wide update after every hourly crawl, which
+  // scanned the catalogue quadratically and exhausted D1's free daily read quota.
   await db.prepare(
     `INSERT INTO coop_apps (appid, name, review_count, review_hint, header_image,
                             short_description, genre, price, release_date, release_ts,
@@ -294,33 +295,10 @@ async function upsert(db, appid, out, floor = MIN_REVIEWS) {
   return true;
 }
 
-/**
- * Renumber popularity_rank across the table from stored review counts.
- *
- * Deliberately does nothing until every row has a review_count. The bulk seed
- * ranked by review count but only stored the score summary, so those rows start
- * NULL — and ranking on COALESCE(review_count, 0) while most rows are NULL
- * collapses the entire catalogue to rank 1 and destroys the ordering the seed
- * got right. The seeded ranks stay authoritative until the incremental refresh
- * has filled in real counts everywhere, then this takes over on its own.
- */
-async function reRank(db) {
-  const gap = await db.prepare(
-    'SELECT COUNT(*) AS n FROM coop_apps WHERE review_count IS NULL').first();
-  if ((gap?.n ?? 0) > 0) return { reranked: false, awaitingCounts: gap.n };
-
-  await db.prepare(
-    `UPDATE coop_apps SET popularity_rank = (
-       SELECT COUNT(*) + 1 FROM coop_apps b WHERE b.review_count > coop_apps.review_count)`
-  ).run();
-  return { reranked: true };
-}
-
 export default {
   async scheduled(event, env, ctx) {
     const out = await crawlOnce(env);
-    const rank = await reRank(env.DB);
-    console.log('crawl', JSON.stringify({ ...out, ...rank }));
+    console.log('crawl', JSON.stringify(out));
   },
 
   /**
@@ -342,7 +320,6 @@ export default {
       return json({ error: 'unauthorised' }, 401);
     }
     const out = await crawlOnce(env, { batch: Number(url.searchParams.get('batch')) || BATCH });
-    const rank = await reRank(env.DB);
-    return json({ ...out, ...rank });
+    return json(out);
   },
 };

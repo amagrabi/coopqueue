@@ -319,6 +319,11 @@ Popularity is `review_count` from `appreviews`, never Steam's `sort_by=Reviews_D
 — that sorts by review *score* and will rank a 534-review DLC above Stardew
 Valley's million.
 
+The app orders browse results and thin-history recommendations directly by
+`review_count DESC`. `popularity_rank` is legacy seed data; do not recompute it
+after a crawl. Ranking every catalogue row with a correlated count is quadratic
+and, when run hourly, exceeds D1's 5 million daily free read limit.
+
 ### Measuring IGDB player-cap coverage
 
 Do not turn IGDB values into caps until coverage and conflicts have been measured.
