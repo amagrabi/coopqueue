@@ -173,6 +173,7 @@ CREATE INDEX idx_coop_apps_rank ON coop_apps(popularity_rank);
 CREATE INDEX idx_coop_apps_name ON coop_apps(name COLLATE NOCASE);
 CREATE INDEX idx_coop_apps_released ON coop_apps(release_ts);
 CREATE INDEX idx_coop_apps_reviews  ON coop_apps(review_count);
+CREATE INDEX idx_coop_apps_crawled  ON coop_apps(crawled_at);
 
 -- Cursor and last-run summary for the cron crawler in crawler/. A Worker
 -- invocation is a cold start with no memory of the previous one, so the
