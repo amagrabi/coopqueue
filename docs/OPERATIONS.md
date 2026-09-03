@@ -166,6 +166,31 @@ wide column across the whole catalogue (e.g. every `tags` value) **exceeds what 
 D1 HTTP API will return** and fails with a Cloudflare API error rather than
 truncating — chunk on `appid % N`, as `scripts/reclassify-coop.mjs` does.
 
+#### Reads from a restricted coding-agent sandbox
+
+On macOS, Wrangler normally writes logs below `~/Library/Preferences/.wrangler`.
+A restricted agent sandbox may be allowed to read the saved OAuth profile but not
+write that log directory. Point only the log at a writable temporary path; widening
+filesystem access is unnecessary:
+
+```bash
+WRANGLER_LOG_PATH=/tmp/coopqueue-wrangler.log \
+  npx wrangler d1 execute g4m1ng --remote --yes --json --command "SELECT ..."
+```
+
+Wrangler's saved OAuth access token expires. If a non-interactive command asks for
+`CLOUDFLARE_API_TOKEN` despite an existing local profile, start `npx wrangler login`
+in an interactive PTY with permission to open the system browser, then rerun the
+read. Do not print, copy or ask the owner to paste tokens. The browser's final
+**Authorize Wrangler** step grants broad account permissions, so an agent must get
+the owner's explicit confirmation immediately before accepting it. The SQL used for
+an information request should remain a `SELECT`; check Wrangler's result metadata
+for `rows_written: 0` before reporting completion.
+
+Personal CSV/JSON exports belong in `local-exports/`, which is gitignored. Give each
+file a clear, dated name, verify its row count, and delete it when the owner is done.
+Never commit a personal export or put one in `migrations/`.
+
 ---
 
 ## Backups and recovery

@@ -2,6 +2,7 @@ node_modules/
 .wrangler/
 .dev.vars
 backup*.sql
+local-exports/
 igdb-cap-coverage.json
 shots/
 .DS_Store
