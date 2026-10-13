@@ -608,9 +608,6 @@ function renderChrome() {
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
   $('#group-name').textContent = state.group.name;
   $('#workspace-tab').textContent = state.group.mode === 'personal' ? 'Settings' : 'Group';
-  $('#queue-empty-copy').textContent = state.group.mode === 'personal'
-    ? 'You have rated or skipped everything in this library. Add a game, or revisit one you already rated.'
-    : 'You have rated or skipped everything in this group. Add a game, or go argue on the Play next tab.';
   $('#browse-fit-option').textContent = state.group.mode === 'personal' ? 'Recommended for me' : 'Recommended for us';
   $('#browse-coop-label span').textContent = state.group.mode === 'personal' ? 'Co-op catalogue only' : 'Co-op only';
   $('#browse-fits-label').hidden = state.group.mode === 'personal';
@@ -812,6 +809,14 @@ function wireOnce() {
   $('#btn-later').addEventListener('click', rateLater);
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   $('#btn-unskip').addEventListener('click', unskipGame);
+  $('#queue-done-next').addEventListener('click', () => setView(state.group.mode === 'personal' ? 'library' : 'next'));
+  for (const mode of ['rated', 'skipped']) {
+    $(`#queue-done-${mode}`).addEventListener('click', () => {
+      state.rateMode = mode;
+      state.qIndex = 0;
+      renderQueue();
+    });
+  }
   $('#rate-back').addEventListener('click', goBack);
   $$('#replay-opts .seg').forEach((b) => b.addEventListener('click', () => {
     // Picking the chosen answer again clears it, so a mis-click is undoable
@@ -1088,6 +1093,7 @@ function renderQueue() {
     return;
   }
   const byMode = queuesByMode();
+  renderMyCoverage();
 
   // Default to whichever mode has work, preferring Played. Also auto-advances
   // when the mode you were in empties, so the queue never looks broken.
@@ -1135,8 +1141,12 @@ function renderQueue() {
   const empty = !queue.length;
   $('#queue-empty').hidden = !empty;
   $('#queue-card').hidden = empty;
+  // Once the work is done, the old question and coverage debt obscure the success.
+  $('#rate-ask').hidden = empty;
   renderQueueList(queue, byMode);
   if (empty) {
+    $('#my-coverage').hidden = true;
+    renderQueueComplete(byMode);
     trailerSeq++;
     const video = $('#rate-video');
     video.pause();
@@ -1213,6 +1223,24 @@ function renderQueue() {
 
   renderReplayAsk(g);
   renderBackButton(g, byMode);
+}
+
+function renderQueueComplete(byMode) {
+  const personal = state.group.mode === 'personal';
+  const rated = byMode.rated.length;
+  const skipped = byMode.skipped.length;
+  $('#queue-empty-copy').textContent = rated
+    ? `Nothing left to rate right now. Your ratings are saved${personal
+      ? ' — ready whenever you return to your library.'
+      : ' and ready to help the group choose what to play next.'}`
+    : 'Nothing left to rate right now. You can revisit the games you skipped whenever you’re ready.';
+  $('#queue-empty-recap').textContent = [
+    rated ? `${rated} game${rated === 1 ? '' : 's'} rated` : '',
+    skipped ? `${skipped} game${skipped === 1 ? '' : 's'} skipped` : '',
+  ].filter(Boolean).join(' · ');
+  $('#queue-done-next').textContent = personal ? 'Back to my library' : 'See what to play next';
+  $('#queue-done-rated').hidden = !rated;
+  $('#queue-done-skipped').hidden = !skipped;
 }
 
 /**

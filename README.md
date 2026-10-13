@@ -67,6 +67,10 @@ current game from your queue. It wraps to the first game at the end of the curre
 mode and is disabled when only one game remains. **No opinion** instead moves the
 game to **Skipped**, where **Put back in my queue** restores it.
 
+Finishing your queue shows **You're all caught up**, with a recap of games rated
+and skipped. From there, head to Play next (or your library in a personal
+workspace), review your ratings, or revisit skipped games.
+
 **Play next.** The backlog ranked, with attendee chips directly above it. Changing
 who is playing immediately recomputes the score from only those people's ratings
 and checks verified player caps against that crew. Unknown caps stay visibly

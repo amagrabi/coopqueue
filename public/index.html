@@ -325,10 +325,26 @@
         <p class="rate-ask" id="rate-ask"></p>
       </div>
 
-      <div id="queue-empty" class="empty" hidden>
-        <h2>Queue clear</h2>
-        <p id="queue-empty-copy">You've rated or skipped everything in this group. Add a game, or go argue on the Play next tab.</p>
-        <button class="btn btn-primary" data-open-add>+ Add a game</button>
+      <div id="queue-empty" class="queue-complete" hidden>
+        <div class="queue-complete-mark" aria-hidden="true">
+          <svg viewBox="0 0 120 100" fill="none">
+            <circle cx="60" cy="50" r="34" />
+            <path class="queue-complete-check" d="m45 50 10 10 21-23" />
+            <path class="queue-complete-spark" d="M15 19v10m-5-5h10M103 66v12m-6-6h12M100 17v8m-4-4h8" />
+            <circle class="queue-complete-dot" cx="21" cy="77" r="3" />
+          </svg>
+        </div>
+        <div role="status">
+          <p class="queue-complete-kicker">Nice work</p>
+          <h2>You're all caught up</h2>
+          <p id="queue-empty-copy">Nothing left to rate right now. Your ratings are saved.</p>
+          <p id="queue-empty-recap" class="queue-complete-recap"></p>
+        </div>
+        <div class="empty-actions">
+          <button class="btn btn-primary" id="queue-done-next" type="button">See what to play next</button>
+          <button class="btn btn-ghost" id="queue-done-rated" type="button">Review my ratings</button>
+        </div>
+        <button class="linkish queue-complete-skipped" id="queue-done-skipped" type="button" hidden>Revisit skipped games</button>
       </div>
 
       <!-- Card and queue side by side where there is room. The list is first in the

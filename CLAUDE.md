@@ -813,6 +813,15 @@ miniature.
 
 Five assertions, including that one member's skip is never reported as another's.
 
+## Finishing the rating queue
+
+The completed queue celebrates **You're all caught up** with separate rated and
+skipped counts. It hides the unanswered-game coverage bar and stale rating question
+while keeping Already rated and Skipped reachable. Its primary action opens Play
+next, or Library in a personal workspace. The success graphic is decorative, its
+brief entrance respects reduced motion, and a truly empty library still uses the
+getting-started screen rather than claiming any work has been completed.
+
 ## Rating later
 
 **Rate later** is navigation within the active Played or Want-to-play queue. It

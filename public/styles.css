@@ -195,6 +195,30 @@ kbd {
 .view.is-library-empty > :not(.empty-library) { display: none; }
 
 /* ────────────────────────── rating queue ──────────────────────────────── */
+.queue-complete {
+  max-width: 740px; margin: 28px auto; padding: clamp(32px, 6vw, 56px) 24px;
+  text-align: center; border: 1px solid rgba(143,224,143,.2); border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 0, rgba(12,163,12,.12), transparent 65%), var(--surface-1);
+  box-shadow: var(--shadow); animation: queue-complete-in .4s ease-out;
+}
+.queue-complete-mark { width: 120px; height: 100px; margin: 0 auto 16px; }
+.queue-complete-mark svg { width: 100%; height: 100%; }
+.queue-complete-mark circle { fill: rgba(12,163,12,.12); stroke: rgba(143,224,143,.3); }
+.queue-complete-check { stroke: #8fe08f; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.queue-complete-spark { stroke: var(--warning); stroke-width: 2; stroke-linecap: round; }
+.queue-complete-mark .queue-complete-dot { fill: var(--series-1); stroke: none; }
+.queue-complete-kicker { margin: 0 0 10px; color: #8fe08f; font-size: 12px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+.queue-complete h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.025em; }
+#queue-empty-copy { max-width: 49ch; margin: 16px auto 0; color: var(--text-secondary); }
+.queue-complete-recap { margin: 22px 0 26px; color: var(--text-secondary); font-size: 13px; }
+.queue-complete-skipped { margin-top: 20px; font-size: 13px; }
+@keyframes queue-complete-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .queue-complete { animation: none; }
+}
 .rate-card {
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
   overflow: hidden; box-shadow: var(--shadow);
