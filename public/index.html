@@ -8,7 +8,8 @@
 <meta name="description" content="Rate co-op games with friends, rank your shared backlog, check player counts and Steam ownership, and find what your group should play next. Free.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://coopqueue.app/">
-<link rel="stylesheet" href="/styles.css">
+<!-- Fresh URLs bypass the four-hour copies cached before these assets revalidated. -->
+<link rel="stylesheet" href="/styles.css?v=2026-10-13-2">
 
 <!-- Icons carry a dark field rather than transparency on purpose: the three figures
      inside the controller are white, so a transparent icon leaves them invisible
@@ -327,7 +328,7 @@
 
       <div id="queue-empty" class="queue-complete" hidden>
         <div class="queue-complete-mark" aria-hidden="true">
-          <svg viewBox="0 0 120 100" fill="none">
+          <svg width="120" height="100" viewBox="0 0 120 100" fill="none">
             <circle cx="60" cy="50" r="34" />
             <path class="queue-complete-check" d="m45 50 10 10 21-23" />
             <path class="queue-complete-spark" d="M15 19v10m-5-5h10M103 66v12m-6-6h12M100 17v8m-4-4h8" />
@@ -895,6 +896,6 @@
      plays in a bare <video>. Vendored rather than pulled from a CDN so the site
      stays a self-contained static bundle. app.js loads it only when a rating card
      actually needs an HLS trailer; the rest of the app does not pay that cost. -->
-<script src="/app.js" type="module"></script>
+<script src="/app.js?v=2026-10-13-2" type="module"></script>
 </body>
 </html>

@@ -7,6 +7,21 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
 
+# HTML and its mutable assets must revalidate together after each deployment.
+# no-cache still permits ETag/304 reuse, without serving an old script or layout.
+# private keeps the custom domain's four-hour CDN setting from rewriting it.
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/app.js
+  Cache-Control: private, no-cache
+
+/styles.css
+  Cache-Control: private, no-cache
+
 /brand/*
   Cache-Control: public, max-age=604800
 

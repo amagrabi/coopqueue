@@ -815,6 +815,18 @@ Five assertions, including that one member's skip is never reported as another's
 
 ## Finishing the rating queue
 
+HTML, `app.js`, and `styles.css` must revalidate together (`public/_headers`). A
+mobile screenshot after this feature shipped showed new completion markup with
+old explanatory copy and an enormous unstyled SVG: the script and stylesheet
+responses had `max-age=14400` while HTML had `max-age=0`. Revision queries on the
+two asset URLs bypass those already-cached copies; `private, no-cache` prevents repeat
+mismatches while still allowing ETag/304 reuse. The SVG also has intrinsic width
+and height so a missing stylesheet cannot turn it into a viewport-sized spacer.
+Plain `no-cache` worked on the Pages host but was rewritten to `max-age=14400`
+on the custom domain, so the mutable assets also bypass its shared cache.
+Verify the live headers when changing this policy, and keep the revision queries
+rather than returning to the older bare cache keys. See `docs/OPERATIONS.md`.
+
 The completed queue celebrates **You're all caught up** with separate rated and
 skipped counts. It hides the unanswered-game coverage bar and stale rating question
 while keeping Already rated and Skipped reachable. Its primary action opens Play

@@ -76,6 +76,22 @@ went to preview.
 **Deploying never touches data.** `wrangler pages deploy` and `wrangler deploy` ship
 code only.
 
+`public/_headers` sets `Cache-Control: no-cache` on HTML and `private, no-cache`
+on `app.js` and `styles.css`. The custom domain's four-hour Browser Cache TTL
+overrode plain `no-cache` on these assets even though the Pages host respected it;
+`private` bypasses that shared cache while preserving browser revalidation.
+Browsers can reuse an unchanged file after ETag validation, but must check it on
+each visit so a deployment does not combine new markup with old code or styles.
+The asset URLs in `index.html` carry a revision query to bypass four-hour browser
+copies cached before this policy was introduced. Keep those queries: reverting
+to the bare URLs could reach an older cached response. Brand and vendor assets
+retain their separate, longer cache policies.
+
+If a fresh deployment looks broken on a returning device, inspect the live
+responses for both asset URLs referenced by `index.html`: their `Cache-Control`
+must contain both `private` and `no-cache` (order does not matter). A Pages
+deployment or CDN purge cannot remove files already cached in somebody's browser.
+
 There is no build step. `public/` is served as-is and `functions/` is bundled by
 wrangler. Because nothing type-checks locally, **`npm run deploy` is the first thing
 that ever resolves the imports** — a typo'd import name is a deploy-time failure, not
