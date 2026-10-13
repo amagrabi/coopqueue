@@ -809,6 +809,7 @@ function wireOnce() {
   // the existing library, and finally discovery for a completely empty workspace.
   $('#brand-home').addEventListener('click', (e) => { e.preventDefault(); setView(workspaceHomeView()); });
   $('#btn-skip').addEventListener('click', () => skipGame(false));
+  $('#btn-later').addEventListener('click', rateLater);
   $('#btn-notplayed').addEventListener('click', () => skipGame(true));
   $('#btn-unskip').addEventListener('click', unskipGame);
   $('#rate-back').addEventListener('click', goBack);
@@ -893,6 +894,8 @@ function onKey(e) {
   if (state.view !== 'queue' || $('#queue-card').hidden) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || $('#add-dialog').open || $('#detail-dialog').open) return;
+  // Let the focused navigation button activate without saving an unintended score.
+  if (e.key === 'Enter' && document.activeElement?.id === 'btn-later') return;
 
   const range = $('#score-range');
   if (/^[0-9]$/.test(e.key)) {
@@ -1094,6 +1097,8 @@ function renderQueue() {
     state.qIndex = 0;
   }
   const queue = byMode[state.rateMode];
+  $('#btn-later').hidden = state.rateMode !== 'played' && state.rateMode !== 'want';
+  $('#btn-later').disabled = queue.length < 2;
 
   const modes = $('#rate-modes');
   modes.hidden = !(byMode.played.length || byMode.want.length
@@ -1352,6 +1357,15 @@ function ownershipChip(g) {
 
 /** The game on screen. qIndex indexes the ACTIVE MODE's queue, not state.queue. */
 const currentCard = () => gameById(queuesByMode()[state.rateMode]?.[state.qIndex]);
+
+function rateLater() {
+  if (state.rateMode !== 'played' && state.rateMode !== 'want') return;
+  const queue = queuesByMode()[state.rateMode];
+  if (queue.length < 2) return;
+  // Navigation only: a skip would remove this game from the unrated queue.
+  state.qIndex = (state.qIndex + 1) % queue.length;
+  renderQueue();
+}
 
 async function saveRating() {
   const g = currentCard();

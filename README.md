@@ -62,6 +62,11 @@ and the more perishable, since memory fades. Keyboard-driven: `1`–`9` (`0` = 1
 `←` `→` to nudge by half a point, `Enter` to save and advance, `S` to skip.
 Forty unrated games takes about three minutes.
 
+**Rate later** advances to the next game without saving a rating or removing the
+current game from your queue. It wraps to the first game at the end of the current
+mode and is disabled when only one game remains. **No opinion** instead moves the
+game to **Skipped**, where **Put back in my queue** restores it.
+
 **Play next.** The backlog ranked, with attendee chips directly above it. Changing
 who is playing immediately recomputes the score from only those people's ratings
 and checks verified player caps against that crew. Unknown caps stay visibly

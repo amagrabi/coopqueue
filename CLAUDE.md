@@ -813,6 +813,14 @@ miniature.
 
 Five assertions, including that one member's skip is never reported as another's.
 
+## Rating later
+
+**Rate later** is navigation within the active Played or Want-to-play queue. It
+advances `state.qIndex`, wrapping at the end, without writing a rating or skip,
+changing queue membership, or changing coverage. It is hidden in Already rated and
+Skipped, and disabled when fewer than two games remain in the active mode.
+Enter on the focused button activates it instead of the queue's save shortcut.
+
 ## Changing a rating
 
 The queue only ever offers games you have **not** scored, so once you rated something
