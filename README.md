@@ -108,6 +108,18 @@ tab ranks everyone by how much of the library they have scored. Rating coverage
 is the thing that decides whether any of the scoring means anything, so it is
 not hidden in a stats page.
 
+**Group activity.** The bell beside your profile shows recent changes by other
+members: games added, ratings submitted, status transitions and comments. Actions
+by the same member within ten minutes are grouped to keep bulk imports and rating
+sessions compact. Scores and comment text never appear in the feed, preserving
+blind ratings. The badge counts unread groups of activity; **Mark all as read**
+saves your place across devices without acknowledging newer arrivals. Individual
+updates open the game, while a group covering several games opens the Library.
+The feed keeps the latest 40 groups from the last 90 days and refreshes once a
+minute while the app is visible, as well as when you open it or return to the tab.
+Personal workspaces hide the bell. Activity begins with new actions after setup;
+existing library history is not backfilled.
+
 **Stats.** A compact full-width library-status summary followed by paired genre and
 rating profiles, yearly starts and finishes, time-versus-rating, and a dot
 plot of your biggest arguments. Missing hours remain unknown and every history

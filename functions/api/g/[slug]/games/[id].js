@@ -1,5 +1,6 @@
 import { json, bad, body } from '../../../../../lib/http.js';
 import { getAppDetails } from '../../../../../lib/steam.js';
+import { statusActivity } from '../../../../../lib/activity.js';
 
 const EDITABLE = [
   'name', 'genre', 'status', 'max_players', 'min_session_minutes',
@@ -98,6 +99,9 @@ export async function onRequestPatch({ params, request, env, data }) {
   const statements = [
     env.DB.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ? AND group_id = ?`).bind(...vals),
   ];
+  if ('status' in patch) {
+    statements.unshift(statusActivity(env.DB, gid, data.user.steam_id, id, patch.status));
+  }
   for (const [field, value] of historyNext) {
     // The detail form submits all three history inputs on every save. Preserve an
     // approximate source when its value did not change, or editing the genre would

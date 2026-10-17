@@ -735,6 +735,52 @@ Ten assertions cover it, four of them the attacks that matter: commenting on,
 reading, and deleting another group's thread by guessing a game id, and that the
 thread never returns a foreign row.
 
+## Group activity
+
+Migration 036 creates `group_activity`, `activity_reads`, their indexes and capture
+triggers. Apply it before deploying the activity API. There is no history backfill.
+Games and ratings remain the source of truth; event rows contain actor, game and
+kind plus old/new statuses when relevant, never scores, rating explanations,
+replay answers or comment bodies. Blind-rating settings therefore cannot leak
+through either the badge, feed or stored activity data.
+
+Game inserts (including Steam import batches), changed scores and posted comments
+are captured by database triggers in the write's own transaction. Equal score
+upserts, seed reassignment and Steam enrichment stay quiet. Status changes have a
+known actor only in the PATCH handler: `statusActivity()` is inserted before the
+game UPDATE in the same D1 batch, reading the real old status and skipping equal
+values. Capture requires a real group membership and skips personal workspaces.
+Deleting a comment cascades its activity away. Group/game deletion cascades events;
+leaving a group cascades only that member's read cursor. Activity older than 90 days
+is hidden and pruned on that group's next activity insert using an indexed range.
+
+`GET /api/g/:slug/activity` captures the group's latest event id, then groups the
+snapshot by actor, kind and fixed ten-minute window. Ratings and additions span
+games; comments and status edits stay per game. The newest 40 groups are returned,
+with an unread-group count over the entire 90-day feed, including groups beyond
+that display limit. Own actions are excluded. Every event/game/cursor join retains
+the group predicate; the existing membership boundary returns 404 to outsiders.
+
+`POST /api/g/:slug/activity {throughId}` acknowledges only a validated id from that
+group's observed snapshot, or zero for an empty feed. Cursors advance monotonically
+with MAX, so an older tab cannot undo a later acknowledgement and events arriving
+after a snapshot remain unread. Event ids use AUTOINCREMENT and must never be reused
+after pruning. Opening the panel or clicking a game does not silently mark all read.
+
+The bell sits beside the profile, is hidden in personal workspaces, and updates on
+open/focus and once a minute while the tab is visible. Background focus requests
+are throttled for 15 seconds. Pending fetches are invalidated on workspace changes
+and on acknowledgement; polling pauses during an acknowledgement. A delayed reply
+from the prior workspace must never repopulate the new workspace's badge or panel.
+Single-game items refresh the library and open game details; multi-game summaries
+open the Library. Escape and outside clicks close the panel; Escape restores focus
+to the bell. Popup positioning clamps both sides inside the mobile viewport.
+
+The harness uses the same activity queries and status helper, with synthetic recent
+actions over its existing games. `PORT=4322 node test/harness.mjs` can run beside an
+existing harness. Tests cover isolation, privacy, grouping, snapshots, monotonic and
+independent cursors, retention, cascades, imports, and idempotent migration replay.
+
 ## "I didn't play this"
 
 `skips.not_played` (migration 016) separates two answers the queue used to conflate:

@@ -29,6 +29,11 @@ const state = {
   cache: {},
 };
 
+const activity = {
+  slug: null, items: [], unreadCount: 0, latestId: 0, seq: 0,
+  loading: false, marking: false, loaded: false, error: '', fetchedAt: 0,
+};
+
 /* Fixed categorical slots, assigned by position in the member list. Colour
    follows the person, never their rank, so filtering never repaints anyone.
 
@@ -532,6 +537,7 @@ let historySeq = 0;
 
 async function loadGroup(expectedSlug = state.group?.slug) {
   if (!expectedSlug) return false;
+  if (activity.slug !== expectedSlug) resetActivity(expectedSlug);
   const seq = ++groupLoadSeq;
   const [lib, q, claim] = await Promise.all([
     gapiFor(expectedSlug, '/games'),
@@ -621,6 +627,112 @@ function renderChrome() {
   renderLibHead();
   renderInviteNotice();
   wireOnce();
+  $('#activity-btn').hidden = state.group.mode === 'personal';
+  if (state.group.mode === 'personal') closeActivity();
+  else void refreshActivity(true);
+}
+
+function closeActivity(returnFocus = false) {
+  $('#activity-panel').hidden = true;
+  $('#activity-btn').setAttribute('aria-expanded', 'false');
+  if (returnFocus) $('#activity-btn').focus();
+}
+
+function resetActivity(slug) {
+  closeActivity();
+  Object.assign(activity, {
+    slug, items: [], unreadCount: 0, latestId: 0, loading: false, marking: false,
+    loaded: false, error: '', fetchedAt: 0, seq: activity.seq + 1,
+  });
+  renderActivity();
+}
+
+function activityText(item) {
+  const actor = `<strong>${esc(item.actor)}</strong>`;
+  const game = `<strong>${esc(item.gameName)}</strong>`;
+  if (item.kind === 'game_added') return `${actor} added ${item.gameCount > 1 ? `${item.gameCount} games` : game}`;
+  if (item.kind === 'rating') return `${actor} rated ${item.gameCount > 1 ? `${item.gameCount} games` : game}`;
+  if (item.kind === 'comment') return `${actor} commented on ${game}`;
+  if (item.kind === 'status_changed') {
+    const from = STATUS_LABEL[item.fromStatus] || item.fromStatus;
+    const to = STATUS_LABEL[item.toStatus] || item.toStatus;
+    return `${actor} changed ${game}${from !== to ? `: ${esc(from)} → ${esc(to)}` : ' status'}`;
+  }
+  return `${actor} updated ${game}`;
+}
+
+function renderActivity() {
+  const count = activity.unreadCount;
+  $('#activity-count').textContent = count > 99 ? '99+' : String(count);
+  $('#activity-count').hidden = count === 0;
+  $('#activity-btn').setAttribute('aria-label', `Group activity${count ? `, ${count} unread updates` : ''}`);
+  $('#activity-group').textContent = state.group?.name || '';
+  $('#activity-read').disabled = !count || activity.marking || !activity.loaded;
+  $('#activity-status').textContent = activity.error || (!activity.loaded
+    ? 'Loading activity…' : !activity.items.length ? 'No activity from other members yet.' : '');
+  $('#activity-retry').hidden = !activity.error;
+  $('#activity-list').innerHTML = activity.items.map((item) => `
+    <button class="activity-item${item.unread ? ' is-unread' : ''}" type="button" data-activity="${item.id}">
+      <span>${activityText(item)}</span>
+      <small>${item.unread ? 'Unread · ' : ''}${when(item.createdAt)}</small>
+    </button>`).join('');
+  $$('#activity-list [data-activity]').forEach((button) => button.addEventListener('click', async () => {
+    const item = activity.items.find((row) => row.id === Number(button.dataset.activity));
+    const slug = activity.slug;
+    if (!item || state.group?.slug !== slug) return;
+    closeActivity();
+    try {
+      // A newly added game may not be in this tab's cached library yet.
+      if (!await reloadGroupView(slug, 'library')) return;
+      if (item.gameCount === 1) openDetail(item.gameId, item.kind === 'comment' ? 'comment' : null);
+    } catch (error) { toast(error.message); }
+  }));
+}
+
+async function refreshActivity(force = false) {
+  const slug = state.group?.slug;
+  if (!slug || state.group.mode === 'personal' || activity.marking || ($('#app').hidden && !force)) return;
+  if (!force && (activity.loading || Date.now() - activity.fetchedAt < 15000)) return;
+  const seq = ++activity.seq;
+  activity.loading = true;
+  try {
+    const result = await gapiFor(slug, '/activity');
+    if (activity.seq !== seq || state.group?.slug !== slug || activity.slug !== slug) return;
+    Object.assign(activity, result, { loaded: true, error: '', fetchedAt: Date.now() });
+  } catch {
+    if (activity.seq !== seq || state.group?.slug !== slug) return;
+    activity.error = 'Activity could not be refreshed.';
+  } finally {
+    if (activity.seq === seq && state.group?.slug === slug) {
+      activity.loading = false;
+      renderActivity();
+    }
+  }
+}
+
+async function markAllActivityRead() {
+  const slug = activity.slug;
+  const throughId = activity.latestId;
+  if (!activity.loaded || !activity.unreadCount || activity.marking || state.group?.slug !== slug) return;
+  // Cancel older GET responses that could reintroduce a just-cleared badge.
+  const seq = ++activity.seq;
+  activity.loading = false;
+  activity.marking = true;
+  renderActivity();
+  try {
+    await gapiFor(slug, '/activity', { method: 'POST', body: { throughId } });
+    if (state.group?.slug === slug && activity.seq === seq) {
+      activity.marking = false;
+      await refreshActivity(true);
+    }
+  } catch {
+    if (state.group?.slug === slug && activity.seq === seq) activity.error = 'Could not mark activity as read. Try again.';
+  } finally {
+    if (state.group?.slug === slug && activity.seq === seq) {
+      activity.marking = false;
+      renderActivity();
+    }
+  }
 }
 
 function renderGroupMenu() {
@@ -753,9 +865,48 @@ function wireOnce() {
   wired = true;
 
   window.addEventListener('focus', () => void refreshIncomingInvites());
+  window.addEventListener('focus', () => void refreshActivity());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void refreshIncomingInvites();
+    if (document.visibilityState === 'visible') {
+      void refreshIncomingInvites();
+      void refreshActivity();
+    }
   });
+  setInterval(() => {
+    if (document.visibilityState === 'visible') void refreshActivity();
+  }, 60000);
+  $('#activity-btn').addEventListener('click', () => {
+    const panel = $('#activity-panel');
+    if (!panel.hidden) return closeActivity(true);
+    closeGroupMenu();
+    const rect = $('#activity-btn').getBoundingClientRect();
+    const width = Math.min(400, innerWidth - 32);
+    const top = Math.max(rect.bottom, $('.topbar').getBoundingClientRect().bottom) + 8;
+    // Align with the bell when space permits; a phone's bell is further left
+    // than the panel is wide, so clamp BOTH edges inside the viewport.
+    const right = Math.max(16, Math.min(innerWidth - rect.right, innerWidth - width - 16));
+    panel.style.setProperty('--activity-top', `${top}px`);
+    panel.style.setProperty('--activity-right', `${right}px`);
+    panel.style.maxHeight = `${Math.max(0, Math.min(innerHeight * .7, 600, innerHeight - top - 16))}px`;
+    panel.hidden = false;
+    $('#activity-btn').setAttribute('aria-expanded', 'true');
+    renderActivity();
+    panel.focus();
+    void refreshActivity(true);
+  });
+  $('#activity-read').addEventListener('click', markAllActivityRead);
+  $('#activity-retry').addEventListener('click', () => void refreshActivity(true));
+  $('#activity-close').addEventListener('click', () => closeActivity(true));
+  document.addEventListener('click', (event) => {
+    if (!$('#activity-panel').contains(event.target) && !$('#activity-btn').contains(event.target)) closeActivity();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !$('#activity-panel').hidden) {
+      event.preventDefault();
+      closeActivity(true);
+    }
+  });
+  window.addEventListener('resize', () => closeActivity());
 
   $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
   $$('[data-open-add]').forEach((b) => b.addEventListener('click', openAdd));

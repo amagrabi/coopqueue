@@ -267,6 +267,28 @@
         Invites <span class="pill" id="incoming-invite-count"></span>
       </button>
       <button class="btn btn-sm btn-primary" data-open-add>+ Add game</button>
+      <button class="btn btn-sm activity-bell" id="activity-btn" type="button" aria-label="Group activity"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="activity-panel" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>
+        </svg>
+        <span class="pill activity-count" id="activity-count" hidden></span>
+      </button>
+      <section id="activity-panel" class="activity-panel" role="dialog" aria-labelledby="activity-title"
+               tabindex="-1" hidden>
+        <div class="activity-head">
+          <div><h3 id="activity-title">Group activity</h3><p id="activity-group"></p></div>
+          <button class="btn btn-icon" id="activity-close" type="button" aria-label="Close activity">✕</button>
+        </div>
+        <div class="activity-tools">
+          <span>Last 90 days</span>
+          <button class="btn btn-sm" id="activity-read" type="button" disabled>Mark all as read</button>
+        </div>
+        <p class="activity-status" id="activity-status" role="status"></p>
+        <button class="btn btn-sm activity-retry" id="activity-retry" type="button" hidden>Try again</button>
+        <div class="activity-list" id="activity-list"></div>
+      </section>
       <div class="who">
         <img id="me-avatar" alt="" width="28" height="28">
         <span id="me-name"></span>

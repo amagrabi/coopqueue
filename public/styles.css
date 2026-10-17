@@ -151,6 +151,31 @@ kbd {
 }
 .pill:empty { display: none; }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.activity-bell { position: relative; min-width: 40px; min-height: 40px; padding: 8px; }
+.activity-count { position: absolute; top: -6px; right: -8px; padding: 1px 5px; }
+.activity-panel {
+  position: fixed; top: var(--activity-top, 64px); right: var(--activity-right, 16px);
+  z-index: 30; width: min(400px, calc(100vw - 32px)); max-height: min(70vh, 600px);
+  display: flex; flex-direction: column; background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.activity-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; }
+.activity-head h3 { margin: 0; font-size: 16px; }
+.activity-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.activity-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 16px 12px; }
+.activity-tools > span { font-size: 12px; color: var(--text-muted); }
+.activity-status { margin: 0; padding: 0 16px; font-size: 13px; color: var(--text-secondary); }
+.activity-status:not(:empty) { padding-bottom: 16px; }
+.activity-retry { align-self: flex-start; margin: 0 16px 16px; }
+.activity-list { overflow-y: auto; overscroll-behavior: contain; }
+.activity-item {
+  display: block; width: 100%; padding: 14px 16px; text-align: left; font: inherit;
+  background: transparent; color: var(--text-primary); border: 0; border-top: 1px solid var(--border);
+  cursor: pointer; line-height: 1.5;
+}
+.activity-item:hover, .activity-item:focus-visible { background: var(--surface-2); }
+.activity-item.is-unread { box-shadow: inset 3px 0 var(--series-1); }
+.activity-item small { display: block; margin-top: 3px; font-size: 12px; color: var(--text-muted); }
 .who { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 550; }
 .who img { border-radius: 50%; background: var(--surface-2); }
 

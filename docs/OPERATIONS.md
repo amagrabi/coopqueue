@@ -166,6 +166,17 @@ personal-workspace code. It adds only the idempotent `workspace_settings` table;
 existing groups have no row and therefore remain co-op. Workspace type is never
 inferred from a one-member count, because every new co-op group starts that way.
 
+Migration `036-group-activity.sql` must be applied before deploying the activity
+bell and API. Take `db:backup` first, then apply only this migration; never apply
+`schema.sql` to an existing database. It adds the event/read tables, indexes and
+capture triggers without changing games, ratings, comments or memberships and
+without backfilling earlier history. Re-running it is harmless. Events begin on
+new co-op group actions, with status-event attribution supplied by the new Pages
+code after deployment. The crawler requires no change. Activity retains 90 days,
+with per-group indexed cleanup on a subsequent event, and never stores rating
+values or comment text. A deployment rollback can leave these additive tables in
+place; drop no existing data to roll back the UI.
+
 ### Useful queries
 
 ```bash

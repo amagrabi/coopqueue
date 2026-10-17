@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
 import { recommend } from '../lib/recommend.js';
 import { classifyCoop } from '../lib/coop.js';
+import { activityFeed, markActivityRead, statusActivity } from '../lib/activity.js';
 import { buildHistoryItems } from '../lib/history.js';
 import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../lib/stats.js';
 
@@ -340,6 +341,29 @@ if (SCENARIO === 'member') {
 
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const one = (sql, ...a) => db.prepare(sql).get(...a);
+// The activity feed uses exactly the shipped SQL, including grouping and cursors.
+const activityDB = {
+  prepare(sql) {
+    let values = [];
+    const statement = {
+      bind(...args) { values = args; return statement; },
+      async first() { return db.prepare(sql).get(...values); },
+      async all() { return { results: db.prepare(sql).all(...values) }; },
+      async run() { return db.prepare(sql).run(...values); },
+    };
+    return statement;
+  },
+};
+if (SCENARIO === 'member') {
+  // Synthetic recent actions over the normal fixtures; production has no backfill.
+  const teammate = one('SELECT steam_id FROM memberships WHERE group_id=1 AND steam_id<>? ORDER BY short_name LIMIT 1', ME);
+  const games = q('SELECT id FROM games WHERE group_id=1 ORDER BY id LIMIT 2');
+  const event = db.prepare('INSERT INTO group_activity (group_id,actor_id,game_id,kind,from_status,to_status,created_at) VALUES (1,?,?,?,?,?,?)');
+  const recent = Math.floor(Date.now() / 600000) * 600;
+  event.run(teammate.steam_id, games[0].id, 'game_added', null, null, recent);
+  for (const game of games) event.run(teammate.steam_id, game.id, 'rating', null, null, recent + 1);
+  event.run(teammate.steam_id, games[0].id, 'status_changed', 'playing', 'dropped', recent + 2);
+}
 let freshCreated = false;
 const send = (res, code, data) => {
   res.writeHead(code, { 'content-type': 'application/json' });
@@ -945,6 +969,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, appid: Number(b.appid) });
     }
 
+    if (sub === '/activity' && req.method === 'GET') {
+      return send(res, 200, await activityFeed(activityDB, gid, ME));
+    }
+    if (sub === '/activity' && req.method === 'POST') {
+      const { throughId } = await readBody(req);
+      if (!Number.isSafeInteger(throughId) || throughId < 0) return send(res, 400, { error: 'invalid activity snapshot' });
+      if (!await markActivityRead(activityDB, gid, ME, throughId)) return send(res, 404, { error: 'no such activity snapshot' });
+      return send(res, 200, { ok: true });
+    }
     if (sub.startsWith('/comments')) {
       const inGroup = (id) => one('SELECT id FROM games WHERE id=? AND group_id=?', id, gid);
       if (req.method === 'GET') {
@@ -1017,6 +1050,7 @@ const server = http.createServer(async (req, res) => {
                        'max_players', 'min_session_minutes', 'name']) {
         if (!(k in b)) continue;
         const value = b[k] === '' ? null : b[k];
+        if (k === 'status') statusActivity(activityDB, gid, ME, id, value).run();
         db.prepare(`UPDATE games SET ${k}=? WHERE id=? AND group_id=?`).run(value, id, gid);
         if (!['hours', 'started', 'finished'].includes(k) || prior[k] === value) continue;
         if (value == null) {
@@ -1055,9 +1089,9 @@ const server = http.createServer(async (req, res) => {
       if (one('SELECT 1 FROM games WHERE group_id=? AND name=? COLLATE NOCASE', gid, name)) {
         return send(res, 409, { error: `${name} is already on your list` });
       }
-      db.prepare(`INSERT INTO games (group_id, name, genre, status, max_players, enriched_at)
-                  VALUES (?,?,?,'backlog',?,unixepoch())`)
-        .run(gid, name, b.genre || null, b.maxPlayers || null);
+      db.prepare(`INSERT INTO games (group_id, name, genre, status, max_players, added_by, enriched_at)
+                  VALUES (?,?,?,'backlog',?,?,unixepoch())`)
+        .run(gid, name, b.genre || null, b.maxPlayers || null, ME);
       return send(res, 201, { ok: true, name, manual: true });
     }
     if (sub === '/skip' && req.method === 'GET') {
@@ -1302,4 +1336,5 @@ const server = http.createServer(async (req, res) => {
   res.end(fs.readFileSync(file));
 });
 
-server.listen(4321, () => console.log(`harness on http://127.0.0.1:4321  (scenario: ${SCENARIO})`));
+const port = Number(process.env.PORT) || 4321;
+server.listen(port, () => console.log(`harness on http://127.0.0.1:${port}  (scenario: ${SCENARIO})`));
