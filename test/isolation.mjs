@@ -479,6 +479,18 @@ await check('a game with no Steam page can be added by hand', async () => {
   return row.enriched_at != null || 'enriched_at not stamped, /enrich will retry forever';
 });
 
+await check('a known single-player Steam game can still be added deliberately', async () => {
+  sqlite.exec(`INSERT INTO steam_apps (appid,name,coop_categories,fetched_at)
+               VALUES (777010,'Deliberate Solo Addition','["Single-player"]',unixepoch())`);
+  sqlite.exec(`INSERT INTO coop_apps (appid,name,tags,is_coop)
+               VALUES (777010,'Deliberate Solo Addition','["Singleplayer"]',0)`);
+  const { data } = await ctxFor(ALICE, 'g4m1ng');
+  const response = await gamesRoute.onRequestPost({ request: req({ input: '777010' }), env, data });
+  const added = sqlite.prepare('SELECT max_players FROM games WHERE group_id=1 AND steam_appid=777010').get();
+  return (response.status === 201 && added && added.max_players == null)
+    || `status ${response.status}, added ${JSON.stringify(added)}`;
+});
+
 await check('a hand-added game is not added twice under the same name', async () => {
   const { data } = await ctxFor(ALICE, 'g4m1ng');
   const r = await gamesRoute.onRequestPost({
@@ -1714,7 +1726,32 @@ await check('a plain member cannot change blind rating', async () => {
 
 console.log('\nCo-op classification');
 
-const { classifyCoop, parseStoreTags } = await import(path.join(SITE, 'lib/coop.js'));
+const { classifyCoop, classifyGameType, parseStoreTags, shapeDetails } = await import(path.join(SITE, 'lib/coop.js'));
+// Public Steam tag order checked 2026-10-17, /app/<appid>/?l=english.
+// Multiplayer evidence sits below the old 12-tag cutoff in all three co-op cases.
+const MODE_FIXTURES = [
+  { appid: 753640, name: 'Outer Wilds', coop: false, tags: [
+    'Exploration', 'Space', 'Mystery', 'Story Rich', 'Adventure', 'Great Soundtrack',
+    'Atmospheric', 'Puzzle', 'Open World', 'Singleplayer', 'Indie', 'Sci-fi', 'Horror',
+    'First-Person', 'Beautiful', 'Psychological Horror', 'Epic', '3D', 'Simulation', 'Action',
+  ] },
+  { appid: 3643170, name: 'Roadside Research', coop: true, tags: [
+    'Early Access', 'Shop Keeper', 'Simulation', 'Relaxing', 'Management', 'Immersive Sim',
+    'Resource Management', 'Singleplayer', 'Inventory Management', 'Economy', 'Building',
+    'Trading', 'Life Sim', 'First-Person', 'Character Customization', 'Funny', 'Comedy',
+    'Sci-fi', 'Casual', 'Online Co-Op',
+  ] },
+  { appid: 1794680, name: 'Vampire Survivors', coop: true, tags: [
+    'Action Roguelike', 'Bullet Hell', 'Roguelite', 'Pixel Graphics', 'Vampires', '2D',
+    'Indie', 'Singleplayer', 'Casual', 'Roguelike', 'Arcade', 'Action', 'Local Co-Op',
+    'RPG', 'Controller', 'Score Attack', 'Retro', 'Dark Fantasy', 'Action RPG', 'Co-op',
+  ] },
+  { appid: 1340990, name: 'Rise of the Ronin', coop: true, tags: [
+    'Open World', 'Action RPG', 'RPG', 'Swordplay', 'Action', 'Third Person', 'Adventure',
+    'Historical', '3D', 'Character Customization', 'Souls-like', 'Singleplayer', 'Samurai',
+    'Multiple Endings', 'Gore', 'Online Co-Op', 'Violent', 'Ninja', 'Co-op', 'Asynchronous Multiplayer',
+  ] },
+];
 /* Real tag orders, as Steam lists them. The first four games are the regression: an
    earlier rule required a co-op tag in the top 5 and classified all of them as NOT
    co-op, which hid most of this group's own library behind a filter that defaults
@@ -1735,7 +1772,7 @@ const CLASSIFY = [
 ];
 
 for (const [name, want, tags] of CLASSIFY) {
-  await check(`${name} classifies as ${want ? 'co-op' : 'PvP'}`, async () => {
+  await check(`${name} classifies as ${want ? 'co-op' : 'not co-op'}`, async () => {
     const got = classifyCoop(tags);
     return got === !!want || `got ${got}`;
   });
@@ -1747,6 +1784,25 @@ await check('a PvP tag past the window is an optional mode, not the genre', asyn
   const rust = ['Survival', 'Crafting', 'Multiplayer', 'Open World', 'Open World Survival Craft', 'Building', 'PvP'];
   const destiny = ['Free to Play', 'Open World', 'Looter Shooter', 'Multiplayer', 'MMORPG', 'FPS', 'Co-op', 'Adventure', 'PvP'];
   return (classifyCoop(rust) && classifyCoop(destiny)) || 'excluded on a PvP tag past rank 6';
+});
+
+for (const game of MODE_FIXTURES) {
+  await check(`${game.name} uses mode evidence beyond the first six tags`, async () =>
+    classifyCoop(game.tags) === game.coop || `wrong verdict for ${game.appid}`);
+}
+
+await check('cached Steam modes rescue co-op games with older truncated tag lists', async () => {
+  const failures = MODE_FIXTURES.filter((game) => game.coop
+    && !classifyCoop(game.tags.slice(0, 12), ['Multi-player', 'Co-op', 'Online Co-op']));
+  return !failures.length || `hidden: ${failures.map((game) => game.name).join(', ')}`;
+});
+
+await check('Steam co-op modes cannot override a primary PvP genre', async () => {
+  const tags = ['FPS', 'PvP', 'Multiplayer', 'Co-op'];
+  const categories = ['Multi-player', 'Co-op', 'Online Co-op'];
+  return (!classifyCoop(tags, categories)
+      && classifyGameType({ tags, categories, isCoop: 1 }) === 'multiplayer')
+    || 'Steam mode hints overrode the PvP exclusion';
 });
 
 console.log('\nStore-page tag parsing');
@@ -1777,6 +1833,47 @@ await check('the tag list is capped, so one page cannot bloat a row', async () =
   return got.tags.length === 12 || `kept ${got.tags.length}`;
 });
 
+for (const game of MODE_FIXTURES) {
+  await check(`${game.name} keeps its complete visible Steam tag list`, async () => {
+    const html = '<div class="glance_tags popular_tags">'
+      + game.tags.map((tag) => `<a class="app_tag" style="display: none;">${tag}</a>`).join('')
+      + '</div><a class="app_tag">PvP</a>';
+    const parsed = parseStoreTags(html);
+    return (JSON.stringify(parsed?.tags) === JSON.stringify(game.tags) && parsed.isCoop === game.coop)
+      || `got ${JSON.stringify(parsed)}`;
+  });
+}
+
+await check('tag parsing stays bounded and never reads multiplayer tags from the modal', async () => {
+  const many = Array.from({ length: 100 }, (_, i) => `<a class="app_tag">Tag${i}</a>`).join('');
+  const bounded = parseStoreTags(`<div class="glance_tags popular_tags">${many}</div>`);
+  const solo = parseStoreTags('<div class="glance_tags popular_tags"><a class="app_tag">Singleplayer</a>'
+    + '</div><div><a class="app_tag">Multiplayer</a></div>');
+  return (bounded.tags.length === 64 && solo.isCoop === false && solo.tags.length === 1)
+    || `bounded ${bounded.tags.length}, solo ${JSON.stringify(solo)}`;
+});
+
+await check('full Steam metadata retains explicit solo evidence without inventing player caps', async () => {
+  const { getAppDetails } = await import(path.join(SITE, 'lib/steam.js'));
+  const previousFetch = globalThis.fetch;
+  const payload = { 710099: { success: true, data: {
+    type: 'game', name: 'Known Solo', categories: [
+      { description: 'Single-player' }, { description: 'Steam Achievements' },
+    ],
+  } } };
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify(payload));
+    const details = await getAppDetails(env.DB, 710099);
+    const cached = JSON.parse(sqlite.prepare('SELECT coop_categories FROM steam_apps WHERE appid=710099').get().coop_categories);
+    const catalogue = shapeDetails(710099, payload);
+    return (JSON.stringify(details.coop_categories) === '["Single-player"]'
+        && JSON.stringify(cached) === '["Single-player"]'
+        && JSON.stringify(catalogue.coop_categories) === '["Single-player"]'
+        && !('max_players' in details) && !('max_players' in catalogue))
+      || `details ${JSON.stringify(details)}, cached ${JSON.stringify(cached)}`;
+  } finally { globalThis.fetch = previousFetch; }
+});
+
 console.log('\nRecommendations');
 
 const recommendRoute = await import(path.join(SITE, 'functions/api/g/[slug]/recommend.js'));
@@ -1797,6 +1894,33 @@ const pad = (n, score, tagsFor, from = 8900) => {
   }
   return out;
 };
+
+await check('full classification tags do not change the measured top-12 taste model', async () => {
+  const tagsFor = new Map();
+  const history = pad(20, 7, tagsFor);
+  for (let i = 0; i < 4; i++) {
+    history.push({ appid: 8800 + i, name: `Liked ${i}`, score: 10 });
+    tagsFor.set(8800 + i, ['Survival', ...Array.from({ length: 11 }, (_, n) => `Mechanic${n}`)]);
+  }
+  for (const [appid, tags] of tagsFor) tagsFor.set(appid, [...tags, ...Array(12).fill('Common')].slice(0, 12));
+  const candidates = [
+    { appid: 1, tags: JSON.stringify(tagsFor.get(8800)), review_count: 100 },
+    { appid: 2, tags: ['Puzzle', ...Array(11).fill('Other')], review_count: 200 },
+  ];
+  const brief = (out) => ({
+    games: out.games.map(({ appid, fit }) => ({ appid, fit })), likes: out.likes, dislikes: out.dislikes,
+  });
+  const before = brief(recommend(candidates, history, tagsFor));
+  const extendedHistory = new Map([...tagsFor].map(([appid, tags]) => [appid,
+    tags.concat('Online Co-Op', 'Late taste tag'),
+  ]));
+  const extendedCandidates = candidates.map((game) => ({ ...game,
+    tags: (typeof game.tags === 'string' ? JSON.parse(game.tags) : game.tags).concat('Online Co-Op', 'Late taste tag'),
+  }));
+  const full = brief(recommend(extendedCandidates, history, extendedHistory));
+  return (before.games.length === 2 && JSON.stringify(before) === JSON.stringify(full))
+    || `before ${JSON.stringify(before)}, full ${JSON.stringify(full)}`;
+});
 
 await check('recommendations are group-scoped: a non-member never reaches them', async () => {
   // Same 404-not-403 boundary as everything else below /api/g/:slug.
@@ -2175,6 +2299,8 @@ sqlite.exec(`INSERT INTO coop_apps (appid,name,max_players,max_players_src) VALU
              (700005,'Wishlist Solo Game',3,NULL)`);
 sqlite.exec(`INSERT INTO coop_apps (appid,name,max_players,max_players_src,coop_categories,is_coop)
              VALUES (700008,'Wishlist Co-op Game',4,'manual:test','["Online Co-op"]',1)`);
+sqlite.exec(`INSERT INTO steam_apps (appid,name,coop_categories,fetched_at)
+             VALUES (700009,'Wishlist Solo Two','["Single-player"]',unixepoch())`);
 
 const originalFetch = globalThis.fetch;
 const steamCalls = [];
@@ -2277,6 +2403,85 @@ await check('Steam import game-type filters apply across the full candidate set'
       && coop.items?.some((game) => game.appid === 700008)
       && coop.items.every((game) => game.gameType === 'coop'))
     || JSON.stringify({ solo: solo.items, coop: coop.items });
+});
+
+await check('Steam import separates solo, multiplayer and unknown without changing saved games', async () => {
+  const previousFetch = globalThis.fetch;
+  const outerWilds = MODE_FIXTURES[0].tags;
+  const cases = [
+    { appid: 710001, want: 'solo', isCoop: 0, tags: ['Singleplayer', 'Adventure'] },
+    { appid: 710002, want: 'solo', isCoop: 1, tags: outerWilds },
+    { appid: 710003, want: 'multiplayer', categories: ['Multi-player'] },
+    { appid: 710004, want: 'solo', tags: ['Adventure', 'Singleplayer'] },
+    { appid: 710005, want: 'unknown' },
+    { appid: 710006, want: 'multiplayer', isCoop: 0, tags: ['FPS', 'PvP', 'Multiplayer'],
+      categories: ['Co-op', 'Online Co-op'] },
+    { appid: 710007, want: 'coop', isCoop: 1, tags: MODE_FIXTURES[1].tags.slice(0, 12),
+      categories: ['Online Co-op'] },
+    { appid: 710008, want: 'unknown', isCoop: 0 },
+    { appid: 710009, want: 'solo', categories: ['Single-player'] },
+    { appid: 710010, want: 'coop', isCoop: 1, tags: ['RPG', 'Co-op'],
+      steamTags: ['PvP', 'Battle Royale'] },
+    { appid: 710011, want: 'coop', categories: ['Single-player', 'Online Co-op'] },
+    { appid: 710012, want: 'multiplayer', tags: ['PvP', 'Hero Shooter'], categories: ['Online Co-op'] },
+    { appid: 710013, want: 'solo', tags: ['Singleplayer', 'PvE'] },
+  ];
+  const before = JSON.stringify(sqlite.prepare('SELECT * FROM games ORDER BY id').all());
+  const cacheInsert = sqlite.prepare(
+    'INSERT INTO steam_apps (appid,name,tags,coop_categories,fetched_at) VALUES (?,?,?,?,unixepoch())');
+  const catalogueInsert = sqlite.prepare(
+    'INSERT INTO coop_apps (appid,name,tags,coop_categories,is_coop) VALUES (?,?,?,?,?)');
+  for (const game of cases) {
+    if (game.isCoop != null) catalogueInsert.run(game.appid, `Mode fixture ${game.appid}`,
+      game.tags ? JSON.stringify(game.tags) : null, JSON.stringify(game.categories || []), game.isCoop);
+    else if (game.tags || game.categories) cacheInsert.run(game.appid, `Mode fixture ${game.appid}`,
+      JSON.stringify(game.tags || []), JSON.stringify(game.categories || []));
+    if (game.steamTags) cacheInsert.run(game.appid, `Mode fixture ${game.appid}`,
+      JSON.stringify(game.steamTags), '[]');
+  }
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('GetOwnedGames')) return new Response('{"response":{"games":[]}}');
+      if (String(url).includes('GetWishlist')) return new Response(JSON.stringify({ response: {
+        items: cases.map((game) => ({ appid: game.appid })),
+      } }));
+      if (String(url).includes('IStoreBrowseService/GetItems')) return new Response(JSON.stringify({ response: {
+        store_items: cases.map((game) => ({ appid: game.appid, name: `Mode fixture ${game.appid}` })),
+      } }));
+      throw new Error(`unexpected Steam call during classification: ${url}`);
+    };
+    const personal = (await ctxFor(ALICE, 'alice-solo')).data;
+    const group = (await ctxFor(ALICE, 'g4m1ng')).data;
+    for (const type of ['coop', 'multiplayer', 'solo', 'unknown']) {
+      const preview = await (await steamImportRoute.onRequestPost({
+        request: req({ action: 'preview', gameTypes: [type] }), env, data: personal,
+      })).json();
+      const wanted = cases.filter((game) => game.want === type).map((game) => game.appid).sort();
+      const got = (preview.items || []).map((game) => game.appid).sort();
+      if (JSON.stringify(wanted) !== JSON.stringify(got)
+          || preview.items.some((game) => game.gameType !== type)
+          || preview.counts.types[type] !== wanted.length) return `${type}: wanted ${wanted}, got ${JSON.stringify(preview)}`;
+    }
+    const personalPreview = await (await steamImportRoute.onRequestPost({
+      request: req({ action: 'preview' }), env, data: personal,
+    })).json();
+    const groupPreview = await (await steamImportRoute.onRequestPost({
+      request: req({ action: 'preview' }), env, data: group,
+    })).json();
+    const flags = sqlite.prepare('SELECT is_coop FROM coop_apps WHERE appid IN (710001,710002) ORDER BY appid').all();
+    return (personalPreview.items.length === cases.length
+        && groupPreview.items.length === cases.filter((game) => game.want === 'coop').length
+        && groupPreview.items.every((game) => game.gameType === 'coop')
+        && flags[0].is_coop === 0 && flags[1].is_coop === 1
+        && before === JSON.stringify(sqlite.prepare('SELECT * FROM games ORDER BY id').all()))
+      || `defaults or saved data changed: ${JSON.stringify({ personalPreview, groupPreview, flags })}`;
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const game of cases) {
+      sqlite.prepare('DELETE FROM coop_apps WHERE appid=?').run(game.appid);
+      sqlite.prepare('DELETE FROM steam_apps WHERE appid=?').run(game.appid);
+    }
+  }
 });
 
 await check('an all-zero Steam library is not silently imported as a real backlog', async () => {

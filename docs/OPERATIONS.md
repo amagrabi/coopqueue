@@ -401,8 +401,13 @@ node scripts/reclassify-coop.mjs --out migrations/0NN-reclassify.sql
 ```
 
 Run `reclassify` after changing the classification rule; run `backfill` after the
-catalogue grows. Both emit a migration rather than writing directly, so the change
-is reviewable and repeatable.
+catalogue grows. The parser now retains up to 64 tags from the bounded tag block,
+including multiplayer modes beyond the former 12-tag cutoff. `backfill --all`
+refreshes that older evidence; reclassification also reads cached Steam modes to
+avoid excluding co-op games whose multiplayer tags were truncated. Modes cannot
+override the primary PvP exclusion or supply a player cap. Both scripts emit a
+migration rather than writing directly, so the change is reviewable and repeatable.
+The classifier/import fix ships no backfill and changes no existing group rows.
 
 ### Player caps
 

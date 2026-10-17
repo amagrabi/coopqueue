@@ -24,7 +24,7 @@
  */
 import {
   UA, searchUrl, detailsUrl, reviewsUrl, storeTagsUrl, STORE_HEADERS,
-  parseSearchItems, shapeDetails, parseReviews, parseStoreTags, OBVIOUS_NON_GAME,
+  parseSearchItems, shapeDetails, parseReviews, parseStoreTags, classifyCoop, OBVIOUS_NON_GAME,
 } from '../lib/coop.js';
 
 /**
@@ -289,7 +289,7 @@ async function upsert(db, appid, out, floor = MIN_REVIEWS) {
     shaped.short_description, shaped.genre, shaped.price, shaped.release_date,
     shaped.release_ts, shaped.metacritic, JSON.stringify(shaped.coop_categories || []),
     tags ? JSON.stringify(tags.tags) : null,
-    tags ? (tags.isCoop ? 1 : 0) : null,
+    tags ? (classifyCoop(tags.tags, shaped.coop_categories) ? 1 : 0) : null,
     tags ? Math.floor(Date.now() / 1000) : null
   ).run();
   return true;

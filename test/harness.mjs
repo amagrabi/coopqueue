@@ -746,13 +746,15 @@ const server = http.createServer(async (req, res) => {
           owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'coop' },
         { appid: 1172470, name: 'Apex Legends', hours: 6.4, lastPlayed: '2023-09-02', played: true,
           owned: true, wishlisted: false, wishlistedAt: null, image: null, gameType: 'multiplayer' },
+        { appid: 9900001, name: 'Unclassified Steam game', hours: 0, lastPlayed: null, played: false,
+          owned: false, wishlisted: true, wishlistedAt: '2025-03-15', image: null, gameType: 'unknown' },
       ];
       const missing = samples.filter((game) =>
         !one('SELECT 1 AS x FROM games WHERE group_id=? AND steam_appid=?', gid, game.appid));
       const source = ['owned', 'wishlist'].includes(b.source) ? b.source : 'all';
       const requestedTypes = Array.isArray(b.gameTypes)
         ? new Set(b.gameTypes) : new Set(ctx.workspace_mode === 'personal'
-          ? ['coop', 'multiplayer', 'solo'] : ['coop']);
+          ? ['coop', 'multiplayer', 'solo', 'unknown'] : ['coop']);
       const visible = missing.filter((game) => {
         const ownedVisible = game.owned && (b.includeUnplayed || game.played);
         if (!requestedTypes.has(game.gameType)) return false;
@@ -774,7 +776,7 @@ const server = http.createServer(async (req, res) => {
             missingOwned: missing.filter((game) => game.owned).length,
             missingWishlist: missing.filter((game) => game.wishlisted).length,
             matching: visible.length, playtimeReadable: true,
-            types: Object.fromEntries(['coop', 'multiplayer', 'solo'].map((type) => [
+            types: Object.fromEntries(['coop', 'multiplayer', 'solo', 'unknown'].map((type) => [
               type, missing.filter((game) => game.gameType === type).length,
             ])),
             ownedState: 'available', wishlistState: 'available' },

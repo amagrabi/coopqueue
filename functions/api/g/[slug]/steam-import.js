@@ -1,4 +1,5 @@
 import { bad, body, json } from '../../../../lib/http.js';
+import { classifyGameType } from '../../../../lib/coop.js';
 import {
   getAppDetails, getAppSummaries, ownedGames, wishlistedGames,
 } from '../../../../lib/steam.js';
@@ -7,7 +8,7 @@ const PAGE = 250;
 const MAX_IMPORT = 250;
 const DB_BATCH = 50;
 const ENRICH_BATCH = 8;
-const GAME_TYPES = new Set(['coop', 'multiplayer', 'solo']);
+const GAME_TYPES = new Set(['coop', 'multiplayer', 'solo', 'unknown']);
 
 const day = (timestamp) => timestamp
   ? new Date(Number(timestamp) * 1000).toISOString().slice(0, 10)
@@ -55,7 +56,10 @@ async function verifiedCatalogueApps(db, appids) {
 }
 
 const parseList = (value) => {
-  try { return Array.isArray(value) ? value : JSON.parse(value || '[]'); }
+  try {
+    const parsed = Array.isArray(value) ? value : JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.filter((label) => typeof label === 'string') : [];
+  }
   catch { return []; }
 };
 
@@ -64,7 +68,7 @@ async function classifyApps(db, appids) {
   for (const batch of chunks(appids)) {
     const placeholders = batch.map(() => '?').join(',');
     const result = await db.prepare(
-      `SELECT appid,coop_categories,NULL AS tags,NULL AS is_coop,0 AS catalogue
+      `SELECT appid,coop_categories,tags,NULL AS is_coop,0 AS catalogue
          FROM steam_apps WHERE appid IN (${placeholders})
        UNION ALL
        SELECT appid,coop_categories,tags,is_coop,1 AS catalogue
@@ -72,30 +76,22 @@ async function classifyApps(db, appids) {
     ).bind(...batch, ...batch).all();
     for (const row of result.results || []) {
       const appid = Number(row.appid);
-      const current = evidence.get(appid) || { categories: [], tags: [], catalogue: null };
+      const current = evidence.get(appid) || { categories: [], steamTags: [], tags: [], isCoop: null };
       current.categories.push(...parseList(row.coop_categories));
-      current.tags.push(...parseList(row.tags));
-      if (row.catalogue) current.catalogue = row.is_coop == null ? null : Number(row.is_coop);
+      // Preserve one ranked list; concatenating sources changes the PvP window.
+      if (row.catalogue) {
+        current.tags = parseList(row.tags);
+        current.isCoop = row.is_coop == null ? null : Number(row.is_coop);
+      } else current.steamTags = parseList(row.tags);
       evidence.set(appid, current);
     }
   }
   return new Map(appids.map((appid) => {
-    const row = evidence.get(Number(appid)) || { categories: [], tags: [], catalogue: null };
-    const labels = [...row.categories, ...row.tags].map((label) => String(label).toLowerCase());
-    let type;
-    if (row.catalogue === 1 || (row.catalogue == null
-        && labels.some((label) => /(^|[- ])co[- ]?op($|[- ])/i.test(label)))) {
-      type = 'coop';
-    } else if (row.catalogue === 0
-        || labels.some((label) => /multiplayer|\bpvp\b|player versus player/i.test(label))) {
-      type = 'multiplayer';
-    } else {
-      // Steam does not publish categories with the owned-library response. An
-      // uncached title therefore falls into Solo until enrichment proves a
-      // multiplayer mode; personal imports include every type by default.
-      type = 'solo';
-    }
-    return [Number(appid), type];
+    const row = evidence.get(Number(appid));
+    return [Number(appid), classifyGameType(row ? {
+      tags: row.tags.length ? row.tags : row.steamTags,
+      categories: row.categories, isCoop: row.isCoop,
+    } : undefined)];
   }));
 }
 
@@ -199,7 +195,7 @@ async function preview(db, data, steam, input) {
       owned: game.owned,
       wishlisted: game.wishlisted,
       wishlistedAt: day(game.wishlistedAt),
-      gameType: classifications.get(game.appid) || 'solo',
+      gameType: classifications.get(game.appid) || 'unknown',
       image: game.iconHash
         ? `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.iconHash}.jpg`
         : summary?.image || null,

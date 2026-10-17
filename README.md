@@ -131,7 +131,7 @@ They have no invite link or group-only comparisons, use your Steam playtime in
 history and Stats, and retain the co-op-first catalogue and verified-cap metadata.
 Settings includes a selective Steam import for both the owned library and public
 wishlist. The same review is available to co-op groups. It previews every candidate before writing, with source and
-Co-op / Multiplayer / Solo filters,
+Co-op / Multiplayer / Solo / Unknown filters,
 select/deselect-all controls, import actions above and below the list, and owned-only
 or wishlist-only shortcuts. New personal and co-op workspaces open this review
 immediately; personal libraries enable every game type while co-op groups begin
@@ -150,6 +150,11 @@ analysis automatically. It can save the
 earliest unlock as an approximate first-played boundary. It shows **Likely finished**
 only for a small curated set of explicit ending achievements, and the player must
 confirm every status change.
+
+Unknown means cached tags and Steam modes do not establish a game type; it does
+not mean single-player. The co-op filter excludes primary PvP genres and games
+tagged Singleplayer without any multiplayer evidence, including tags further down
+the list. Manual additions remain available regardless of classification.
 
 Opening a workspace normally leads to Rate while it has unrated games. Once the
 queue is clear it opens the Library instead, or Find games when the library itself

@@ -125,7 +125,7 @@ CREATE TABLE steam_apps (
   price             TEXT,
   release_date      TEXT,
   metacritic        INTEGER,
-  coop_categories   TEXT,                     -- JSON array, Steam's own co-op tags
+  coop_categories   TEXT,                     -- JSON array, Steam modes including Single-player
   -- Steam user tags for games the co-op catalogue does not list. The recommender
   -- learns a group's taste from these, and reading them only from `coop_apps` threw
   -- away 44% of group 1's evidence. NULL means nobody has looked, never "no tags",
@@ -159,7 +159,7 @@ CREATE TABLE coop_apps (
   -- Steam JSON API, and `genre` is too coarse to substitute (235 of 337 rows are
   -- "Action"). These are what the Recommended sort matches against a group's taste.
   tags              TEXT,             -- JSON array of tag names
-  -- 0 only for games whose top tags are a PvP genre. Requiring a co-op tag instead
+  -- 0 for primary PvP or Singleplayer with no multiplayer evidence. Requiring a co-op tag instead
   -- was measured wrong: 24% of real co-op games carry none. See lib/coop.js.
   is_coop           INTEGER,
   tags_at           INTEGER,

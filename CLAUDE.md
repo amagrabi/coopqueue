@@ -210,10 +210,12 @@ and all three are load-bearing:
   requiring a co-op tag hid 20 of 42 games this group demonstrably plays together
   (Terraria, Stardew Valley, Elden Ring, Baldur's Gate 3), because 24% of real
   co-op games carry no co-op tag at all. Excluding PvP hid 2, both genuinely PvP.
-  Steam's categories cannot help: Apex Legends, Euro Truck Simulator 2 and Terraria
+  Steam's categories cannot distinguish PvP from co-op: Apex Legends, Euro Truck Simulator 2 and Terraria
   all report exactly `['Multi-player', 'Co-op', 'Online Co-op']`.
 
-The window is the top **6** tags. Untagged rows (`is_coop IS NULL`) stay *visible*
+The PvP window is the top **6** tags. The singleplayer exclusion checks the full
+retained tag list, with Steam modes allowed only to rescue multiplayer evidence
+missing from older truncated lists. Untagged rows (`is_coop IS NULL`) stay *visible*
 under the co-op filter — hiding them would empty a freshly crawled catalogue — so a
 row with no tag block must be left NULL rather than recorded as "no tags", or the
 crawler will never retry it.
@@ -645,12 +647,17 @@ newer user edits.
 
 `POST /api/g/:slug/steam-import` works in both workspace modes and has three bounded actions.
 `preview` reads `GetOwnedGames` and the public wishlist, then returns 250 untracked
-titles at a time with owned/wishlist source filters plus Co-op / Multiplayer / Solo
-classification. Personal workspaces enable all three by default; co-op workspaces
-start with Co-op only. The catalogue's measured `is_coop` flag wins when present;
-otherwise cached Steam categories distinguish co-op and multiplayer, and an
-unclassified app stays in the Solo bucket until full enrichment supplies better
-evidence. This classification is only a review filter. It never writes or claims a
+titles at a time with owned/wishlist source filters plus Co-op / Multiplayer / Solo /
+Unknown classification. Personal workspaces enable all four by default; co-op workspaces
+start with Co-op only. Catalogue verdicts are re-derived from cached tags and modes
+when tags exist, so a stale `is_coop` flag cannot override newer classifier logic.
+Catalogue tags take precedence over `steam_apps.tags`; ranked lists are never
+concatenated. Outside the catalogue, explicit tags or modes establish a type;
+missing evidence stays Unknown. Full Steam metadata retains the Single-player
+mode so an explicitly solo game can be distinguished from an unclassified one.
+A negative co-op verdict alone proves neither multiplayer nor solo. Preview does
+not rewrite saved flags or group games. This classification is only a review filter.
+It never writes or claims a
 player cap. Selecting a source or type in the UI
 loads all of its pages, while the initial combined view keeps an explicit Load more
 control. Wishlist ids get cache-first names and art through bounded 50-app
@@ -1452,14 +1459,29 @@ The **Co-op only** toggle is on by default and filters on `is_coop` — see inva
 7 for why that flag is computed by excluding PvP genres, and why untagged rows stay
 visible rather than being hidden.
 
-That exclusion rule has **one narrow exception**, added because Ghost of Tsushima
-DIRECTOR'S CUT came back under the filter: a game whose top six tags include
-`Singleplayer` and whose *whole* tag list contains no multiplayer tag at all is not
-co-op. This is not the rejected "require a co-op tag" rule — that asked for one in
-the top few and hid Terraria, Elden Ring, Stardew Valley and Baldur's Gate 3, all of
-which carry Multiplayer or Online Co-Op further down (Elden Ring has both, at 7 and
-11). Measured across the catalogue it reclassifies exactly one game and leaves the
-29 others with Singleplayer high up untouched.
+The singleplayer exception originally checked only the first six tags and was
+introduced after Ghost of Tsushima DIRECTOR'S CUT appeared under the filter.
+Outer Wilds exposed the limit: Singleplayer is tenth, with no multiplayer tags.
+The exception now checks the full retained list and excludes a singleplayer-tagged
+game only when neither its tags nor its Steam modes provide multiplayer evidence.
+Modes cannot override the primary PvP exclusion and never establish a player cap.
+This remains an exclusion rule, not a requirement to carry a co-op tag.
+
+The parser previously kept 12 tags. On 2026-10-17, live Steam checks found Roadside
+Research's Online Co-Op at rank 20, Vampire Survivors' Local Co-Op at 13, and Rise of
+the Ronin's Online Co-Op at 16. It now reads the bounded tag block up to 64 tags and
+32 KiB, stopping before the tag modal. Steam modes preserve these games when only
+older truncated tags are cached. Taste matching still uses only the top 12 tags
+for both candidates and rated history, preserving the evidence used for the ranking
+measurements above. Replaying the 337 stored tag rows with their available Steam
+modes changes only Ghost of Tsushima from excluded to included; the original
+singleplayer exception had missed its co-op mode evidence. All six live-page checks
+(Outer Wilds, the three late-tag co-op cases, Call to Arms: Panzer Elite, and Ghost
+of Tsushima) retain 20 tags and give the intended verdict when combined with cached
+modes. The seeded group's 25 rated catalogue matches produce the same taste order,
+fit values and preference summary with the old and new recommender. No data
+backfill or group-library correction accompanies the
+code change; manual additions remain unrestricted.
 
 ## "Not interested", and the way back
 

@@ -41,7 +41,7 @@ const rows = [];
 for (let c = 0; c < CHUNKS; c++) {
   process.stderr.write(`  chunk ${c + 1}/${CHUNKS}\r`);
   rows.push(...query(
-    'SELECT appid, name, tags FROM coop_apps '
+    'SELECT appid, name, tags, coop_categories FROM coop_apps '
     + `WHERE tags IS NOT NULL AND appid % ${CHUNKS} = ${c}`
   ));
 }
@@ -52,9 +52,12 @@ for (const r of rows) {
   let tags;
   try { tags = JSON.parse(r.tags); } catch { continue; }
   if (!Array.isArray(tags) || !tags.length) continue;
-  // The stored array is already in vote order, which is the only thing the
-  // classifier reads — so it can be applied straight to it.
-  flips.push({ appid: r.appid, name: r.name, isCoop: classifyCoop(tags) });
+  // Preserve vote order for the PvP window. Modes only rescue multiplayer
+  // evidence lost by the older 12-tag parser; they cannot override that window.
+  let categories;
+  try { categories = JSON.parse(r.coop_categories || '[]'); } catch { categories = []; }
+  flips.push({ appid: r.appid, name: r.name,
+    isCoop: classifyCoop(tags, Array.isArray(categories) ? categories : []) });
 }
 
 const coop = flips.filter((f) => f.isCoop);
@@ -80,6 +83,6 @@ const sql = [
 ].join('\n');
 
 writeFileSync(OUT, sql);
-console.log(`${flips.length} tagged rows: ${coop.length} co-op, ${not.length} PvP-primary`);
+console.log(`${flips.length} tagged rows: ${coop.length} co-op, ${not.length} not co-op`);
 console.log(`excluded: ${not.slice(0, 12).map((f) => f.name).join(', ')}`);
 console.log(`wrote ${OUT}`);

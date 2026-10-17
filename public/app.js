@@ -3051,7 +3051,7 @@ const steamImport = {
 
 function steamImportMeta(game) {
   const sources = [];
-  sources.push({ coop: 'Co-op', multiplayer: 'Multiplayer', solo: 'Solo' }[game.gameType] || 'Solo');
+  sources.push({ coop: 'Co-op', multiplayer: 'Multiplayer', solo: 'Solo', unknown: 'Unknown' }[game.gameType] || 'Unknown');
   if (game.owned) sources.push(game.played
     ? `Owned, ${fmtHours(game.hours)}h${game.lastPlayed ? `, last played ${game.lastPlayed}` : ''}`
     : 'Owned, never launched');
