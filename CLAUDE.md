@@ -723,6 +723,14 @@ rather than bundled into the library payload, which is loaded once and filtered
 client-side — shipping every comment for every game would grow that for a thread
 almost nobody has open.
 
+Comment deletion uses an app-owned modal rather than `window.confirm`, whose
+browser-controlled heading adds "The page at … says" (or its localised equivalent).
+Cancel receives focus by default; Cancel and Escape preserve the comment. Every
+opening resets the result, so Escape cannot reuse a prior Delete approval. The
+pending action is cancelled if game details close and checked against the original
+workspace/game before sending DELETE. Server-side yours-or-owner checks still decide
+permission.
+
 Ten assertions cover it, four of them the attacks that matter: commenting on,
 reading, and deleting another group's thread by guessing a game id, and that the
 thread never returns a foreign row.

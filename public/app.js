@@ -879,7 +879,10 @@ function wireOnce() {
       || e.clientY < rect.top || e.clientY > rect.bottom;
     if (outside) detailDialog.close();
   });
-  detailDialog.addEventListener('close', () => { detailGameId = null; });
+  detailDialog.addEventListener('close', () => {
+    detailGameId = null;
+    if ($('#comment-delete-dialog').open) $('#comment-delete-dialog').close('cancel');
+  });
 
   $('#man-add').addEventListener('click', addManual);
   $('#man-name').addEventListener('keydown', (e) => {
@@ -4024,12 +4027,23 @@ async function syncAchievements(gameId, slug, automatic) {
   }
 }
 
+function confirmCommentDeletion() {
+  const dialog = $('#comment-delete-dialog');
+  if (dialog.open) return Promise.resolve(false);
+  // Escape leaves returnValue unchanged, so never reuse a previous approval.
+  dialog.returnValue = 'cancel';
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'delete'), { once: true });
+    dialog.showModal();
+  });
+}
+
 /** Fetched per game rather than bundled into the library payload — see the route. */
 async function loadComments(gameId, slug = state.group.slug) {
   const box = $('#d-comments');
   try {
     const { comments } = await gapiFor(slug, `/comments?gameId=${gameId}`);
-    if (state.group?.slug !== slug || !$('#detail-dialog').open) return;
+    if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
     box.innerHTML = comments.length
       ? comments.map((c) => `
         <article class="comment">
@@ -4045,14 +4059,16 @@ async function loadComments(gameId, slug = state.group.slug) {
       : '<p class="panel-sub" style="margin:0">No comments yet. Say something.</p>';
 
     $$('#d-comments [data-del-comment]').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Delete this comment?')) return;
+      if (!await confirmCommentDeletion()) return;
+      if (state.group?.slug !== slug || detailGameId !== gameId || !$('#detail-dialog').open) return;
+      b.disabled = true;
       try {
         await gapiFor(slug, '/comments', { method: 'DELETE', body: { id: Number(b.dataset.delComment) } });
         void loadComments(gameId, slug);
-      } catch (e) { toast(e.message); }
+      } catch (e) { b.disabled = false; toast(e.message); }
     }));
   } catch (e) {
-    if (state.group?.slug === slug && $('#detail-dialog').open) {
+    if (state.group?.slug === slug && detailGameId === gameId && $('#detail-dialog').open) {
       box.innerHTML = `<p class="panel-sub" style="margin:0">${esc(e.message)}</p>`;
     }
   }

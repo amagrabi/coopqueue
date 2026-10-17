@@ -891,6 +891,20 @@
   <div class="dialog-body" id="detail-body"></div>
 </dialog>
 
+<dialog id="comment-delete-dialog" class="dialog" aria-labelledby="comment-delete-title"
+        aria-describedby="comment-delete-description">
+  <div class="dialog-head">
+    <h3 id="comment-delete-title">Delete this comment?</h3>
+  </div>
+  <form method="dialog" class="dialog-body">
+    <p id="comment-delete-description" class="panel-sub">This cannot be undone.</p>
+    <div class="comment-delete-actions">
+      <button class="btn" value="cancel" autofocus>Cancel</button>
+      <button class="btn btn-danger" value="delete">Delete comment</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
 <!-- Steam serves trailers only as segmented HLS now, which nothing but Safari
