@@ -137,7 +137,11 @@ Each game's detail panel also has a **Trophy relay**: opening it automatically
 refreshes the signed-in member's stale or missing progress for that one game, then
 the group sees its combined progress, fresh unlocks and achievements that are one
 person short of a clean sweep. Personal workspaces turn it into a **Trophy trail**
-with playful progress ranks. A refresh button remains for retries.
+with playful progress ranks. A refresh button remains for retries. Both trophy
+panels include expandable Steam privacy instructions beneath the sync status,
+with links to Steam's settings and support guides. The instructions cover public
+profile/game details, per-game privacy and retrying the sync; the separate
+playtime checkbox is explained without treating it as an achievement requirement.
 
 **Personal workspaces.** Create one directly during onboarding, or convert an
 existing one-person group from Settings without losing games, ratings or history.

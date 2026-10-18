@@ -4155,7 +4155,24 @@ function renderAchievements(gameId, slug, view) {
       <span id="d-ach-status">${view.notice ? esc(view.notice) : personal
         ? (syncedMembers.length ? `Synced ${when(syncedMembers[0].fetchedAt)}` : 'Syncs automatically when you open a game')
         : `${relay.synced}/${relay.eligible} accounts synced for this game`}</span>
-    </div>`;
+    </div>
+    <details class="trophy-help">
+      <summary>How to make achievement data public</summary>
+      <ol>
+        <li>Open <a href="https://steamcommunity.com/my/edit/settings/" target="_blank" rel="noopener noreferrer">your Steam privacy settings</a>
+          and sign in if asked. In the Steam client, go to your profile → Edit Profile → Privacy Settings.</li>
+        <li>Set <strong>My profile</strong> and <strong>Game details</strong> to <strong>Public</strong>.
+          Game details includes your games, achievements and playtime, so these become visible to other people too.</li>
+        <li>If this game is marked <strong>Private</strong>, open it in your Steam Library,
+          then use the gear menu → Manage → <strong>Unmark as Private</strong>.</li>
+        <li>Return here and click <strong>Sync my progress</strong> (or <strong>Refresh my progress</strong>).
+          If Steam still reports private data, wait a little and retry.</li>
+      </ol>
+      <p>For playtime syncing too, untick <strong>Always keep my total playtime private</strong>.
+        That checkbox is separate from achievement visibility.</p>
+      <p><a href="https://help.steampowered.com/en/faqs/view/588C-C67D-0251-C276" target="_blank" rel="noopener noreferrer">Steam’s profile privacy guide</a>
+        · <a href="https://help.steampowered.com/en/faqs/view/1150-C06F-4D62-4966" target="_blank" rel="noopener noreferrer">Steam’s private games guide</a></p>
+    </details>`;
 
   $('#d-ach-sync').addEventListener('click', () => syncAchievements(gameId, slug, false));
 }
