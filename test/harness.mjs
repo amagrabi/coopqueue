@@ -18,7 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { calibrate, globalStats, scoreGame, viability } from '../lib/score.js';
 import { recommend } from '../lib/recommend.js';
 import { classifyCoop } from '../lib/coop.js';
-import { activityFeed, markActivityRead, statusActivity } from '../lib/activity.js';
+import { activityFeed, markActivityRead, markActivityItemRead, statusActivity } from '../lib/activity.js';
 import { buildHistoryItems } from '../lib/history.js';
 import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../lib/stats.js';
 
@@ -973,7 +973,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await activityFeed(activityDB, gid, ME));
     }
     if (sub === '/activity' && req.method === 'POST') {
-      const { throughId } = await readBody(req);
+      const { throughId, itemId } = await readBody(req);
+      if (itemId !== undefined) {
+        if (throughId !== undefined || !Number.isSafeInteger(itemId) || itemId <= 0) return send(res, 400, { error: 'invalid activity item' });
+        if (!await markActivityItemRead(activityDB, gid, ME, itemId)) return send(res, 404, { error: 'no such activity item' });
+        return send(res, 200, { ok: true });
+      }
       if (!Number.isSafeInteger(throughId) || throughId < 0) return send(res, 400, { error: 'invalid activity snapshot' });
       if (!await markActivityRead(activityDB, gid, ME, throughId)) return send(res, 404, { error: 'no such activity snapshot' });
       return send(res, 200, { ok: true });

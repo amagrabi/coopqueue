@@ -6,6 +6,7 @@
 -- row in users (keyed by their SteamID64) and can belong to any number of
 -- groups; their display name and role are per-group, held on memberships.
 
+DROP TABLE IF EXISTS activity_item_reads;
 DROP TABLE IF EXISTS activity_reads;
 DROP TABLE IF EXISTS group_activity;
 DROP TABLE IF EXISTS comments;
@@ -436,6 +437,17 @@ CREATE TABLE IF NOT EXISTS activity_reads (
   PRIMARY KEY (group_id, steam_id),
   FOREIGN KEY (group_id, steam_id) REFERENCES memberships(group_id, steam_id) ON DELETE CASCADE
 );
+
+-- Individual acknowledgements complement the existing mark-all watermark.
+-- Mirrors migrations/037-activity-item-reads.sql.
+CREATE TABLE IF NOT EXISTS activity_item_reads (
+  group_id INTEGER NOT NULL,
+  steam_id TEXT NOT NULL,
+  event_id INTEGER NOT NULL REFERENCES group_activity(id) ON DELETE CASCADE,
+  PRIMARY KEY (group_id, steam_id, event_id),
+  FOREIGN KEY (group_id, steam_id) REFERENCES memberships(group_id, steam_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_activity_item_reads_event ON activity_item_reads(event_id);
 
 -- Capture writes atomically, including bulk imports, without copying rating values
 -- or comment bodies. Seed claims and metadata enrichment must not manufacture news.

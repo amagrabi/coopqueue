@@ -2959,6 +2959,7 @@ async function withActivity(fn) {
     otherReader: (await ctxFor(ACT_A, 'activity-other')).data,
     feed: async (data) => (await activityRoute.onRequestGet({ env, data })).json(),
     mark: (data, throughId) => activityRoute.onRequestPost({ env, data, request: req({ throughId }) }),
+    markItem: (data, itemId) => activityRoute.onRequestPost({ env, data, request: req({ itemId }) }),
     rate: (gameId, score, data) => rateRoute.onRequestPost({ env, data, request: req({ gameId, score, comment: 'Secret rating explanation' }) }),
     comment: (gameId, data) => commentsRoute.onRequestPost({ env, data, request: req({ gameId, body: 'Secret comment body' }) }),
     align: () => sqlite.prepare('UPDATE group_activity SET created_at=? WHERE group_id=5101')
@@ -3126,6 +3127,149 @@ await check('activity cursor validation rejects missing, negative, fractional an
     if (response.status !== 400) return `${throughId}: ${response.status}`;
   }
   return (await f.mark(f.a, 0)).status === 200 || 'empty snapshot rejected';
+}));
+
+await check('clicking one notification leaves both older and newer notifications unread', () => withActivity(async (f) => {
+  await f.comment(f.first, f.b);
+  await f.rate(f.first, 7, f.b);
+  const selected = (await f.feed(f.a)).items.find((item) => item.kind === 'rating');
+  await f.comment(f.second, f.b);
+  const response = await f.markItem(f.a, selected.id);
+  const feed = await f.feed(f.a);
+  const cursors = sqlite.prepare('SELECT COUNT(*) AS n FROM activity_reads WHERE group_id=5101').get().n;
+  return (response.status === 200 && feed.unreadCount === 2 && cursors === 0
+    && !feed.items.find((item) => item.kind === 'rating').unread
+    && feed.items.filter((item) => item.kind === 'comment').every((item) => item.unread)) || JSON.stringify(feed);
+}));
+
+await check('individual reads acknowledge every game in a grouped rating snapshot but no later edits', () => withActivity(async (f) => {
+  await f.rate(f.first, 7, f.b);
+  await f.rate(f.second, 8, f.b);
+  f.align();
+  const selected = (await f.feed(f.a)).items[0];
+  await f.rate(f.first, 9, f.b);
+  f.align();
+  await f.markItem(f.a, selected.id);
+  const afterArrival = await f.feed(f.a);
+  const receipts = sqlite.prepare('SELECT COUNT(*) AS n FROM activity_item_reads WHERE group_id=5101').get().n;
+  await f.markItem(f.a, afterArrival.items[0].id);
+  const read = await f.feed(f.a);
+  await f.rate(f.second, 6, f.b);
+  f.align();
+  const afterRead = await f.feed(f.a);
+  return (selected.gameCount === 2 && selected.actions === 2 && receipts === 2
+    && afterArrival.items.length === 1 && afterArrival.unreadCount === 1
+    && read.unreadCount === 0 && afterRead.unreadCount === 1) || JSON.stringify({ selected, receipts, afterArrival, read, afterRead });
+}));
+
+await check('individual reads match the feed window, actor, kind and per-game grouping', () => withActivity(async (f) => {
+  const old = await (await f.comment(f.first, f.b)).json();
+  await f.comment(f.first, f.b);
+  await f.comment(f.first, f.b);
+  await f.comment(f.second, f.b);
+  await f.rate(f.first, 7, f.b);
+  sqlite.prepare('INSERT INTO memberships (group_id,steam_id,short_name) VALUES (5101,?,?)').run(ACT_C, 'Carol');
+  await f.comment(f.first, { ...f.b, user: { ...f.b.user, steam_id: ACT_C } });
+  f.align();
+  sqlite.prepare('UPDATE group_activity SET created_at=created_at-600 WHERE group_id=5101 AND comment_id=?').run(old.id);
+  const before = await f.feed(f.a);
+  const selected = before.items.find((item) => item.kind === 'comment' && item.actor === 'Bob' && item.actions === 2);
+  await f.markItem(f.a, selected.id);
+  const feed = await f.feed(f.a);
+  return (before.unreadCount === 5 && feed.unreadCount === 4
+    && feed.items.filter((item) => !item.unread).length === 1
+    && !feed.items.find((item) => item.id === selected.id).unread) || JSON.stringify({ before, feed });
+}));
+
+await check('individual reads persist across devices, are idempotent and stay per member and group', () => withActivity(async (f) => {
+  await f.rate(f.first, 7, f.b);
+  await f.comment(f.second, f.a);
+  await f.comment(f.foreign, f.other);
+  const selected = (await f.feed(f.a)).items[0];
+  await f.markItem(f.a, selected.id);
+  const repeated = await f.markItem(f.a, selected.id);
+  const secondDevice = await f.feed((await ctxFor(ACT_A, 'activity-team')).data);
+  const bob = await f.feed(f.b);
+  const other = await f.feed(f.otherReader);
+  const rows = sqlite.prepare('SELECT COUNT(*) AS n FROM activity_item_reads WHERE group_id=5101').get().n;
+  return (repeated.status === 200 && rows === 1 && secondDevice.unreadCount === 0
+    && bob.unreadCount === 1 && other.unreadCount === 1) || JSON.stringify({ rows, secondDevice, bob, other });
+}));
+
+await check('mark all continues clearing remaining notifications after individual reads', () => withActivity(async (f) => {
+  await f.rate(f.first, 7, f.b);
+  const selected = (await f.feed(f.a)).items[0];
+  await f.markItem(f.a, selected.id);
+  await f.comment(f.second, f.b);
+  const snapshot = await f.feed(f.a);
+  await f.mark(f.a, snapshot.latestId);
+  await f.markItem(f.a, selected.id);
+  const read = await f.feed(f.a);
+  await f.rate(f.first, 9, f.b);
+  f.align();
+  const later = await f.feed(f.a);
+  return (snapshot.unreadCount === 1 && read.unreadCount === 0 && later.unreadCount === 1
+    && later.items.find((item) => item.kind === 'rating').unread) || JSON.stringify({ snapshot, read, later });
+}));
+
+await check('foreign, own, expired and fabricated individual activity ids return 404 without read state', () => withActivity(async (f) => {
+  await f.comment(f.first, f.a);
+  await f.comment(f.first, f.b);
+  await f.comment(f.foreign, f.other);
+  const own = (await f.feed(f.b)).items[0].id;
+  const expired = (await f.feed(f.a)).items[0].id;
+  sqlite.prepare('UPDATE group_activity SET created_at=unixepoch()-7776001 WHERE group_id=5101 AND id=?').run(expired);
+  const foreign = (await f.feed(f.otherReader)).items[0].id;
+  for (const id of [own, expired, foreign, foreign + 100000]) {
+    const response = await f.markItem(f.a, id);
+    if (response.status !== 404) return `${id}: ${response.status}`;
+  }
+  return sqlite.prepare('SELECT COUNT(*) AS n FROM activity_item_reads WHERE group_id=5101').get().n === 0 || 'unexpected receipts';
+}));
+
+await check('individual read validation rejects invalid ids and ambiguous mark-all requests', () => withActivity(async (f) => {
+  for (const itemId of [undefined, null, 0, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+    const response = await f.markItem(f.a, itemId);
+    if (response.status !== 400) return `${itemId}: ${response.status}`;
+  }
+  for (const payload of [{ itemId: 1, throughId: 0 }, { itemId: null, throughId: 0 }, { itemId: 1, throughId: null }]) {
+    const response = await activityRoute.onRequestPost({ env, data: f.a, request: req(payload) });
+    if (response.status !== 400) return `${JSON.stringify(payload)}: ${response.status}`;
+  }
+  return true;
+}));
+
+await check('individual read receipts cascade with comments, retention and only the departing member', () => withActivity(async (f) => {
+  const comment = await (await f.comment(f.first, f.b)).json();
+  await f.markItem(f.a, (await f.feed(f.a)).items[0].id);
+  await commentsRoute.onRequestDelete({ env, data: f.b, request: req({ id: comment.id }) });
+  const rows = () => sqlite.prepare('SELECT COUNT(*) AS n FROM activity_item_reads WHERE group_id=5101').get().n;
+  if (rows() !== 0) return 'comment receipt survived deletion';
+  await f.rate(f.first, 7, f.b);
+  await f.markItem(f.a, (await f.feed(f.a)).items[0].id);
+  sqlite.prepare('UPDATE group_activity SET created_at=unixepoch()-7776001 WHERE group_id=5101').run();
+  await f.comment(f.first, f.a);
+  if (rows() !== 0) return 'expired receipt survived retention';
+  await f.markItem(f.b, (await f.feed(f.b)).items[0].id);
+  await f.comment(f.second, f.b);
+  await f.markItem(f.a, (await f.feed(f.a)).items[0].id);
+  sqlite.prepare('DELETE FROM memberships WHERE group_id=5101 AND steam_id=?').run(ACT_A);
+  const remaining = sqlite.prepare('SELECT steam_id FROM activity_item_reads WHERE group_id=5101').all();
+  return (remaining.length === 1 && remaining[0].steam_id === ACT_B) || JSON.stringify(remaining);
+}));
+
+await check('individual read migration is additive and idempotent with existing cursors and receipts', () => withActivity(async (f) => {
+  await f.rate(f.first, 7, f.b);
+  const selected = (await f.feed(f.a)).items[0];
+  await f.mark(f.a, selected.id);
+  await f.markItem(f.a, selected.id);
+  const snapshot = () => JSON.stringify(['games', 'ratings', 'comments', 'group_activity', 'activity_reads', 'activity_item_reads']
+    .map((table) => sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()));
+  const before = snapshot();
+  const migration = fs.readFileSync(path.join(SITE, 'migrations/037-activity-item-reads.sql'), 'utf8');
+  sqlite.exec(migration);
+  sqlite.exec(migration);
+  return (snapshot() === before && sqlite.prepare('PRAGMA foreign_key_check').all().length === 0) || 'replay changed existing data';
 }));
 
 await check('the unread total includes groups beyond the forty-item display limit', () => withActivity(async (f) => {

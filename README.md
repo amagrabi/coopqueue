@@ -113,8 +113,10 @@ members: games added, ratings submitted, status transitions and comments. Action
 by the same member within ten minutes are grouped to keep bulk imports and rating
 sessions compact. Scores and comment text never appear in the feed, preserving
 blind ratings. The badge counts unread groups of activity; **Mark all as read**
-saves your place across devices without acknowledging newer arrivals. Individual
-updates open the game, while a group covering several games opens the Library.
+saves your place across devices without acknowledging newer arrivals. Clicking an
+update marks just that grouped activity as read and opens the game, while a group
+covering several games opens the Library. Other updates stay unread, including
+later changes within a previously read group of activity.
 The feed keeps the latest 40 groups from the last 90 days and refreshes once a
 minute while the app is visible, as well as when you open it or return to the tab.
 Personal workspaces hide the bell. Activity begins with new actions after setup;

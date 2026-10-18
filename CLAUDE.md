@@ -751,8 +751,9 @@ known actor only in the PATCH handler: `statusActivity()` is inserted before the
 game UPDATE in the same D1 batch, reading the real old status and skipping equal
 values. Capture requires a real group membership and skips personal workspaces.
 Deleting a comment cascades its activity away. Group/game deletion cascades events;
-leaving a group cascades only that member's read cursor. Activity older than 90 days
-is hidden and pruned on that group's next activity insert using an indexed range.
+leaving a group cascades only that member's read cursor and individual receipts.
+Activity older than 90 days is hidden and pruned on that group's next activity
+insert using an indexed range.
 
 `GET /api/g/:slug/activity` captures the group's latest event id, then groups the
 snapshot by actor, kind and fixed ten-minute window. Ratings and additions span
@@ -765,7 +766,16 @@ the group predicate; the existing membership boundary returns 404 to outsiders.
 group's observed snapshot, or zero for an empty feed. Cursors advance monotonically
 with MAX, so an older tab cannot undo a later acknowledgement and events arriving
 after a snapshot remain unread. Event ids use AUTOINCREMENT and must never be reused
-after pruning. Opening the panel or clicking a game does not silently mark all read.
+after pruning. Opening the panel does not mark activity as read.
+
+Migration 037 adds `activity_item_reads` before deploying individual acknowledgements.
+`POST /api/g/:slug/activity {itemId}` marks only the clicked summary's events through
+that observed id, matching the feed's actor/kind/window/game grouping. It never
+advances the mark-all cursor, so unrelated older updates and later events in the
+same summary stay unread. The two payload forms are mutually exclusive. Receipts
+persist per member across devices and cascade when events expire or members leave.
+Clicking an update acknowledges it before opening the game or Library; a failed
+acknowledgement reports the failure and still lets the user navigate.
 
 The bell sits beside the profile, is hidden in personal workspaces, and updates on
 open/focus and once a minute while the tab is visible. Background focus requests

@@ -177,6 +177,12 @@ with per-group indexed cleanup on a subsequent event, and never stores rating
 values or comment text. A deployment rollback can leave these additive tables in
 place; drop no existing data to roll back the UI.
 
+Migration `037-activity-item-reads.sql` must be applied before deploying individual
+notification acknowledgements. Back up first, then apply this additive, idempotent
+migration. It adds per-member event receipts without changing existing activity,
+mark-all cursors or library data. Receipts expire with their events and cascade
+when the member leaves. Mark-all continues using the existing monotonic cursor.
+
 ### Useful queries
 
 ```bash

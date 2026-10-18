@@ -672,15 +672,20 @@ function renderActivity() {
     ? 'Loading activity…' : !activity.items.length ? 'No activity from other members yet.' : '');
   $('#activity-retry').hidden = !activity.error;
   $('#activity-list').innerHTML = activity.items.map((item) => `
-    <button class="activity-item${item.unread ? ' is-unread' : ''}" type="button" data-activity="${item.id}">
+    <button class="activity-item${item.unread ? ' is-unread' : ''}" type="button" data-activity="${item.id}"${activity.marking ? ' disabled' : ''}>
       <span>${activityText(item)}</span>
       <small>${item.unread ? 'Unread · ' : ''}${when(item.createdAt)}</small>
     </button>`).join('');
   $$('#activity-list [data-activity]').forEach((button) => button.addEventListener('click', async () => {
     const item = activity.items.find((row) => row.id === Number(button.dataset.activity));
     const slug = activity.slug;
-    if (!item || state.group?.slug !== slug) return;
+    if (!item || activity.marking || state.group?.slug !== slug) return;
     closeActivity();
+    if (item.unread) {
+      const marked = await acknowledgeActivity({ itemId: item.id });
+      if (state.group?.slug !== slug) return;
+      if (!marked) toast('Could not mark this update as read. Try again.');
+    }
     try {
       // A newly added game may not be in this tab's cached library yet.
       if (!await reloadGroupView(slug, 'library')) return;
@@ -711,22 +716,28 @@ async function refreshActivity(force = false) {
 }
 
 async function markAllActivityRead() {
+  if (!activity.unreadCount) return;
+  await acknowledgeActivity({ throughId: activity.latestId });
+}
+
+async function acknowledgeActivity(snapshot) {
   const slug = activity.slug;
-  const throughId = activity.latestId;
-  if (!activity.loaded || !activity.unreadCount || activity.marking || state.group?.slug !== slug) return;
+  if (!activity.loaded || activity.marking || state.group?.slug !== slug) return false;
   // Cancel older GET responses that could reintroduce a just-cleared badge.
   const seq = ++activity.seq;
   activity.loading = false;
   activity.marking = true;
   renderActivity();
   try {
-    await gapiFor(slug, '/activity', { method: 'POST', body: { throughId } });
+    await gapiFor(slug, '/activity', { method: 'POST', body: snapshot });
     if (state.group?.slug === slug && activity.seq === seq) {
       activity.marking = false;
       await refreshActivity(true);
     }
+    return true;
   } catch {
     if (state.group?.slug === slug && activity.seq === seq) activity.error = 'Could not mark activity as read. Try again.';
+    return false;
   } finally {
     if (state.group?.slug === slug && activity.seq === seq) {
       activity.marking = false;
