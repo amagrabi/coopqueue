@@ -1118,6 +1118,9 @@ await check('achievement sync preserves private errors and falls back when the k
     if (fallback && publicHost) {
       return new Response(null, { status: 403 });
     }
+    if (fallback && String(url).includes('/achievements/')) {
+      return new Response(null, { status: 429 });
+    }
     if (fallback && String(url).startsWith('https://steamcommunity.com/profiles/')) {
       const first = masked
         ? '<achievement closed="0"><name>First Night</name><apiname>first</apiname></achievement>'
@@ -1170,9 +1173,147 @@ await check('achievement sync preserves private errors and falls back when the k
       'SELECT achieved FROM achievement_progress WHERE steam_id=? AND appid=?'
     ).get(ALICE, 982000);
     const mine = maskedView.members.find((member) => member.steamId === ALICE);
-    return (maskedResponse.status === 200 && maskedView.notice?.includes('Game details to Public')
+    return (maskedResponse.status === 200 && maskedView.notice?.includes('even with public settings')
         && mine?.total == null && !maskedRow)
       || `masked status ${maskedResponse.status}, row ${JSON.stringify(maskedRow)}, ${JSON.stringify(maskedView)}`;
+  } finally {
+    env.STEAM_API_KEY = originalKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Synthetic accounts and two achievements mirror the current Community page's
+// sparse personal data plus separate schema. Never commit a real profile dump.
+function communityAchievementQueries() {
+  return [
+    { queryKey: ['achievements', 982000, 'user_achievements', ALICE], state: {
+      status: 'success', data: { appid: 982000, steamid: ALICE, schema_hash: 123,
+        achievements: { 256: { internal_key: 256, unlocked: true, unlock_time: 456 } } },
+    } },
+    { queryKey: ['achievements', 982000, 'schema'], state: {
+      status: 'success', data: { appid: 982000, schema_hash: 123, groups: [{
+        id: 0, ispublic: true, archived: false, achievements: [
+          { internal_key: 256, api_name: 'first', name: 'First & Night', hidden: false },
+          { internal_key: 257, api_name: 'later', name: 'Another Night', hidden: true },
+        ],
+      }] },
+    } },
+    { queryKey: ['achievements', 982000, 'globalpercentages'], state: {
+      status: 'success', data: { percentages: { 256: 80, 257: 40 } },
+    } },
+  ];
+}
+
+function communityAchievementHtml(queries) {
+  return `<script type="application/json" id="valve-ssr-data">${JSON.stringify({
+    renderContext: { queryData: JSON.stringify({ queries }) },
+  })}</script>`;
+}
+
+await check('achievement sync reads current public unlocks before the legacy XML fallback', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = env.STEAM_API_KEY;
+  env.STEAM_API_KEY = 'test-key';
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).startsWith('https://api.steampowered.com/')) return new Response(null, { status: 403 });
+    if (String(url) === `https://steamcommunity.com/profiles/${ALICE}/achievements/982000?l=english`) {
+      return new Response(communityAchievementHtml(communityAchievementQueries()));
+    }
+    throw new Error('Unexpected fallback request');
+  };
+  try {
+    const { data } = await ctxFor(ALICE, 'g4m1ng');
+    const response = await achievementsRoute.onRequestPost({ request: req({ gameId: 8200 }), env, data });
+    const row = sqlite.prepare(
+      'SELECT achieved,total,unlocked FROM achievement_progress WHERE steam_id=? AND appid=?'
+    ).get(ALICE, 982000);
+    const unlocked = JSON.parse(row?.unlocked || '[]');
+    return (response.status === 200 && row?.achieved === 1 && row?.total === 2
+        && unlocked[0]?.key === 'first' && unlocked[0]?.name === 'First & Night'
+        && unlocked[0]?.unlocktime === 456 && calls.length === 2)
+      || `status ${response.status}, row ${JSON.stringify(row)}, calls ${calls.length}`;
+  } finally {
+    env.STEAM_API_KEY = originalKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await check('current Community fallback rejects mismatched, malformed and global-only data without changing progress', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = env.STEAM_API_KEY;
+  env.STEAM_API_KEY = 'test-key';
+  let html;
+  globalThis.fetch = async (url) => String(url).includes('/achievements/')
+    ? new Response(html) : new Response(null, { status: String(url).includes('/stats/') ? 429 : 403 });
+  const cases = [
+    ['foreign account key', (q) => { q[0].queryKey[3] = BOB; }],
+    ['foreign account payload', (q) => { q[0].state.data.steamid = BOB; }],
+    ['foreign app key', (q) => { q[0].queryKey[1] = 700002; }],
+    ['foreign app payload', (q) => { q[0].state.data.appid = 700002; }],
+    ['foreign schema', (q) => { q[1].state.data.appid = 700002; }],
+    ['mismatched schema revision', (q) => { q[0].state.data.schema_hash = 456; }],
+    ['schema alone', (q) => { q.shift(); }],
+    ['global rates alone', (q) => { q.splice(0, 2); }],
+    ['unknown unlocked key', (q) => {
+      q[0].state.data.achievements[258] = { internal_key: 258, unlocked: true };
+    }],
+    ['mismatched internal key', (q) => { q[0].state.data.achievements[256].internal_key = 257; }],
+    ['duplicate achievement', (q) => {
+      q[1].state.data.groups[0].achievements.push(q[1].state.data.groups[0].achievements[0]);
+    }],
+    ['malformed JSON', null],
+    ['oversized page', null],
+  ];
+  try {
+    const { data } = await ctxFor(ALICE, 'g4m1ng');
+    for (const [label, mutate] of cases) {
+      const queries = communityAchievementQueries();
+      if (mutate) mutate(queries);
+      html = mutate ? communityAchievementHtml(queries)
+        : label === 'malformed JSON' ? '<script id="valve-ssr-data">{</script>' : 'x'.repeat(2 * 1024 * 1024 + 1);
+      const response = await achievementsRoute.onRequestPost({ request: req({ gameId: 8200 }), env, data });
+      const row = sqlite.prepare(
+        'SELECT achieved,total FROM achievement_progress WHERE steam_id=? AND appid=?'
+      ).get(ALICE, 982000);
+      if (response.status !== 502 || row?.achieved !== 1 || row?.total !== 2) {
+        return `${label}: status ${response.status}, row ${JSON.stringify(row)}`;
+      }
+    }
+    return true;
+  } finally {
+    env.STEAM_API_KEY = originalKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await check('empty current Community progress stays unknown, clears only old zeroes and preserves real progress', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = env.STEAM_API_KEY;
+  env.STEAM_API_KEY = 'test-key';
+  let queries;
+  globalThis.fetch = async (url) => String(url).includes('/achievements/')
+    ? new Response(communityAchievementHtml(queries)) : new Response(null, { status: 403 });
+  try {
+    const { data } = await ctxFor(ALICE, 'g4m1ng');
+    for (const hash of [0, 123]) {
+      queries = communityAchievementQueries();
+      queries[0].state.data.achievements = {};
+      queries[0].state.data.schema_hash = hash;
+      const response = await achievementsRoute.onRequestPost({ request: req({ gameId: 8200 }), env, data });
+      const view = await response.json();
+      const mine = view.members.find((member) => member.steamId === ALICE);
+      if (response.status !== 200 || mine?.achieved !== 1 || !view.notice?.includes('even with public settings')) {
+        return `empty hash ${hash}: status ${response.status}, ${JSON.stringify(view)}`;
+      }
+    }
+    sqlite.prepare('UPDATE achievement_progress SET achieved=0,unlocked=? WHERE steam_id=? AND appid=?')
+      .run('[]', ALICE, 982000);
+    const response = await achievementsRoute.onRequestPost({ request: req({ gameId: 8200 }), env, data });
+    const view = await response.json();
+    return (response.status === 200 && view.members.find((member) => member.steamId === ALICE)?.total == null)
+      || `empty cache status ${response.status}, ${JSON.stringify(view)}`;
   } finally {
     env.STEAM_API_KEY = originalKey;
     globalThis.fetch = originalFetch;

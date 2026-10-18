@@ -482,7 +482,7 @@ whole-image bounding box instead lets the watermark set the right edge and leave
 | Harness refuses to start | `schema.sql` drifted from `migrations/` | add the missing column to `schema.sql` |
 | Trailers silent in Chrome | `hls.light.min.js` cannot play Steam's separate audio rendition | keep the **full** `hls.min.js` |
 | A game shows the wrong trailer | a bad Steam appid match | relink by pasting the store URL in the Library |
-| Achievement progress stays unsynced with a Game details message | Steam exposed the achievement catalogue but hid the account's unlocks; a signed-in Steam page can still see them | set Game details to Public, make sure that game is not individually marked Private, then retry |
+| Achievement progress stays unsynced with an empty-progress notice | Steam returned the achievement catalogue without readable personal unlocks; this also happens with public settings | compare the game's current Community achievement page while signed out, check per-game privacy if needed, then retry; the current-page fallback runs before legacy XML and never caches ambiguous zeroes |
 | Catalogue browse looks empty | co-op filter plus untagged rows | untagged rows stay visible by design; check `is_coop` |
 | `pkill -f harness.mjs` kills your shell | the pattern matches the shell's own command line | `pkill -f "[h]arness.mjs"` |
 

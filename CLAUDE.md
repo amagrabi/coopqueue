@@ -618,6 +618,19 @@ is ambiguous, stays unsynced, and invalidates an older cached zero rather than
 turning hidden data into 0%. The documented JSON Web API remains first because the
 older Community view is not a complete replacement.
 
+On 2026-10-18, Splintered Fate exposed another split: the public profile and current
+achievement page showed 5/82 unlocks while the XML path had returned an all-zero
+list, and diagnostic XML requests subsequently returned 429. The current page also
+showed Abiotic Factor's 22/53. On a Web API 401/403, the fallback now reads the
+current `/profiles/:id/achievements/:appid?l=english` page before trying legacy XML.
+Only the `valve-ssr-data` JSON is parsed; no page code is executed. Personal data
+and schema query keys, payload identities and schema hashes must agree, and
+internal achievement keys are mapped to the schema's API names. Global completion
+percentages are never personal progress. Malformed, mismatched or oversized pages
+are rejected, and the positive-unlock requirement still applies to both fallback
+readers. Empty personal data stays unknown and uses a neutral retry notice because
+public settings alone do not prove Steam has returned readable unlocks.
+
 ## Personal workspaces
 
 `workspace_settings.mode` is explicit (`coop | personal`), with a missing row
