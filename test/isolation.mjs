@@ -3745,17 +3745,160 @@ await check('schedule migration is additive and idempotent', () => withSchedule(
   return snapshot() === before || 'replay changed schedule data';
 }));
 
-await check('deleting a group takes its schedule, answers and away ranges with it', async () => {
+await check('deleting a group takes its schedule, answers, away ranges and overrides with it', async () => {
   await withSchedule(async (f) => {
     await f.put(f.a, DAILY);
     const date = f.sessions()[1].date;
     await f.post(f.a, { action: 'rsvp', date, answer: 'out' });
     await f.post(f.b, { action: 'away', from: date, to: date });
+    await f.post(f.a, { action: 'cancel', key: f.sessions()[2].key });
   });
-  const left = ['session_schedules', 'session_rsvps', 'member_away']
+  const left = ['session_schedules', 'session_rsvps', 'member_away', 'session_overrides']
     .map((t) => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE group_id=5201`).get().n);
   return left.every((n) => n === 0) || left.join(',');
 });
+
+console.log('\nOne-off session changes');
+
+const TUESDAYS = { ...DAILY, weekdays: [2] };
+const tuesdays = () => sched.upcomingSessions(sched.parseRule(TUESDAYS).rule, Date.now(), 4);
+
+await check('only the owner can move, cancel or restore one session', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  const move = await f.post(f.b, { action: 'move', key: one.key, date: sched.addDays(one.key, -1), time: '20:30' });
+  const cancel = await f.post(f.b, { action: 'cancel', key: one.key });
+  await f.post(f.a, { action: 'cancel', key: one.key });
+  const restore = await f.post(f.b, { action: 'restore', key: one.key });
+  const rows = f.rows('session_overrides');
+  return (move.status === 403 && cancel.status === 403 && restore.status === 403
+    && rows.length === 1 && rows[0].cancelled === 1) || JSON.stringify({ move: move.status, cancel: cancel.status, restore: restore.status, rows });
+}));
+
+await check('a moved session keeps its key, clears only its own answers, and the rule carries on', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one, two] = tuesdays();
+  await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'out' });
+  await f.post(f.b, { action: 'rsvp', date: two.key, answer: 'maybe' });
+  const monday = sched.addDays(one.key, -1);
+  const r = await f.post(f.a, { action: 'move', key: one.key, date: monday, time: '19:00' });
+  const body = await f.get(f.b);
+  const moved = body.sessions.find((s) => s.key === one.key);
+  const next = body.sessions.find((s) => s.key === two.key);
+  return (r.status === 200 && moved.date === monday && moved.moved && moved.time === '19:00'
+    && moved.regularStartsAt === one.startsAt && moved.changedBy === SCH_A
+    && moved.attendance[SCH_B].state === 'in' && !next.moved && next.attendance[SCH_B].state === 'maybe'
+    && body.sessions.filter((s) => !s.cancelled).length === sched.SESSION_COUNT)
+    || JSON.stringify({ status: r.status, moved, next });
+}));
+
+await check('answers to a moved session use its key; away ranges use the day it is played', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  const monday = sched.addDays(one.key, -1);
+  await f.post(f.a, { action: 'move', key: one.key, date: monday, time: '20:30' });
+  const byNewDate = await f.post(f.b, { action: 'rsvp', date: monday, answer: 'out' });
+  await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'maybe' });
+  // Away on the original Tuesday only: no longer the day this session is played.
+  await f.post(f.a, { action: 'away', from: one.key, to: one.key });
+  const body = await f.get(f.a);
+  const s = body.sessions.find((x) => x.key === one.key);
+  await f.post(f.a, { action: 'away', from: monday, to: monday });
+  const after = (await f.get(f.a)).sessions.find((x) => x.key === one.key);
+  return (byNewDate.status === 400 && s.attendance[SCH_B].state === 'maybe' && s.attendance[SCH_A].state === 'in'
+    && after.attendance[SCH_A].state === 'out' && after.attendance[SCH_A].source === 'away')
+    || JSON.stringify({ byNewDate: byNewDate.status, s: s.attendance, after: after.attendance });
+}));
+
+await check('cancelling keeps answers, refuses new ones, and restoring brings them back', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'out' });
+  await f.post(f.a, { action: 'cancel', key: one.key });
+  const off = (await f.get(f.a)).sessions.find((s) => s.key === one.key);
+  const rsvp = await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'maybe' });
+  const twice = await f.post(f.a, { action: 'cancel', key: one.key });
+  await f.post(f.a, { action: 'restore', key: one.key });
+  const back = (await f.get(f.a)).sessions.find((s) => s.key === one.key);
+  return (off.cancelled && Object.keys(off.attendance).length === 0 && rsvp.status === 409 && twice.status === 409
+    && !back.cancelled && back.attendance[SCH_B].state === 'out' && f.rows('session_overrides').length === 0)
+    || JSON.stringify({ off, rsvp: rsvp.status, twice: twice.status, back });
+}));
+
+await check('a cancelled session is listed but does not count towards the upcoming eight', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  await f.post(f.a, { action: 'cancel', key: one.key });
+  const body = await f.get(f.a);
+  return (body.sessions.length === sched.SESSION_COUNT + 1
+    && body.sessions.filter((s) => s.cancelled).map((s) => s.key).join() === one.key)
+    || body.sessions.map((s) => `${s.key}${s.cancelled ? 'x' : ''}`).join(' ');
+}));
+
+await check('restoring a move clears answers given for the moved time', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  await f.post(f.a, { action: 'move', key: one.key, date: sched.addDays(one.key, -1), time: '20:30' });
+  await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'out' });
+  await f.post(f.a, { action: 'restore', key: one.key });
+  const s = (await f.get(f.a)).sessions.find((x) => x.key === one.key);
+  return (!s.moved && s.date === one.key && s.attendance[SCH_B].state === 'in' && f.rows('session_rsvps').length === 0)
+    || JSON.stringify(s);
+}));
+
+await check('moves are refused onto another session, into the past, or to where it already is', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one, two] = tuesdays();
+  const statuses = [
+    (await f.post(f.a, { action: 'move', key: one.key, date: two.key, time: '18:00' })).status,
+    (await f.post(f.a, { action: 'move', key: one.key, date: sched.addDays(one.key, -30), time: '20:30' })).status,
+    (await f.post(f.a, { action: 'move', key: one.key, date: one.key, time: '20:30' })).status,
+    (await f.post(f.a, { action: 'move', key: one.key, date: 'tomorrow', time: '20:30' })).status,
+    (await f.post(f.a, { action: 'move', key: one.key, date: sched.addDays(one.key, 1), time: '25:00' })).status,
+    (await f.post(f.a, { action: 'move', key: sched.addDays(one.key, 1), date: sched.addDays(one.key, 2), time: '20:30' })).status,
+    (await f.post(f.a, { action: 'restore', key: one.key })).status,
+  ];
+  // A second session moved onto a day another session was already moved to.
+  await f.post(f.a, { action: 'move', key: one.key, date: sched.addDays(one.key, 1), time: '20:30' });
+  statuses.push((await f.post(f.a, { action: 'move', key: two.key, date: sched.addDays(one.key, 1), time: '21:00' })).status);
+  return statuses.join() === '409,400,409,400,400,400,409,409' || statuses.join();
+}));
+
+await check('moving a session back onto its own slot removes the override', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one] = tuesdays();
+  await f.post(f.a, { action: 'move', key: one.key, date: one.key, time: '18:00' });
+  const moved = f.rows('session_overrides').length;
+  await f.post(f.a, { action: 'move', key: one.key, date: one.key, time: '20:30' });
+  return (moved === 1 && f.rows('session_overrides').length === 0) || `${moved} → ${f.rows('session_overrides').length}`;
+}));
+
+await check("another group's owner cannot change this group's sessions", () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  await f.put(f.other, TUESDAYS);
+  const [, one] = tuesdays();
+  await f.post(f.other, { action: 'cancel', key: one.key });
+  const mine = (await f.get(f.a)).sessions.find((s) => s.key === one.key);
+  const before = f.rows('session_overrides').length;
+  // Same key in both groups: restoring here must leave the other group's row alone.
+  await f.post(f.a, { action: 'cancel', key: one.key });
+  await f.post(f.a, { action: 'restore', key: one.key });
+  const theirs = sqlite.prepare('SELECT COUNT(*) AS n FROM session_overrides WHERE group_id=5202').get().n;
+  return (!mine.cancelled && before === 0 && f.rows('session_overrides').length === 0 && theirs === 1)
+    || JSON.stringify({ mine, before, theirs });
+}));
+
+await check('session override migration is additive and idempotent', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one, two] = tuesdays();
+  await f.post(f.a, { action: 'cancel', key: one.key });
+  await f.post(f.a, { action: 'move', key: two.key, date: sched.addDays(two.key, 1), time: '20:30' });
+  const before = JSON.stringify(f.rows('session_overrides'));
+  const migration = fs.readFileSync(path.join(SITE, 'migrations/039-session-overrides.sql'), 'utf8');
+  sqlite.exec(migration);
+  sqlite.exec(migration);
+  return JSON.stringify(f.rows('session_overrides')) === before || 'replay changed overrides';
+}));
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

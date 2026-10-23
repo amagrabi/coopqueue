@@ -395,6 +395,13 @@ kbd {
 .session-crew { white-space: nowrap; color: var(--text-secondary); }
 .session-crew .btn { margin-left: 6px; padding: 3px 8px; font-size: 12.5px; }
 .session-more { margin-top: 8px; font-size: 13px; }
+.session-edit { display: block; margin-top: 4px; font-size: 12px; }
+.session-table tbody th small.session-moved { color: #f2d79a; }
+.session-table tr.is-cancelled th { color: var(--text-muted); }
+.session-off { color: var(--text-muted); font-style: italic; }
+.strip-off { margin-left: 6px; color: #f0a3a3; }
+.session-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+#session-dialog { width: min(480px, calc(100vw - 32px)); }
 
 .away-block { margin-top: 14px; }
 .away-block summary { cursor: pointer; font-size: 13.5px; color: var(--text-secondary); }

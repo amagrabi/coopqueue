@@ -1,8 +1,8 @@
 import { json, bad, body } from '../../../../lib/http.js';
 import {
   SESSION_COUNT, RSVP_HORIZON_DAYS, AWAY_SPAN_DAYS, AWAY_LIMIT, PRUNE_AFTER_DAYS,
-  parseRule, ruleFromRow, upcomingSessions, attendanceOn, isSessionDate, sessionOn,
-  localDate, addDays, daysBetween, parseDate, awayCovers,
+  parseRule, ruleFromRow, upcomingSessions, attendanceOn, findSession, sessionClash,
+  validTime, localDate, addDays, daysBetween, parseDate, awayCovers,
 } from '../../../../lib/schedule.js';
 
 /**
@@ -13,13 +13,19 @@ import {
  * realistic flow is "Dave said in Discord he can't make it" and somebody else
  * updating the site — and an unclaimed placeholder cannot answer at all.
  * `set_by` keeps that visible. Changing the standing rule is owner-only, like
- * every other group rule.
+ * every other group rule — and so is moving or cancelling one session, which is
+ * the owner recording what the group already agreed, without asking again.
  *
  * Personal workspaces have nobody to schedule with: GET reports it disabled and
  * every write is refused.
  */
 const scheduleRow = (db, gid) =>
   db.prepare('SELECT * FROM session_schedules WHERE group_id = ?').bind(gid).first();
+// Bounded without a query limit: one row per rule session at most, within the
+// answer horizon, and pruned 30 days after it has passed.
+const overrideRows = async (db, gid) => (await db.prepare(
+  'SELECT original_date, new_date, new_time, cancelled, set_by FROM session_overrides WHERE group_id = ?'
+).bind(gid).all()).results || [];
 
 export async function onRequestGet({ env, data }) {
   if (data.group.workspace_mode === 'personal') return json({ enabled: false });
@@ -44,13 +50,16 @@ export async function onRequestGet({ env, data }) {
 
   if (!rule) return json({ enabled: true, canEdit, schedule: null, sessions: [], away, today });
 
-  const sessions = upcomingSessions(rule, now, SESSION_COUNT);
+  const overrides = await overrideRows(env.DB, gid);
+  const changedBy = new Map(overrides.map((o) => [o.original_date, o.set_by]));
+  const sessions = upcomingSessions(rule, now, SESSION_COUNT, overrides);
   let rsvps = [];
   if (sessions.length) {
+    // By key, not by a date range: a moved session's key can sit far from its neighbours.
     const res = await env.DB.prepare(
       `SELECT steam_id, session_date, answer, set_by FROM session_rsvps
-        WHERE group_id = ? AND session_date BETWEEN ? AND ?`
-    ).bind(gid, sessions[0].date, sessions[sessions.length - 1].date).all();
+        WHERE group_id = ? AND session_date IN (${sessions.map(() => '?').join(',')})`
+    ).bind(gid, ...sessions.map((s) => s.key)).all();
     rsvps = res.results || [];
   }
 
@@ -60,7 +69,11 @@ export async function onRequestGet({ env, data }) {
     schedule: rule,
     today,
     away,
-    sessions: sessions.map((s) => ({ ...s, attendance: attendanceOn(members, rsvps, aways, s.date) })),
+    sessions: sessions.map((s) => ({
+      ...s,
+      changedBy: s.moved || s.cancelled ? changedBy.get(s.key) || null : null,
+      attendance: s.cancelled ? {} : attendanceOn(members, rsvps, aways, s),
+    })),
   });
 }
 
@@ -105,7 +118,17 @@ export async function onRequestPost({ request, env, data }) {
   const prune = [
     env.DB.prepare('DELETE FROM session_rsvps WHERE group_id = ? AND session_date < ?').bind(gid, pruneBefore),
     env.DB.prepare('DELETE FROM member_away WHERE group_id = ? AND to_date < ?').bind(gid, pruneBefore),
+    // A session moved forward from an old key must survive until it is played too.
+    env.DB.prepare(
+      `DELETE FROM session_overrides WHERE group_id = ?1 AND original_date < ?2
+          AND COALESCE(new_date, original_date) < ?2`
+    ).bind(gid, pruneBefore),
   ];
+  const overrides = rule ? await overrideRows(env.DB, gid) : [];
+
+  if (['move', 'cancel', 'restore'].includes(action)) {
+    return changeSession({ env, data, input, action, rule, overrides, now, today, prune });
+  }
 
   if (action === 'unaway') {
     const id = Number(input.id);
@@ -124,10 +147,13 @@ export async function onRequestPost({ request, env, data }) {
 
   if (action === 'rsvp') {
     if (!rule) return bad('this group has no regular session yet', 409);
+    // `date` is the session's key: the day the rule gives it, even after a move.
     const date = String(input.date || '');
-    if (!isSessionDate(rule, date)) return bad('there is no session on that date');
-    if (sessionOn(rule, date).endsAt <= now) return bad('that session is already over');
-    if (daysBetween(today, date) > RSVP_HORIZON_DAYS) return bad('that session is too far ahead');
+    const session = findSession(rule, overrides, date);
+    if (!session) return bad('there is no session on that date');
+    if (session.cancelled) return bad('that session is cancelled', 409);
+    if (session.endsAt <= now) return bad('that session is already over');
+    if (daysBetween(today, session.date) > RSVP_HORIZON_DAYS) return bad('that session is too far ahead');
     const answer = input.answer == null ? null : String(input.answer);
     if (answer != null && !['in', 'maybe', 'out'].includes(answer)) return bad('answer must be in, maybe or out');
 
@@ -137,7 +163,7 @@ export async function onRequestPost({ request, env, data }) {
     const aways = (await env.DB.prepare(
       'SELECT steam_id, from_date, to_date FROM member_away WHERE group_id = ? AND steam_id = ?'
     ).bind(gid, target).all()).results || [];
-    const store = answer === 'in' ? awayCovers(aways, target, date) : answer != null;
+    const store = answer === 'in' ? awayCovers(aways, target, session.date) : answer != null;
     await env.DB.batch([
       store
         ? env.DB.prepare(
@@ -182,3 +208,65 @@ export async function onRequestPost({ request, env, data }) {
 
   return bad('unknown schedule action');
 }
+
+/**
+ * Owner-only one-off changes: move a single session, cancel it, or put it back on
+ * the rule. None of them touches the rule, so the regular slot resumes by itself.
+ *
+ * Moving clears the answers given for that session, because they were answers to
+ * a different time: "can't make Tuesday" says nothing about Monday. Cancelling
+ * keeps them, since restoring a cancelled session brings back the same time.
+ */
+async function changeSession({ env, data, input, action, rule, overrides, now, today, prune }) {
+  if (data.group.role !== 'owner') return bad('only the group owner can change a single session', 403);
+  if (!rule) return bad('this group has no regular session yet', 409);
+  const gid = data.group.group_id;
+  const key = String(input.key || '');
+  const session = findSession(rule, overrides, key);
+  if (!session) return bad('there is no session on that date');
+  if (session.endsAt <= now) return bad('that session is already over');
+  const existing = overrides.find((o) => o.original_date === key);
+  const clearAnswers = env.DB.prepare('DELETE FROM session_rsvps WHERE group_id = ? AND session_date = ?')
+    .bind(gid, key);
+  const removeOverride = env.DB.prepare('DELETE FROM session_overrides WHERE group_id = ? AND original_date = ?')
+    .bind(gid, key);
+  const upsert = (newDate, newTime, cancelled) => env.DB.prepare(
+    `INSERT INTO session_overrides (group_id, original_date, new_date, new_time, cancelled, set_by, updated_at)
+     VALUES (?,?,?,?,?,?,unixepoch())
+     ON CONFLICT(group_id, original_date) DO UPDATE SET
+       new_date=excluded.new_date, new_time=excluded.new_time, cancelled=excluded.cancelled,
+       set_by=excluded.set_by, updated_at=unixepoch()`
+  ).bind(gid, key, newDate, newTime, cancelled, data.user.steam_id);
+
+  if (action === 'restore') {
+    if (!existing) return bad('that session already follows the regular schedule', 409);
+    const regular = findSession(rule, [], key);
+    if (regular.endsAt <= now) return bad('its regular time has already passed');
+    if (sessionClash(rule, overrides, key, key)) return bad('another session has been moved onto that day', 409);
+    await env.DB.batch([...(existing.cancelled ? [] : [clearAnswers]), removeOverride, ...prune]);
+    return json({ ok: true });
+  }
+
+  if (action === 'cancel') {
+    if (session.cancelled) return bad('that session is already cancelled', 409);
+    await env.DB.batch([upsert(null, null, 1), ...prune]);
+    return json({ ok: true });
+  }
+
+  const date = String(input.date || '');
+  const time = String(input.time || '');
+  if (parseDate(date) == null) return bad('date must be YYYY-MM-DD');
+  if (!validTime(time)) return bad('time must be HH:MM');
+  if (daysBetween(today, date) > RSVP_HORIZON_DAYS) return bad('that date is too far ahead');
+  const moved = findSession(rule, [{ original_date: key, new_date: date, new_time: time, cancelled: 0 }], key);
+  if (moved.startsAt <= now) return bad('pick a time that has not started yet');
+  if (sessionClash(rule, overrides, date, key)) return bad('there is already a session on that day', 409);
+  if (!session.cancelled && session.date === date && session.time === time) {
+    return bad('that is already when this session is', 409);
+  }
+  // Back onto its own slot is a restore, so the session reads as regular again.
+  const toRegular = date === key && time === rule.time;
+  await env.DB.batch([clearAnswers, toRegular ? removeOverride : upsert(date, time, 0), ...prune]);
+  return json({ ok: true });
+}
+

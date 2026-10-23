@@ -9,7 +9,7 @@
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://coopqueue.app/">
 <!-- Fresh URLs bypass the four-hour copies cached before these assets revalidated. -->
-<link rel="stylesheet" href="/styles.css?v=2026-10-23-1">
+<link rel="stylesheet" href="/styles.css?v=2026-10-23-2">
 
 <!-- Icons carry a dark field rather than transparency on purpose: the three figures
      inside the controller are white, so a transparent icon leaves them invisible
@@ -951,12 +951,39 @@
   </form>
 </dialog>
 
+<!-- Owner-only: one session moved or cancelled without asking everyone again. -->
+<dialog id="session-dialog" class="dialog" aria-labelledby="session-dialog-title"
+        aria-describedby="session-dialog-sub">
+  <div class="dialog-head">
+    <h3 id="session-dialog-title">Change one session</h3>
+    <button class="btn btn-icon" type="button" id="sd-close" aria-label="Close">✕</button>
+  </div>
+  <div class="dialog-body">
+    <p id="session-dialog-sub" class="panel-sub"></p>
+    <div class="schedule-fields">
+      <div class="detail-field"><label for="sd-date">Day</label>
+        <input type="date" id="sd-date" class="input"></div>
+      <div class="detail-field"><label for="sd-time">Starts at</label>
+        <input type="time" id="sd-time" class="input"></div>
+    </div>
+    <p class="field-help" id="sd-zone" hidden></p>
+    <p class="field-help">Only this session changes; the regular schedule carries on afterwards.
+      Moving it clears the answers given for the old time. Away ranges still apply.</p>
+    <p class="add-status" id="session-dialog-status" role="status"></p>
+    <div class="session-dialog-actions">
+      <button class="btn btn-primary" type="button" id="sd-move">Move session</button>
+      <button class="btn" type="button" id="sd-restore" hidden>Back to the regular time</button>
+      <button class="btn btn-danger" type="button" id="sd-cancel">Cancel this session</button>
+    </div>
+  </div>
+</dialog>
+
 <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
 <!-- Steam serves trailers only as segmented HLS now, which nothing but Safari
      plays in a bare <video>. Vendored rather than pulled from a CDN so the site
      stays a self-contained static bundle. app.js loads it only when a rating card
      actually needs an HLS trailer; the rest of the app does not pay that cost. -->
-<script src="/app.js?v=2026-10-23-1" type="module"></script>
+<script src="/app.js?v=2026-10-23-2" type="module"></script>
 </body>
 </html>

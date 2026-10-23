@@ -88,7 +88,11 @@ group chat. **Away** ranges cover holidays without answering week by week. Play
 next preselects the next session's crew, so the ranking is already for the people
 who will actually be there, and any upcoming session can rank games for its own
 crew. Times show in each viewer's own timezone and stay on the group's wall-clock
-time through daylight-saving changes. Personal workspaces have no schedule.
+time through daylight-saving changes. When the group has already agreed on a
+one-off change, the owner can **move** a single session to another day or time, or
+**cancel** it, without changing the regular slot; everyone sees "moved from Tue 27
+Oct" or a struck-through week, and the next one is back on the usual day. Personal
+workspaces have no schedule.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
@@ -365,7 +369,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 256 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 266 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 

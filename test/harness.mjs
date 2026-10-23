@@ -374,13 +374,19 @@ if (SCENARIO === 'member' && process.env.SCHEDULE !== 'none') {
   db.prepare(`INSERT INTO session_schedules (group_id,weekdays,start_time,timezone,every_weeks,anchor_date,duration_min,updated_by)
               VALUES (1,?,?,?,?,?,?,?)`)
     .run(JSON.stringify(rule.weekdays), rule.time, rule.timezone, rule.everyWeeks, rule.anchorDate, rule.durationMin, ME);
-  const [next, second, third] = upcomingSessions(rule, Date.now(), 3);
+  const [next, second, third, fourth] = upcomingSessions(rule, Date.now(), 4);
   const rsvp = db.prepare('INSERT INTO session_rsvps (group_id,steam_id,session_date,answer,set_by) VALUES (1,?,?,?,?)');
   rsvp.run('seed:1:dave', next.date, 'out', ME);
   rsvp.run('seed:1:pat', next.date, 'maybe', ME);
   rsvp.run(ME, second.date, 'maybe', ME);
   db.prepare('INSERT INTO member_away (group_id,steam_id,from_date,to_date,set_by) VALUES (1,?,?,?,?)')
     .run('seed:1:leo', addDays(third.date, -2), addDays(third.date, 12), ME);
+  // One-off owner changes: the second session moved to the Monday before, the
+  // fourth called off. The rule itself stays Tuesdays.
+  const override = db.prepare(`INSERT INTO session_overrides (group_id,original_date,new_date,new_time,cancelled,set_by)
+                               VALUES (1,?,?,?,?,?)`);
+  override.run(second.date, addDays(second.date, -1), '20:00', 0, ME);
+  override.run(fourth.date, null, null, 1, ME);
 }
 if (SCENARIO === 'member') {
   // Synthetic recent actions over the normal fixtures; production has no backfill.

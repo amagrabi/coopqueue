@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 256 assertions — ALWAYS before a deploy
+npm test          # 266 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -194,6 +194,12 @@ tolerates that and shows no session strip, but every schedule write returns 500.
 Old answers and away
 ranges are pruned on the next schedule write once they are 30 days in the past,
 so no cron is needed.
+
+Migration `039-session-overrides.sql` must be applied before deploying one-off
+session changes. Back up first; it adds only `session_overrides` and changes no
+existing row. Until it exists, `GET /schedule` fails (the client then shows no
+strip) and every schedule write returns 500, because each write also prunes old
+overrides.
 
 ### Useful queries
 

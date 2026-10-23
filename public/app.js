@@ -561,6 +561,8 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.queue = q.queue;
   state.schedule = schedule;
   scheduleFetchedAt = Date.now();
+  // Its session key belongs to the workspace being left.
+  if ($('#session-dialog').open) $('#session-dialog').close();
   state.nextAttendees = null;
   state.crewFrom = null;
   state.replayFor = null;
@@ -1028,6 +1030,10 @@ function wireOnce() {
   $('#lib-played').addEventListener('change', renderLibrary);
   $('#lib-archived').addEventListener('change', renderLibrary);
   $('#hide-unviable').addEventListener('change', renderNext);
+  $('#sd-move').addEventListener('click', () => void changeSession('move'));
+  $('#sd-cancel').addEventListener('click', () => void changeSession('cancel'));
+  $('#sd-restore').addEventListener('click', () => void changeSession('restore'));
+  $('#sd-close').addEventListener('click', () => $('#session-dialog').close());
   $('#hide-ea').addEventListener('change', renderNext);
   $('#hide-unreleased').addEventListener('change', renderNext);
   $('#pn-budget').addEventListener('input', renderNext);
@@ -1983,9 +1989,11 @@ const nameList = (ids) => {
 
 const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** Sessions that have not ended. The server list ages while the tab stays open. */
+/** Sessions that have not ended. The server list ages while the tab stays open.
+    Each has a `key` — the date the rule gives it — which stays its identity after
+    the owner moves it; answers are posted against the key, never the new date. */
 const upcomingSessions = () => (state.schedule?.sessions || []).filter((s) => s.endsAt > Date.now());
-const nextSession = () => (state.group?.mode === 'personal' ? null : upcomingSessions()[0] || null);
+const nextSession = () => (state.group?.mode === 'personal' ? null : upcomingSessions().find((s) => !s.cancelled) || null);
 /** A member who joined after the fetch has no entry yet, and opt-out means coming. */
 const attendOf = (session, steamId) => session.attendance?.[steamId] || { state: 'in', source: 'default' };
 const crewOf = (session) => state.members.map((m) => m.steam_id).filter((id) => attendOf(session, id).state !== 'out');
@@ -2027,13 +2035,13 @@ async function refreshSchedule(force = false) {
   }
 }
 
-async function setAttendance(date, steamId, answer) {
+async function setAttendance(key, steamId, answer) {
   const slug = state.group.slug;
   try {
     // 'in' is the default; the server only stores it where it overrides an away range.
-    await gapiFor(slug, '/schedule', { method: 'POST', body: { action: 'rsvp', date, steamId, answer } });
+    await gapiFor(slug, '/schedule', { method: 'POST', body: { action: 'rsvp', date: key, steamId, answer } });
     if (steamId === state.me.steamId && answer !== 'in') {
-      const session = upcomingSessions().find((s) => s.date === date);
+      const session = upcomingSessions().find((s) => s.key === key);
       toast(`${answer === 'out' ? "Marked you as not coming" : 'Marked you as maybe'}${
         session ? ` on ${sessionDay(session.startsAt)}` : ''}`);
     }
@@ -2055,11 +2063,15 @@ function renderSessionStrip() {
   const out = ids.filter((id) => attendOf(session, id).state === 'out');
   const maybe = ids.filter((id) => attendOf(session, id).state === 'maybe');
   const mine = attendOf(session, state.me.steamId).state;
+  // A called-off week before the next session is the news people most need to see.
+  const off = upcomingSessions().filter((s) => s.cancelled && s.startsAt < session.startsAt);
   strip.hidden = false;
   strip.innerHTML = `
     <span class="strip-label">${live ? 'Playing now' : 'Next session'}</span>
     <span class="strip-when"><strong>${esc(sessionWhen(session.startsAt))}</strong>
-      <span class="strip-rel">${live ? `until ${esc(clockTime(session.endsAt))}` : relativeDay(session.startsAt)}</span></span>
+      <span class="strip-rel">${live ? `until ${esc(clockTime(session.endsAt))}` : relativeDay(session.startsAt)}</span>${
+      session.moved ? ` <span class="chip chip-warn">moved from ${esc(sessionDay(session.regularStartsAt))}</span>` : ''}${
+      off.length ? ` <span class="strip-off">${esc(off.map((s) => sessionDay(s.startsAt)).join(', '))} cancelled</span>` : ''}</span>
     <span class="strip-crew">${ids.length - out.length} of ${ids.length} coming${
       out.length ? ` · <span class="strip-out">${esc(capitalise(nameList(out)))} can't make it</span>` : ''}${
       maybe.length ? ` · ${esc(capitalise(nameList(maybe)))} maybe` : ''}</span>
@@ -2073,7 +2085,7 @@ function renderSessionStrip() {
   $$('[data-strip-answer]', strip).forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.stripAnswer === mine) return;
     $$('[data-strip-answer]', strip).forEach((x) => { x.disabled = true; });
-    void setAttendance(session.date, state.me.steamId, b.dataset.stripAnswer);
+    void setAttendance(session.key, state.me.steamId, b.dataset.stripAnswer);
   }));
   $('[data-strip-schedule]', strip).addEventListener('click', () => {
     setView('next');
@@ -2125,19 +2137,30 @@ function renderSessions() {
           <th scope="col"><span class="session-person"><i class="dot" style="background:${colorOf(m.steam_id)}"></i>${esc(m.short_name)}</span></th>`).join('')}
           <th scope="col">Coming</th></tr></thead>
         <tbody>${sessions.map((s, i) => {
+          const hide = i >= SESSION_ROWS && !sessionsExpanded ? ' hidden' : '';
+          const by = s.changedBy ? ` by ${esc(nameOf(s.changedBy))}` : '';
+          const edit = sched.canEdit ? `<button type="button" class="link-btn session-edit" data-edit-session="${s.key}"
+            aria-label="Change the ${esc(sessionDay(s.startsAt))} session">Change</button>` : '';
+          if (s.cancelled) {
+            return `<tr class="is-cancelled"${hide}>
+              <th scope="row"><s>${esc(sessionWhen(s.startsAt))}</s><small>cancelled${by}</small>${edit}</th>
+              <td colspan="${members.length + 1}" class="session-off">No session this week. The regular schedule carries on after it.</td>
+            </tr>`;
+          }
           const crew = crewOf(s);
-          return `<tr${i >= SESSION_ROWS && !sessionsExpanded ? ' hidden' : ''}>
-            <th scope="row">${esc(sessionWhen(s.startsAt))}<small>${s.startsAt <= Date.now() ? 'playing now' : relativeDay(s.startsAt)}</small></th>
+          return `<tr${s.moved ? ' class="is-moved"' : ''}${hide}>
+            <th scope="row">${esc(sessionWhen(s.startsAt))}<small>${s.startsAt <= Date.now() ? 'playing now' : relativeDay(s.startsAt)}</small>${
+              s.moved ? `<small class="session-moved">moved from ${esc(sessionWhen(s.regularStartsAt))}${by}</small>` : ''}${edit}</th>
             ${members.map((m) => {
               const a = attendOf(s, m.steam_id);
               const hint = attendHint(s, m.steam_id);
-              return `<td><select class="attend attend-${a.state}" data-date="${s.date}" data-member="${esc(m.steam_id)}"
+              return `<td><select class="attend attend-${a.state}" data-key="${s.key}" data-member="${esc(m.steam_id)}"
                   aria-label="${esc(m.short_name)} on ${esc(sessionDay(s.startsAt))}">
                 ${['in', 'maybe', 'out'].map((v) => `<option value="${v}"${a.state === v ? ' selected' : ''}>${ATTEND_LABEL[v]}</option>`).join('')}
               </select>${hint ? `<small class="attend-src">${esc(hint)}</small>` : ''}</td>`;
             }).join('')}
             <td class="session-crew"><span>${crew.length} of ${members.length}</span>
-              <button type="button" class="btn btn-sm btn-ghost" data-use-crew="${s.date}"
+              <button type="button" class="btn btn-sm btn-ghost" data-use-crew="${s.key}"
                 ${crew.length ? '' : 'disabled'}>Rank games for them</button></td>
           </tr>`;
         }).join('')}</tbody></table></div>
@@ -2151,19 +2174,76 @@ function renderSessions() {
       });
       $$('#session-grid select.attend').forEach((sel) => sel.addEventListener('change', () => {
         sel.disabled = true;
-        void setAttendance(sel.dataset.date, sel.dataset.member, sel.value);
+        void setAttendance(sel.dataset.key, sel.dataset.member, sel.value);
       }));
+      $$('#session-grid [data-edit-session]').forEach((b) => b.addEventListener('click', () => openSessionDialog(b.dataset.editSession)));
       $$('#session-grid [data-use-crew]').forEach((b) => b.addEventListener('click', () => {
-        const session = upcomingSessions().find((s) => s.date === b.dataset.useCrew);
+        const session = upcomingSessions().find((s) => s.key === b.dataset.useCrew);
         if (!session) return;
         state.nextAttendees = crewOf(session);
-        state.crewFrom = session.date;
+        state.crewFrom = session.key;
         renderNext();
         $('#pn-attendees').scrollIntoView({ behavior: 'smooth', block: 'center' });
       }));
     }
   }
   if (rule) renderAway();
+}
+
+/* The owner recording a change the group already agreed: move one session, call
+   it off, or put it back. The rule is untouched, so the regular slot resumes on its
+   own. Inputs are in the schedule's timezone, which is what the server reads. */
+let sessionDialogKey = null;
+function openSessionDialog(key) {
+  const session = upcomingSessions().find((s) => s.key === key);
+  const rule = state.schedule?.schedule;
+  if (!session || !rule) return;
+  sessionDialogKey = key;
+  const dialog = $('#session-dialog');
+  $('#session-dialog-title').textContent = `Change the ${sessionDay(session.cancelled ? session.startsAt : session.regularStartsAt ?? session.startsAt)} session`;
+  $('#session-dialog-sub').textContent = session.cancelled
+    ? 'This session is cancelled. Move it to another day, or put it back on its regular time.'
+    : session.moved
+      ? `Moved from its regular time, ${sessionWhen(session.regularStartsAt)}. Pick another time, put it back, or cancel it.`
+      : 'Pick another day or time for this one session, or cancel it.';
+  $('#sd-date').value = session.date;
+  $('#sd-time').value = session.time;
+  $('#sd-zone').textContent = rule.timezone === viewerZone() ? '' : `Times are ${rule.timezone.replace(/_/g, ' ')} time, like the regular session.`;
+  $('#sd-zone').hidden = rule.timezone === viewerZone();
+  $('#sd-restore').hidden = !(session.moved || session.cancelled);
+  $('#sd-cancel').hidden = session.cancelled;
+  $('#sd-move').textContent = session.cancelled ? 'Move and reinstate' : 'Move session';
+  $('#session-dialog-status').textContent = '';
+  $$('#session-dialog .btn').forEach((b) => { b.disabled = false; });
+  dialog.showModal();
+  $('#sd-date').focus();
+}
+
+async function changeSession(action) {
+  const key = sessionDialogKey;
+  const slug = state.group.slug;
+  const body = { action, key };
+  if (action === 'move') {
+    body.date = $('#sd-date').value;
+    body.time = $('#sd-time').value;
+    if (!body.date || !body.time) { $('#session-dialog-status').textContent = 'Pick a day and a time.'; return; }
+  }
+  $$('#session-dialog .btn').forEach((b) => { b.disabled = true; });
+  try {
+    await gapiFor(slug, '/schedule', { method: 'POST', body });
+  } catch (e) {
+    $('#session-dialog-status').textContent = e.message;
+    $$('#session-dialog .btn').forEach((b) => { b.disabled = false; });
+    return;
+  }
+  if (state.group?.slug !== slug) return;
+  $('#session-dialog').close();
+  toast(action === 'move' ? 'Session moved — answers for the old time were cleared'
+    : action === 'cancel' ? 'Session cancelled' : 'Session is back on its regular time');
+  await refreshSchedule(true);
+  sessionSignature = '';
+  renderSessionStrip();
+  if (state.view === 'next') renderNext();
 }
 
 /* Away ranges cover every session in them, including sessions a later rule change
@@ -2229,7 +2309,7 @@ function renderCrewNote() {
   const session = nextSession();
   if (!session) { note.hidden = true; return; }
   note.hidden = false;
-  const crewSession = state.crewFrom && upcomingSessions().find((s) => s.date === state.crewFrom);
+  const crewSession = state.crewFrom && upcomingSessions().find((s) => s.key === state.crewFrom && !s.cancelled);
   if (crewSession) {
     note.innerHTML = `Selected from ${esc(sessionDay(crewSession.startsAt))}'s session.
       <button type="button" class="link-btn" data-crew-reset>Back to the next session</button>`;

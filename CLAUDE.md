@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 256 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 266 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -383,7 +383,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-256/256 assertions pass. `npm run test:ui` does **not** run on macOS: it
+266/266 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -628,9 +628,36 @@ re-renders every minute without fetching (relative time, a finished session
 dropping off); other people's answers arrive on focus, throttled to 15 seconds.
 Play next shows four sessions with a toggle for all eight: it is a page about games.
 
+### Moving or cancelling one session
+
+The owner can move a single session or cancel it without touching the rule, so the
+regular slot resumes by itself: "Tuesdays, but next week everyone agreed on Monday".
+Owner-only and immediate, because it records a decision already made elsewhere;
+the poll for deciding one is still phase 2. `session_overrides` (migration 039) is
+keyed by the session's **original** date, and that key stays the session's
+identity: the API returns `key` (rule date) beside `date` (the day it is played),
+answers are posted and stored against the key, and away ranges are compared with
+the played date. Keying answers by the played date instead would collide when a
+session moves onto a day another session used to occupy.
+
+Moving clears that session's answers in the same batch — "can't make Tuesday" says
+nothing about Monday — and so does restoring a moved session. Cancelling keeps
+them, since restoring a cancelled session brings back the same time. A move onto
+the session's own regular slot deletes the override rather than storing a no-op.
+Moves are refused onto a day another session is already played (two sessions on
+one day are indistinguishable in every "Tue 27 Oct" label), into the past, and
+beyond the answer horizon.
+
+`upcomingSessions()` sorts by when a session is actually played, scans one extra
+rule date per override (each can remove a regular session), and adds overridden
+keys from before the scan window, so a session moved forward from an old date still
+appears. Cancelled sessions are listed, flagged, and do not count towards the eight.
+Overrides prune 30 days after both their key and their played date have passed.
+
 `test/harness.mjs` calls the **real** route through its D1 shim rather than a
-reimplementation, and seeds a Tuesday 20:30 Berlin rule with Dave out, Pat maybe
-and Leo away. `SCHEDULE=none` starts without a rule to exercise setup.
+reimplementation, and seeds a Tuesday 20:30 Berlin rule with Dave out, Pat maybe,
+Leo away, the second session moved to the Monday before at 20:00 and the fourth
+cancelled. `SCHEDULE=none` starts without a rule to exercise setup.
 
 ## Exports and achievements
 
