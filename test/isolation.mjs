@@ -3480,5 +3480,282 @@ await check('old activity expires and leaving a group clears only that member re
   return (rows === 1 && reads === 0) || `events ${rows}, reads ${reads}`;
 }));
 
+console.log('\nRegular sessions');
+
+const scheduleRoute = await import(path.join(SITE, 'functions/api/g/[slug]/schedule.js'));
+const sched = await import(path.join(SITE, 'lib/schedule.js'));
+const { claimSeedIdentity } = await import(path.join(SITE, 'lib/groups.js'));
+const SCH_A = '76561198000520001';
+const SCH_B = '76561198000520002';
+const SCH_C = '76561198000520003';
+sqlite.prepare('INSERT INTO users (steam_id,display_name) VALUES (?,?),(?,?),(?,?)')
+  .run(SCH_A, 'Schedule Alice', SCH_B, 'Schedule Bob', SCH_C, 'Schedule Carol');
+
+// Every day, so a session is always one or two days away whatever day the suite runs.
+const DAILY = { weekdays: [1, 2, 3, 4, 5, 6, 7], time: '20:30', timezone: 'Europe/Berlin',
+                everyWeeks: 1, startDate: '2026-01-05', durationMin: 180 };
+
+async function withSchedule(fn) {
+  sqlite.exec(`INSERT INTO groups (id,slug,name) VALUES
+    (5201,'schedule-team','Schedule Team'),(5202,'schedule-other','Other Schedule'),
+    (5203,'schedule-solo','Solo Schedule')`);
+  sqlite.exec("INSERT INTO workspace_settings (group_id,mode) VALUES (5203,'personal')");
+  sqlite.exec("INSERT INTO users (steam_id,display_name) VALUES ('seed:5201:zed','Zed (unclaimed)')");
+  const member = sqlite.prepare('INSERT INTO memberships (group_id,steam_id,short_name,role,is_seed) VALUES (?,?,?,?,?)');
+  member.run(5201, SCH_A, 'Alice', 'owner', 0);
+  member.run(5201, SCH_B, 'Bob', 'member', 0);
+  member.run(5201, 'seed:5201:zed', 'Zed', 'member', 1);
+  member.run(5202, SCH_C, 'Carol', 'owner', 0);
+  member.run(5203, SCH_A, 'Alice', 'owner', 0);
+  const f = {
+    a: (await ctxFor(SCH_A, 'schedule-team')).data,
+    b: (await ctxFor(SCH_B, 'schedule-team')).data,
+    other: (await ctxFor(SCH_C, 'schedule-other')).data,
+    solo: (await ctxFor(SCH_A, 'schedule-solo')).data,
+    get: async (data) => (await scheduleRoute.onRequestGet({ env, data })).json(),
+    put: (data, rule) => scheduleRoute.onRequestPut({ env, data, request: req(rule) }),
+    post: (data, input) => scheduleRoute.onRequestPost({ env, data, request: req(input) }),
+    rows: (table) => sqlite.prepare(`SELECT * FROM ${table} WHERE group_id=5201 ORDER BY rowid`).all(),
+    // Not the first session: that one may already be in progress when the suite runs.
+    sessions: () => sched.upcomingSessions(sched.parseRule(DAILY).rule, Date.now(), 4),
+  };
+  try { return await fn(f); }
+  finally {
+    sqlite.exec('DELETE FROM groups WHERE id IN (5201,5202,5203)');
+    sqlite.exec("DELETE FROM users WHERE steam_id='seed:5201:zed'");
+  }
+}
+
+await check('schedule GET, PUT and POST sit behind the 404 tenancy boundary', () => withSchedule(async () => {
+  const outsider = { user: user(MALLORY), steamId: MALLORY };
+  const response = await groupMw.onRequest({ env, data: outsider, params: { slug: 'schedule-team' },
+    next: async () => 'LEAKED' });
+  return (response?.status === 404) || `outsider got ${response?.status ?? response}`;
+}));
+
+await check('only the owner sets the regular session; a member gets 403 and nothing changes', () => withSchedule(async (f) => {
+  const denied = await f.put(f.b, DAILY);
+  const before = f.rows('session_schedules').length;
+  const ok = await f.put(f.a, DAILY);
+  const after = f.rows('session_schedules');
+  const removed = await scheduleRoute.onRequestDelete({ env, data: f.b });
+  return (denied.status === 403 && before === 0 && ok.status === 200 && after.length === 1
+    && after[0].updated_by === SCH_A && removed.status === 403 && f.rows('session_schedules').length === 1)
+    || JSON.stringify({ denied: denied.status, before, ok: ok.status, after, removed: removed.status });
+}));
+
+await check('invalid rules are rejected: no days, bad time, unknown zone, impossible date', () => withSchedule(async (f) => {
+  const cases = [
+    { ...DAILY, weekdays: [] }, { ...DAILY, weekdays: [0] }, { ...DAILY, weekdays: [2, 2] },
+    { ...DAILY, time: '24:00' }, { ...DAILY, time: '8:30' }, { ...DAILY, timezone: 'Mars/Olympus' },
+    { ...DAILY, startDate: '2026-02-30' }, { ...DAILY, everyWeeks: 5 }, { ...DAILY, durationMin: 10 },
+  ];
+  const statuses = [];
+  for (const rule of cases) statuses.push((await f.put(f.a, rule)).status);
+  return (statuses.every((s) => s === 400) && f.rows('session_schedules').length === 0) || statuses.join(',');
+}));
+
+await check('sessions keep their wall-clock time across a daylight-saving change', () => {
+  const rule = sched.parseRule({ ...DAILY, weekdays: [2] }).rule;
+  // 2026-10-25 is the European switch back to winter time.
+  const [summer, winter] = sched.upcomingSessions(rule, Date.parse('2026-10-19T00:00:00Z'), 2);
+  return (summer.date === '2026-10-20' && new Date(summer.startsAt).toISOString() === '2026-10-20T18:30:00.000Z'
+    && winter.date === '2026-10-27' && new Date(winter.startsAt).toISOString() === '2026-10-27T19:30:00.000Z')
+    || JSON.stringify([summer, winter]);
+});
+
+await check('every-other-week rules keep their phase from the start date', () => {
+  const rule = sched.parseRule({ ...DAILY, weekdays: [2], everyWeeks: 2, startDate: '2026-10-01' }).rule;
+  const dates = sched.upcomingSessions(rule, Date.parse('2026-10-19T00:00:00Z'), 3).map((s) => s.date);
+  return dates.join() === '2026-10-27,2026-11-10,2026-11-24' || dates.join();
+});
+
+await check('attendance is opt-out: everyone is coming until they say otherwise', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const body = await f.get(f.b);
+  const states = body.sessions.flatMap((s) => Object.values(s.attendance).map((a) => a.state));
+  return (body.sessions.length === sched.SESSION_COUNT && states.length === 3 * sched.SESSION_COUNT
+    && states.every((s) => s === 'in') && f.rows('session_rsvps').length === 0) || JSON.stringify(body).slice(0, 300);
+}));
+
+await check("any member can mark another member out, and set_by records who did", () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  const r = await f.post(f.b, { action: 'rsvp', date, steamId: 'seed:5201:zed', answer: 'out' });
+  const body = await f.get(f.a);
+  const cell = body.sessions.find((s) => s.date === date).attendance['seed:5201:zed'];
+  return (r.status === 200 && cell.state === 'out' && cell.setBy === SCH_B) || JSON.stringify({ status: r.status, cell });
+}));
+
+await check('answering for somebody outside the group is refused and writes nothing', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  const r = await f.post(f.a, { action: 'rsvp', date, steamId: SCH_C, answer: 'out' });
+  const a = await f.post(f.a, { action: 'away', steamId: SCH_C, from: date, to: date });
+  const leaked = sqlite.prepare('SELECT COUNT(*) AS n FROM session_rsvps WHERE steam_id=?').get(SCH_C).n
+    + sqlite.prepare('SELECT COUNT(*) AS n FROM member_away WHERE steam_id=?').get(SCH_C).n;
+  return (r.status === 400 && a.status === 400 && leaked === 0) || `${r.status} ${a.status} rows ${leaked}`;
+}));
+
+await check('answers are only accepted for real, unfinished sessions', () => withSchedule(async (f) => {
+  const none = await f.post(f.a, { action: 'rsvp', date: f.sessions()[1].date, answer: 'out' });
+  await f.put(f.a, { ...DAILY, weekdays: [2] });
+  const tuesday = sched.upcomingSessions(sched.parseRule({ ...DAILY, weekdays: [2] }).rule, Date.now(), 1)[0].date;
+  const wednesday = sched.addDays(tuesday, 1);
+  const wrongDay = await f.post(f.a, { action: 'rsvp', date: wednesday, answer: 'out' });
+  const past = await f.post(f.a, { action: 'rsvp', date: sched.addDays(tuesday, -7), answer: 'out' });
+  const bad = await f.post(f.a, { action: 'rsvp', date: tuesday, answer: 'yes' });
+  return (none.status === 409 && wrongDay.status === 400 && past.status === 400 && bad.status === 400
+    && f.rows('session_rsvps').length === 0) || [none.status, wrongDay.status, past.status, bad.status].join(',');
+}));
+
+await check('"coming" clears an answer instead of storing one, unless it overrides an away range', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const [, one, two] = f.sessions();
+  await f.post(f.a, { action: 'rsvp', date: one.date, answer: 'maybe' });
+  await f.post(f.a, { action: 'rsvp', date: one.date, answer: 'in' });
+  const cleared = f.rows('session_rsvps').length;
+  await f.post(f.a, { action: 'away', from: one.date, to: two.date });
+  await f.post(f.a, { action: 'rsvp', date: two.date, answer: 'in' });
+  const body = await f.get(f.a);
+  const at = (date) => body.sessions.find((s) => s.date === date).attendance[SCH_A];
+  return (cleared === 0 && at(one.date).state === 'out' && at(one.date).source === 'away'
+    && at(two.date).state === 'in' && at(two.date).source === 'answer')
+    || JSON.stringify({ cleared, one: at(one.date), two: at(two.date) });
+}));
+
+await check('a new away range supersedes an earlier "coming after all" inside it', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const [, one] = f.sessions();
+  await f.post(f.a, { action: 'away', from: one.date, to: one.date });
+  await f.post(f.a, { action: 'rsvp', date: one.date, answer: 'in' });
+  const overridden = f.rows('session_rsvps').length;
+  await f.post(f.a, { action: 'away', from: one.date, to: sched.addDays(one.date, 3) });
+  const body = await f.get(f.a);
+  const cell = body.sessions.find((s) => s.date === one.date).attendance[SCH_A];
+  return (overridden === 1 && f.rows('session_rsvps').length === 0 && cell.state === 'out')
+    || JSON.stringify({ overridden, cell });
+}));
+
+await check('away ranges are validated and bounded per person', () => withSchedule(async (f) => {
+  const today = sched.localDate('UTC', Date.now());
+  const statuses = [
+    (await f.post(f.a, { action: 'away', from: '2026-13-01', to: '2026-13-02' })).status,
+    (await f.post(f.a, { action: 'away', from: sched.addDays(today, 5), to: sched.addDays(today, 4) })).status,
+    (await f.post(f.a, { action: 'away', from: sched.addDays(today, -9), to: sched.addDays(today, -3) })).status,
+    (await f.post(f.a, { action: 'away', from: today, to: sched.addDays(today, 400) })).status,
+  ];
+  for (let i = 0; i < sched.AWAY_LIMIT; i++) {
+    await f.post(f.a, { action: 'away', from: sched.addDays(today, i), to: sched.addDays(today, i) });
+  }
+  const over = await f.post(f.a, { action: 'away', from: today, to: today });
+  return (statuses.every((s) => s === 400) && over.status === 409 && f.rows('member_away').length === sched.AWAY_LIMIT)
+    || JSON.stringify({ statuses, over: over.status, rows: f.rows('member_away').length });
+}));
+
+await check("another group's away range cannot be removed by guessing its id", () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  const added = await (await f.post(f.a, { action: 'away', from: date, to: date })).json();
+  const foreign = await f.post(f.other, { action: 'unaway', id: added.id });
+  const kept = f.rows('member_away').length;
+  const own = await f.post(f.b, { action: 'unaway', id: added.id });
+  return (foreign.status === 404 && kept === 1 && own.status === 200 && f.rows('member_away').length === 0)
+    || JSON.stringify({ id: added.id, foreign: foreign.status, kept, own: own.status });
+}));
+
+await check("one group's schedule never reaches another group's GET", () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  await f.post(f.a, { action: 'rsvp', date, steamId: SCH_B, answer: 'out' });
+  await f.post(f.a, { action: 'away', from: date, to: date });
+  const other = await f.get(f.other);
+  return (other.schedule === null && other.sessions.length === 0 && other.away.length === 0) || JSON.stringify(other);
+}));
+
+await check('personal workspaces have no schedule and refuse every write', () => withSchedule(async (f) => {
+  const body = await f.get(f.solo);
+  const put = await f.put(f.solo, DAILY);
+  const post = await f.post(f.solo, { action: 'away', from: '2026-12-01', to: '2026-12-02' });
+  const del = await scheduleRoute.onRequestDelete({ env, data: f.solo });
+  const rows = sqlite.prepare('SELECT COUNT(*) AS n FROM session_schedules WHERE group_id=5203').get().n;
+  return (body.enabled === false && put.status === 409 && post.status === 409 && del.status === 409 && rows === 0)
+    || JSON.stringify({ body, put: put.status, post: post.status, del: del.status, rows });
+}));
+
+await check('removing the rule keeps answers, which return with the same days', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  await f.post(f.b, { action: 'rsvp', date, answer: 'out' });
+  await scheduleRoute.onRequestDelete({ env, data: f.a });
+  const gone = await f.get(f.a);
+  await f.put(f.a, DAILY);
+  const back = await f.get(f.a);
+  return (gone.schedule === null && back.sessions.find((s) => s.date === date)?.attendance[SCH_B].state === 'out')
+    || JSON.stringify({ gone: gone.schedule, back: back.sessions[1] });
+}));
+
+await check('answers far in the past are pruned on the next write', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  sqlite.prepare("INSERT INTO session_rsvps (group_id,steam_id,session_date,answer) VALUES (5201,?,'2020-01-07','out')").run(SCH_B);
+  sqlite.prepare("INSERT INTO member_away (group_id,steam_id,from_date,to_date) VALUES (5201,?,'2020-01-01','2020-01-09')").run(SCH_B);
+  await f.post(f.a, { action: 'rsvp', date: f.sessions()[1].date, answer: 'out' });
+  const rsvps = f.rows('session_rsvps').map((r) => r.session_date);
+  return (rsvps.length === 1 && !rsvps.includes('2020-01-07') && f.rows('member_away').length === 0)
+    || JSON.stringify({ rsvps, away: f.rows('member_away') });
+}));
+
+await check('claiming a placeholder carries over answers given on its behalf', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const [, one, two] = f.sessions();
+  await f.post(f.a, { action: 'rsvp', date: one.date, steamId: 'seed:5201:zed', answer: 'out' });
+  await f.post(f.a, { action: 'rsvp', date: two.date, steamId: 'seed:5201:zed', answer: 'maybe' });
+  await f.post(f.a, { action: 'away', steamId: 'seed:5201:zed', from: sched.addDays(two.date, 1), to: sched.addDays(two.date, 2) });
+  sqlite.prepare("INSERT INTO memberships (group_id,steam_id,short_name) VALUES (5201,?,'Carol')").run(SCH_C);
+  // The real account already answered for `two`; that answer must win.
+  sqlite.prepare("INSERT INTO session_rsvps (group_id,steam_id,session_date,answer) VALUES (5201,?,?,'out')").run(SCH_C, two.date);
+  const claimed = await claimSeedIdentity(DB, 5201, SCH_C, 'seed:5201:zed');
+  const rsvps = sqlite.prepare('SELECT session_date,answer FROM session_rsvps WHERE group_id=5201 AND steam_id=? ORDER BY session_date').all(SCH_C);
+  const away = sqlite.prepare('SELECT COUNT(*) AS n FROM member_away WHERE group_id=5201 AND steam_id=?').get(SCH_C).n;
+  const orphans = sqlite.prepare("SELECT COUNT(*) AS n FROM session_rsvps WHERE steam_id='seed:5201:zed'").get().n;
+  return (claimed === 'Zed' && JSON.stringify(rsvps) === JSON.stringify([
+    { session_date: one.date, answer: 'out' }, { session_date: two.date, answer: 'out' },
+  ]) && away === 1 && orphans === 0) || JSON.stringify({ claimed, rsvps, away, orphans });
+}));
+
+await check('leaving a group removes only that member’s answers and away ranges', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  const date = f.sessions()[1].date;
+  await f.post(f.a, { action: 'rsvp', date, answer: 'out' });
+  await f.post(f.b, { action: 'rsvp', date, answer: 'maybe' });
+  await f.post(f.b, { action: 'away', from: date, to: date });
+  sqlite.prepare('DELETE FROM memberships WHERE group_id=5201 AND steam_id=?').run(SCH_B);
+  const left = f.rows('session_rsvps').map((r) => r.steam_id);
+  return (left.join() === SCH_A && f.rows('member_away').length === 0) || JSON.stringify(left);
+}));
+
+await check('schedule migration is additive and idempotent', () => withSchedule(async (f) => {
+  await f.put(f.a, DAILY);
+  await f.post(f.a, { action: 'rsvp', date: f.sessions()[1].date, answer: 'out' });
+  const snapshot = () => JSON.stringify([f.rows('session_schedules'), f.rows('session_rsvps'), f.rows('member_away')]);
+  const before = snapshot();
+  const migration = fs.readFileSync(path.join(SITE, 'migrations/038-session-schedule.sql'), 'utf8');
+  sqlite.exec(migration);
+  sqlite.exec(migration);
+  return snapshot() === before || 'replay changed schedule data';
+}));
+
+await check('deleting a group takes its schedule, answers and away ranges with it', async () => {
+  await withSchedule(async (f) => {
+    await f.put(f.a, DAILY);
+    const date = f.sessions()[1].date;
+    await f.post(f.a, { action: 'rsvp', date, answer: 'out' });
+    await f.post(f.b, { action: 'away', from: date, to: date });
+  });
+  const left = ['session_schedules', 'session_rsvps', 'member_away']
+    .map((t) => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE group_id=5201`).get().n);
+  return left.every((n) => n === 0) || left.join(',');
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

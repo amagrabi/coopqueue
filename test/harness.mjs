@@ -9,6 +9,7 @@
  *   SCENARIO=claim node ...          # in the group, nothing claimed yet
  *   SCENARIO=anon  node ...          # signed out (landing page)
  *   MARKETING=1 node ...             # member fixture with publishable identities
+ *   SCHEDULE=none node ...           # member fixture without a regular session
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -21,6 +22,8 @@ import { classifyCoop } from '../lib/coop.js';
 import { activityFeed, markActivityRead, markActivityItemRead, statusActivity } from '../lib/activity.js';
 import { buildHistoryItems } from '../lib/history.js';
 import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../lib/stats.js';
+import * as scheduleRoute from '../functions/api/g/[slug]/schedule.js';
+import { upcomingSessions, addDays } from '../lib/schedule.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.join(here, '..');
@@ -349,11 +352,36 @@ const activityDB = {
       bind(...args) { values = args; return statement; },
       async first() { return db.prepare(sql).get(...values); },
       async all() { return { results: db.prepare(sql).all(...values) }; },
-      async run() { return db.prepare(sql).run(...values); },
+      async run() {
+        const r = db.prepare(sql).run(...values);
+        return { meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
+      },
     };
     return statement;
   },
+  async batch(statements) {
+    const out = [];
+    for (const statement of statements) out.push(await statement.run());
+    return out;
+  },
 };
+if (SCENARIO === 'member' && process.env.SCHEDULE !== 'none') {
+  // A regular Tuesday session with the situations the UI has to show: somebody out
+  // next time (entered on their behalf), a maybe, and an away range further on.
+  // SCHEDULE=none starts without one, to exercise the setup path.
+  const rule = { weekdays: [2], time: '20:30', timezone: 'Europe/Berlin', everyWeeks: 1,
+                 anchorDate: '2026-01-06', durationMin: 180 };
+  db.prepare(`INSERT INTO session_schedules (group_id,weekdays,start_time,timezone,every_weeks,anchor_date,duration_min,updated_by)
+              VALUES (1,?,?,?,?,?,?,?)`)
+    .run(JSON.stringify(rule.weekdays), rule.time, rule.timezone, rule.everyWeeks, rule.anchorDate, rule.durationMin, ME);
+  const [next, second, third] = upcomingSessions(rule, Date.now(), 3);
+  const rsvp = db.prepare('INSERT INTO session_rsvps (group_id,steam_id,session_date,answer,set_by) VALUES (1,?,?,?,?)');
+  rsvp.run('seed:1:dave', next.date, 'out', ME);
+  rsvp.run('seed:1:pat', next.date, 'maybe', ME);
+  rsvp.run(ME, second.date, 'maybe', ME);
+  db.prepare('INSERT INTO member_away (group_id,steam_id,from_date,to_date,set_by) VALUES (1,?,?,?,?)')
+    .run('seed:1:leo', addDays(third.date, -2), addDays(third.date, 12), ME);
+}
 if (SCENARIO === 'member') {
   // Synthetic recent actions over the normal fixtures; production has no backfill.
   const teammate = one('SELECT steam_id FROM memberships WHERE group_id=1 AND steam_id<>? ORDER BY short_name LIMIT 1', ME);
@@ -969,6 +997,17 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, appid: Number(b.appid) });
     }
 
+    // The real handler over the same shim, so the local schedule is the shipped one.
+    if (sub === '/schedule') {
+      const handler = scheduleRoute[`onRequest${req.method[0]}${req.method.slice(1).toLowerCase()}`];
+      if (!handler) return send(res, 405, { error: 'method not allowed' });
+      const raw = await readBody(req);
+      const request = new Request('http://x/', { method: req.method === 'GET' ? 'GET' : 'POST',
+        body: req.method === 'GET' ? undefined : JSON.stringify(raw) });
+      const response = await handler({ request, env: { DB: activityDB },
+        data: { group: ctx, user: { steam_id: ME } } });
+      return send(res, response.status, await response.json());
+    }
     if (sub === '/activity' && req.method === 'GET') {
       return send(res, 200, await activityFeed(activityDB, gid, ME));
     }

@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 190 assertions — ALWAYS before a deploy
+npm test          # 256 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -182,6 +182,18 @@ notification acknowledgements. Back up first, then apply this additive, idempote
 migration. It adds per-member event receipts without changing existing activity,
 mark-all cursors or library data. Receipts expire with their events and cascade
 when the member leaves. Mark-all continues using the existing monotonic cursor.
+
+Migration `038-session-schedule.sql` must be applied before deploying regular
+sessions. Back up first, then apply this additive, idempotent migration. It adds
+`session_schedules`, `session_rsvps` and `member_away` and changes no existing
+row. **The order matters beyond the feature itself:** claiming a placeholder
+identity now repoints its attendance rows, so deploying the code first makes every
+seed claim fail — including the automatic `seed_assignments` claim on a friend's
+first sign-in. Without the migration `GET /schedule` also fails; the client
+tolerates that and shows no session strip, but every schedule write returns 500.
+Old answers and away
+ranges are pruned on the next schedule write once they are 30 days in the past,
+so no cron is needed.
 
 ### Useful queries
 

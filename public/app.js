@@ -23,7 +23,10 @@ const state = {
   replayShown: false,   // revealed by hand when Steam has no playtime to prove it
   lastAction: null,     // { gameId, mode } — the card just answered for, so the
                         // back button can return to it; see goBack()
-  nextAttendees: null,  // selected member ids; null means everybody in the workspace
+  nextAttendees: null,  // selected member ids; null means the next session's crew
+                        // (or everybody, without a schedule) — see defaultAttendees()
+  crewFrom: null,       // the session date a "Rank for this crew" click picked
+  schedule: null,       // GET /schedule: the regular session and who is coming
   history: null,        // current member's missing shared-history facts
   view: 'queue',
   cache: {},
@@ -539,10 +542,13 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   if (!expectedSlug) return false;
   if (activity.slug !== expectedSlug) resetActivity(expectedSlug);
   const seq = ++groupLoadSeq;
-  const [lib, q, claim] = await Promise.all([
+  const [lib, q, claim, schedule] = await Promise.all([
     gapiFor(expectedSlug, '/games'),
     gapiFor(expectedSlug, '/skip'),
     gapiFor(expectedSlug, '/claim'),
+    // The schedule is a convenience on top of the library; a failure here must not
+    // stop the workspace from opening.
+    gapiFor(expectedSlug, '/schedule').catch(() => null),
   ]);
   // A slow response from the group we just left must never overwrite the group
   // the person is now looking at. This also drops an earlier reload superseded by
@@ -553,7 +559,10 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.group = lib.group;
   state.model = lib.model;
   state.queue = q.queue;
+  state.schedule = schedule;
+  scheduleFetchedAt = Date.now();
   state.nextAttendees = null;
+  state.crewFrom = null;
   state.replayFor = null;
   state.lastAction = null;
   state.history = null;
@@ -627,6 +636,7 @@ function renderChrome() {
   renderLibHead();
   renderInviteNotice();
   wireOnce();
+  renderSessionStrip();
   $('#activity-btn').hidden = state.group.mode === 'personal';
   if (state.group.mode === 'personal') closeActivity();
   else void refreshActivity(true);
@@ -877,14 +887,19 @@ function wireOnce() {
 
   window.addEventListener('focus', () => void refreshIncomingInvites());
   window.addEventListener('focus', () => void refreshActivity());
+  window.addEventListener('focus', () => void refreshSchedule());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       void refreshIncomingInvites();
       void refreshActivity();
+      void refreshSchedule();
     }
   });
   setInterval(() => {
     if (document.visibilityState === 'visible') void refreshActivity();
+    // Local only: "in 2 days" goes stale and a finished session must drop off the
+    // strip, but neither needs the server. Other people's answers arrive on focus.
+    renderSessionStrip();
   }, 60000);
   $('#activity-btn').addEventListener('click', () => {
     const panel = $('#activity-panel');
@@ -1812,8 +1827,10 @@ function isUnreleased(g) {
 
 function renderNext() {
   if (renderEmptyLibrary('next')) return;
+  renderSessions();
   renderAttendeeFilter();
-  const attendees = state.nextAttendees || state.members.map((member) => member.steam_id);
+  renderCrewNote();
+  const attendees = currentAttendees();
   const selected = new Set(attendees);
   const need = attendees.length;
   const names = attendees.map(nameOf);
@@ -1908,12 +1925,19 @@ function renderNext() {
     .forEach((r) => r.addEventListener('click', () => openDetail(Number(r.dataset.id))));
 }
 
+/* The selection is part of the signature because the default crew can change
+   underneath the chips — somebody says they can't make it — and the chips must
+   follow. A click updates the signature itself, so ticking a box never rebuilds
+   the list and throws away focus. */
+const attendeeSignature = () =>
+  `${state.group.slug}|${state.members.map((member) => member.steam_id).join('|')}|${currentAttendees().join('|')}`;
+
 function renderAttendeeFilter() {
   const box = $('#pn-attendees');
-  const signature = `${state.group.slug}|${state.members.map((member) => member.steam_id).join('|')}`;
+  const signature = attendeeSignature();
   if (box.dataset.members === signature) return;
   box.dataset.members = signature;
-  const selected = new Set(state.nextAttendees || state.members.map((member) => member.steam_id));
+  const selected = new Set(currentAttendees());
   box.innerHTML = state.members.map((member) => `
     <label class="attendee">
       <input type="checkbox" value="${esc(member.steam_id)}" ${selected.has(member.steam_id) ? 'checked' : ''}>
@@ -1922,8 +1946,383 @@ function renderAttendeeFilter() {
     </label>`).join('');
   $$('input', box).forEach((input) => input.addEventListener('change', () => {
     state.nextAttendees = $$('input:checked', box).map((checked) => checked.value);
+    state.crewFrom = null;
+    box.dataset.members = attendeeSignature();
     renderNext();
   }));
+}
+
+/* ══════════════════════════════ SESSIONS ═══════════════════════════════ */
+/* The group's regular session. Sessions are computed by the server from one
+   standing rule; this file only renders them and records who can't make it.
+   Attendance is opt-out, so "Coming" is what nobody ever has to click. */
+const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ATTEND_LABEL = { in: 'Coming', maybe: 'Maybe', out: "Can't make it" };
+const viewerZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+let scheduleFetchedAt = 0;
+let scheduleSeq = 0;
+
+const sessionWhen = (ms) => new Date(ms).toLocaleString(undefined, {
+  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+});
+const sessionDay = (ms) => new Date(ms).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const clockTime = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+/** Calendar days in the viewer's own timezone, not 24-hour periods. */
+function relativeDay(ms) {
+  const day = (t) => { const d = new Date(t); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const n = Math.round((day(ms) - day(Date.now())) / 86400000);
+  return n <= 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`;
+}
+/** "you and Dave", with the viewer first: their own name reads as a stranger's. */
+const nameList = (ids) => {
+  const names = [...ids].sort((a, b) => (b === state.me.steamId) - (a === state.me.steamId))
+    .map((id) => id === state.me.steamId ? 'you' : nameOf(id));
+  return names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+};
+
+const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Sessions that have not ended. The server list ages while the tab stays open. */
+const upcomingSessions = () => (state.schedule?.sessions || []).filter((s) => s.endsAt > Date.now());
+const nextSession = () => (state.group?.mode === 'personal' ? null : upcomingSessions()[0] || null);
+/** A member who joined after the fetch has no entry yet, and opt-out means coming. */
+const attendOf = (session, steamId) => session.attendance?.[steamId] || { state: 'in', source: 'default' };
+const crewOf = (session) => state.members.map((m) => m.steam_id).filter((id) => attendOf(session, id).state !== 'out');
+
+/* Play next ranks for the people who will actually be there. Maybe counts as
+   coming: it is usually "probably, a bit late". With nobody able to make it the
+   ranking would be for nobody, so it falls back to everyone. */
+function defaultAttendees() {
+  const session = nextSession();
+  const crew = session ? crewOf(session) : [];
+  return crew.length ? crew : state.members.map((member) => member.steam_id);
+}
+const currentAttendees = () => state.nextAttendees || defaultAttendees();
+
+function ruleText(rule) {
+  const days = rule.weekdays.map((d) => rule.everyWeeks === 1 ? `${WEEKDAY_LONG[d - 1]}s` : WEEKDAY_LONG[d - 1]);
+  const list = days.length < 3 ? days.join(' and ') : `${days.slice(0, -1).join(', ')} and ${days.at(-1)}`;
+  const lead = rule.everyWeeks === 1 ? list
+    : rule.everyWeeks === 2 ? `Every other ${list}` : `Every ${rule.everyWeeks} weeks on ${list}`;
+  const zone = rule.timezone === viewerZone() ? '' : ` (${rule.timezone.replace(/_/g, ' ')} time)`;
+  return `${lead} at ${rule.time}${zone}`;
+}
+
+async function refreshSchedule(force = false) {
+  const slug = state.group?.slug;
+  if (!slug || state.group.mode === 'personal' || $('#app').hidden) return;
+  if (!force && Date.now() - scheduleFetchedAt < 15000) return;
+  scheduleFetchedAt = Date.now();
+  const seq = ++scheduleSeq;
+  let data;
+  try { data = await gapiFor(slug, '/schedule'); } catch { return; }
+  // A reply for the workspace we just left must never repaint the new one.
+  if (seq !== scheduleSeq || state.group?.slug !== slug) return;
+  state.schedule = data;
+  renderSessionStrip();
+  if (state.view === 'next') renderNext();
+  if (state.view === 'members' && state.cache.members?.slug === slug) {
+    renderScheduleSettings(state.group.role === 'owner');
+  }
+}
+
+async function setAttendance(date, steamId, answer) {
+  const slug = state.group.slug;
+  try {
+    // 'in' is the default; the server only stores it where it overrides an away range.
+    await gapiFor(slug, '/schedule', { method: 'POST', body: { action: 'rsvp', date, steamId, answer } });
+    if (steamId === state.me.steamId && answer !== 'in') {
+      const session = upcomingSessions().find((s) => s.date === date);
+      toast(`${answer === 'out' ? "Marked you as not coming" : 'Marked you as maybe'}${
+        session ? ` on ${sessionDay(session.startsAt)}` : ''}`);
+    }
+  } catch (e) { toast(e.message); }
+  await refreshSchedule(true);
+  // Repaint even when the refresh failed or nothing changed: the control that was
+  // disabled for the write must come back showing the stored answer.
+  sessionSignature = '';
+  renderSessionStrip();
+  if (state.view === 'next') renderNext();
+}
+
+function renderSessionStrip() {
+  const strip = $('#session-strip');
+  const session = state.me && state.group ? nextSession() : null;
+  if (!session) { strip.hidden = true; strip.innerHTML = ''; return; }
+  const live = session.startsAt <= Date.now();
+  const ids = state.members.map((m) => m.steam_id);
+  const out = ids.filter((id) => attendOf(session, id).state === 'out');
+  const maybe = ids.filter((id) => attendOf(session, id).state === 'maybe');
+  const mine = attendOf(session, state.me.steamId).state;
+  strip.hidden = false;
+  strip.innerHTML = `
+    <span class="strip-label">${live ? 'Playing now' : 'Next session'}</span>
+    <span class="strip-when"><strong>${esc(sessionWhen(session.startsAt))}</strong>
+      <span class="strip-rel">${live ? `until ${esc(clockTime(session.endsAt))}` : relativeDay(session.startsAt)}</span></span>
+    <span class="strip-crew">${ids.length - out.length} of ${ids.length} coming${
+      out.length ? ` · <span class="strip-out">${esc(capitalise(nameList(out)))} can't make it</span>` : ''}${
+      maybe.length ? ` · ${esc(capitalise(nameList(maybe)))} maybe` : ''}</span>
+    <span class="strip-actions">
+      <span class="strip-answer segmented" role="group" aria-label="Your answer for ${esc(sessionDay(session.startsAt))}">
+        ${['in', 'maybe', 'out'].map((a) => `<button type="button" class="seg${mine === a ? ' is-on' : ''}"
+          data-strip-answer="${a}" aria-pressed="${mine === a}">${ATTEND_LABEL[a]}</button>`).join('')}
+      </span>
+      <button type="button" class="btn btn-sm btn-ghost" data-strip-schedule>Schedule</button>
+    </span>`;
+  $$('[data-strip-answer]', strip).forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.stripAnswer === mine) return;
+    $$('[data-strip-answer]', strip).forEach((x) => { x.disabled = true; });
+    void setAttendance(session.date, state.me.steamId, b.dataset.stripAnswer);
+  }));
+  $('[data-strip-schedule]', strip).addEventListener('click', () => {
+    setView('next');
+    $('#session-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function attendHint(session, steamId) {
+  const a = attendOf(session, steamId);
+  if (a.source === 'away') return a.setBy && a.setBy !== steamId ? `away · by ${nameOf(a.setBy)}` : 'away';
+  if (a.source === 'answer' && a.setBy && a.setBy !== steamId) return `by ${nameOf(a.setBy)}`;
+  return '';
+}
+
+let sessionSignature = '';
+let awaySignature = '';
+// Play next is about games; the full eight weeks stay one click away.
+const SESSION_ROWS = 4;
+let sessionsExpanded = false;
+function renderSessions() {
+  const panel = $('#session-panel');
+  const sched = state.schedule;
+  if (!sched?.enabled || state.group.mode === 'personal') { panel.hidden = true; return; }
+  panel.hidden = false;
+  const rule = sched.schedule;
+  const sessions = upcomingSessions();
+  // Rebuilding on every Play next repaint (the budget slider fires per pixel)
+  // would also throw away the focus of a select somebody is using.
+  const signature = JSON.stringify([state.group.slug, state.members.map((m) => [m.steam_id, m.short_name]), rule, sessions, sched.canEdit]);
+  if (signature !== sessionSignature) {
+    sessionSignature = signature;
+    $('#session-rule').textContent = rule ? ruleText(rule) : '';
+    $('#session-sub').hidden = !rule;
+    $('#away-block').hidden = !rule;
+    if (!rule) {
+      $('#session-grid').innerHTML = `<p class="session-empty">No regular session yet. ${sched.canEdit
+        ? 'Set one up and everyone sees when the next one is, and who can make it.</p><button type="button" class="btn btn-sm" data-goto-schedule>Set a regular session</button>'
+        : 'The group owner can set one in the Group tab.</p>'}`;
+      $('[data-goto-schedule]')?.addEventListener('click', () => {
+        setView('members');
+        $('#schedule-settings-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    } else if (!sessions.length) {
+      $('#session-grid').innerHTML = '<p class="session-empty">No upcoming sessions.</p>';
+    } else {
+      const members = state.members;
+      $('#session-grid').innerHTML = `<div class="session-scroll"><table class="session-table">
+        <thead><tr><th scope="col">Session</th>${members.map((m) => `
+          <th scope="col"><span class="session-person"><i class="dot" style="background:${colorOf(m.steam_id)}"></i>${esc(m.short_name)}</span></th>`).join('')}
+          <th scope="col">Coming</th></tr></thead>
+        <tbody>${sessions.map((s, i) => {
+          const crew = crewOf(s);
+          return `<tr${i >= SESSION_ROWS && !sessionsExpanded ? ' hidden' : ''}>
+            <th scope="row">${esc(sessionWhen(s.startsAt))}<small>${s.startsAt <= Date.now() ? 'playing now' : relativeDay(s.startsAt)}</small></th>
+            ${members.map((m) => {
+              const a = attendOf(s, m.steam_id);
+              const hint = attendHint(s, m.steam_id);
+              return `<td><select class="attend attend-${a.state}" data-date="${s.date}" data-member="${esc(m.steam_id)}"
+                  aria-label="${esc(m.short_name)} on ${esc(sessionDay(s.startsAt))}">
+                ${['in', 'maybe', 'out'].map((v) => `<option value="${v}"${a.state === v ? ' selected' : ''}>${ATTEND_LABEL[v]}</option>`).join('')}
+              </select>${hint ? `<small class="attend-src">${esc(hint)}</small>` : ''}</td>`;
+            }).join('')}
+            <td class="session-crew"><span>${crew.length} of ${members.length}</span>
+              <button type="button" class="btn btn-sm btn-ghost" data-use-crew="${s.date}"
+                ${crew.length ? '' : 'disabled'}>Rank games for them</button></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>
+        ${sessions.length > SESSION_ROWS ? `<button type="button" class="link-btn session-more" aria-expanded="${sessionsExpanded}">${
+          sessionsExpanded ? 'Show fewer sessions' : `Show ${sessions.length - SESSION_ROWS} more sessions`}</button>` : ''}`;
+      $('#session-grid .session-more')?.addEventListener('click', (e) => {
+        sessionsExpanded = !sessionsExpanded;
+        $$('#session-grid tbody tr').forEach((row, i) => { row.hidden = i >= SESSION_ROWS && !sessionsExpanded; });
+        e.target.setAttribute('aria-expanded', String(sessionsExpanded));
+        e.target.textContent = sessionsExpanded ? 'Show fewer sessions' : `Show ${sessions.length - SESSION_ROWS} more sessions`;
+      });
+      $$('#session-grid select.attend').forEach((sel) => sel.addEventListener('change', () => {
+        sel.disabled = true;
+        void setAttendance(sel.dataset.date, sel.dataset.member, sel.value);
+      }));
+      $$('#session-grid [data-use-crew]').forEach((b) => b.addEventListener('click', () => {
+        const session = upcomingSessions().find((s) => s.date === b.dataset.useCrew);
+        if (!session) return;
+        state.nextAttendees = crewOf(session);
+        state.crewFrom = session.date;
+        renderNext();
+        $('#pn-attendees').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }));
+    }
+  }
+  if (rule) renderAway();
+}
+
+/* Away ranges cover every session in them, including sessions a later rule change
+   creates, which is why they are ranges and not a batch of per-session answers. */
+function renderAway() {
+  const sched = state.schedule;
+  const signature = JSON.stringify([state.group.slug, state.members.map((m) => [m.steam_id, m.short_name]), sched.away, sched.today]);
+  $('#away-block summary').textContent = sched.away.length
+    ? `Away ranges (${sched.away.length})` : 'Away for a while?';
+  if (signature === awaySignature) return;
+  awaySignature = signature;
+  $('#away-body').innerHTML = `
+    <p class="field-help">Covers every session in the range, so nobody has to answer week by week.</p>
+    <div class="away-form">
+      <div class="detail-field"><label for="away-who">Who</label>
+        <select id="away-who" class="input">${state.members.map((m) => `<option value="${esc(m.steam_id)}"${
+          m.steam_id === state.me.steamId ? ' selected' : ''}>${esc(m.short_name)}</option>`).join('')}</select></div>
+      <div class="detail-field"><label for="away-from">First day</label>
+        <input type="date" id="away-from" class="input" min="${esc(sched.today)}"></div>
+      <div class="detail-field"><label for="away-to">Last day</label>
+        <input type="date" id="away-to" class="input" min="${esc(sched.today)}"></div>
+      <button type="button" class="btn btn-sm" id="away-add">Add</button>
+    </div>
+    ${sched.away.length ? `<ul class="away-list">${sched.away.map((a) => `
+      <li><i class="dot" style="background:${colorOf(a.steamId)}"></i>
+        <span><strong>${esc(nameOf(a.steamId))}</strong> · ${esc(awayRange(a.from, a.to))}${
+          a.setBy && a.setBy !== a.steamId ? ` <small>added by ${esc(nameOf(a.setBy))}</small>` : ''}</span>
+        <button type="button" class="btn btn-sm btn-ghost" data-unaway="${a.id}"
+          aria-label="Remove ${esc(nameOf(a.steamId))}'s away range ${esc(awayRange(a.from, a.to))}">Remove</button></li>`).join('')}</ul>` : ''}`;
+  $('#away-from').addEventListener('change', (e) => {
+    $('#away-to').min = e.target.value || sched.today;
+    if (!$('#away-to').value || $('#away-to').value < e.target.value) $('#away-to').value = e.target.value;
+  });
+  $('#away-add').addEventListener('click', async () => {
+    const from = $('#away-from').value;
+    const to = $('#away-to').value || from;
+    if (!from) { toast('Pick the first day away'); return; }
+    const slug = state.group.slug;
+    $('#away-add').disabled = true;
+    try {
+      await gapiFor(slug, '/schedule', { method: 'POST', body: { action: 'away', steamId: $('#away-who').value, from, to } });
+      awaySignature = '';
+    } catch (e) { toast(e.message); $('#away-add').disabled = false; return; }
+    await refreshSchedule(true);
+  });
+  $$('#away-body [data-unaway]').forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try {
+      await gapiFor(state.group.slug, '/schedule', { method: 'POST', body: { action: 'unaway', id: Number(b.dataset.unaway) } });
+    } catch (e) { toast(e.message); b.disabled = false; return; }
+    await refreshSchedule(true);
+  }));
+}
+
+/** Calendar dates, so format them as UTC: a local-midnight shift would move the day. */
+function awayRange(from, to) {
+  const f = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return from === to ? f(from) : `${f(from)} – ${f(to)}`;
+}
+
+function renderCrewNote() {
+  const note = $('#pn-crew-note');
+  const session = nextSession();
+  if (!session) { note.hidden = true; return; }
+  note.hidden = false;
+  const crewSession = state.crewFrom && upcomingSessions().find((s) => s.date === state.crewFrom);
+  if (crewSession) {
+    note.innerHTML = `Selected from ${esc(sessionDay(crewSession.startsAt))}'s session.
+      <button type="button" class="link-btn" data-crew-reset>Back to the next session</button>`;
+  } else if (state.nextAttendees) {
+    note.innerHTML = `Your own selection.
+      <button type="button" class="link-btn" data-crew-reset>Use the next session's crew</button>`;
+  } else {
+    const out = state.members.map((m) => m.steam_id).filter((id) => attendOf(session, id).state === 'out');
+    note.textContent = out.length === state.members.length
+      ? `Nobody can make ${sessionDay(session.startsAt)}, so everyone is selected.`
+      : `Preselected for ${sessionDay(session.startsAt)}${out.length
+        ? `: ${nameList(out)} can't make it.` : ' — everyone is coming.'}`;
+  }
+  $('[data-crew-reset]', note)?.addEventListener('click', () => {
+    state.nextAttendees = null;
+    state.crewFrom = null;
+    renderNext();
+  });
+}
+
+/** The standing rule. Owner-only, like every other group rule. */
+function renderScheduleSettings(isOwner) {
+  const sched = state.schedule;
+  const box = $('#schedule-settings');
+  if (!sched?.enabled) {
+    box.innerHTML = '<p class="field-help">Could not load the schedule. Reload to try again.</p>';
+    return;
+  }
+  const rule = sched.schedule;
+  if (!rule && !isOwner) {
+    box.innerHTML = '<p class="field-help">No regular session yet. Only the group owner can set one.</p>';
+    return;
+  }
+  const zone = rule?.timezone || viewerZone();
+  const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  if (!zones.includes(zone)) zones.unshift(zone);
+  const off = isOwner ? '' : ' disabled';
+  const lengths = [60, 90, 120, 150, 180, 240, 300, 360];
+  if (rule && !lengths.includes(rule.durationMin)) lengths.push(rule.durationMin);
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  box.innerHTML = `
+    <fieldset class="weekday-pick"${off}>
+      <legend>Days</legend>
+      <div class="attendee-list">${WEEKDAY_SHORT.map((d, i) => `
+        <label class="attendee"><input type="checkbox" value="${i + 1}"${rule?.weekdays.includes(i + 1) ? ' checked' : ''}>
+          <span>${d}</span></label>`).join('')}</div>
+    </fieldset>
+    <div class="schedule-fields">
+      <div class="detail-field"><label for="sch-time">Starts at</label>
+        <input type="time" id="sch-time" class="input" value="${esc(rule?.time || '20:30')}"${off}></div>
+      <div class="detail-field"><label for="sch-length">Usually lasts</label>
+        <select id="sch-length" class="input"${off}>${lengths.sort((a, b) => a - b).map((m) => `
+          <option value="${m}"${(rule?.durationMin ?? 180) === m ? ' selected' : ''}>${m % 60 ? `${(m / 60).toFixed(1)} h` : `${m / 60} h`}</option>`).join('')}</select></div>
+      <div class="detail-field"><label for="sch-every">Repeats</label>
+        <select id="sch-every" class="input"${off}>${[1, 2, 3, 4].map((n) => `
+          <option value="${n}"${(rule?.everyWeeks ?? 1) === n ? ' selected' : ''}>${n === 1 ? 'Every week' : n === 2 ? 'Every other week' : `Every ${n} weeks`}</option>`).join('')}</select></div>
+      <div class="detail-field"><label for="sch-start">Starting</label>
+        <input type="date" id="sch-start" class="input" value="${esc(rule?.anchorDate || today)}"${off}></div>
+      <div class="detail-field sch-zone"><label for="sch-tz">Timezone</label>
+        <select id="sch-tz" class="input"${off}>${zones.map((z) => `
+          <option value="${esc(z)}"${z === zone ? ' selected' : ''}>${esc(z.replace(/_/g, ' '))}</option>`).join('')}</select></div>
+    </div>
+    <p class="field-help">${isOwner
+      ? 'Everyone sees session times in their own timezone. The rule stays on this wall-clock time through daylight-saving changes.'
+      : 'Only the group owner can change the regular session.'}</p>
+    ${isOwner ? `<div class="schedule-actions">
+      <button type="button" class="btn btn-primary" id="sch-save">${rule ? 'Save' : 'Set regular session'}</button>
+      ${rule ? '<button type="button" class="btn btn-ghost" id="sch-remove">Remove regular session</button>' : ''}
+    </div>` : ''}`;
+  if (!isOwner) return;
+  $('#sch-save').addEventListener('click', async () => {
+    const slug = state.group.slug;
+    const weekdays = $$('.weekday-pick input:checked', box).map((i) => Number(i.value));
+    if (!weekdays.length) { toast('Pick at least one day'); return; }
+    $('#sch-save').disabled = true;
+    try {
+      await gapiFor(slug, '/schedule', { method: 'PUT', body: {
+        weekdays, time: $('#sch-time').value, timezone: $('#sch-tz').value,
+        everyWeeks: Number($('#sch-every').value), startDate: $('#sch-start').value,
+        durationMin: Number($('#sch-length').value),
+      } });
+      toast('Regular session saved');
+    } catch (e) { toast(e.message); $('#sch-save').disabled = false; return; }
+    await refreshSchedule(true);
+  });
+  $('#sch-remove')?.addEventListener('click', async () => {
+    if (!confirm('Remove the regular session? Answers already given are kept and come back if you set the same days again.')) return;
+    try {
+      await gapiFor(state.group.slug, '/schedule', { method: 'DELETE' });
+      toast('Regular session removed');
+    } catch (e) { toast(e.message); return; }
+    await refreshSchedule(true);
+  });
 }
 
 /* ══════════════════════════════ LIBRARY ═══════════════════════════════ */
@@ -2712,6 +3111,8 @@ async function renderMembers() {
   $('#group-coverage-panel').hidden = personal;
   $('#group-members-panel').hidden = personal;
   $('#group-invite-panel').hidden = personal;
+  $('#schedule-settings-panel').hidden = personal;
+  if (!personal) renderScheduleSettings(isOwner);
   $('#workspace-settings-grid').classList.toggle('single', personal);
   $('#playtime-title').textContent = personal ? 'Your Steam playtime' : 'Steam playtime';
   $('#playtime-copy').innerHTML = personal

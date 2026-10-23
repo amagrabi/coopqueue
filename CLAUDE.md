@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 190 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 256 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -383,7 +383,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-190/190 assertions pass. `npm run test:ui` does **not** run on macOS: it
+256/256 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -503,6 +503,8 @@ the first and a full list of zeroes for the second.
    group has members. Rating coverage is the app's core problem — in the original
    spreadsheet it ranged from 89% to 27% per person.
 4. **Public read-only group pages.** Also the cheapest growth loop the site has.
+5. **Rescheduling, phases 2–4.** See Regular sessions below: replacement-slot polls
+   with a confirm step, a private .ics feed per member, and a Discord webhook.
 
 ## Group hours
 
@@ -572,6 +574,63 @@ identifiers or avatars.
 `POST /api/g/:slug/play-night` retains the same attendee-specific semantics for API
 callers and accepts 1–64 group members, which also supports personal workspaces. It
 does not persist session state.
+
+## Regular sessions
+
+Phase 1 of an agreed four-phase plan (owner, October 2026): a standing rule, the
+next-session strip, opt-out attendance with away ranges, and Play next prefilled
+with the next session's crew. Still to come, in order: rescheduling polls
+(replacement slots, everyone marks which work, any member confirms play-anyway,
+move or skip, and the original plan holds if nobody decides), a private `.ics`
+feed per member, and a Discord webhook. The last two matter because the bell only
+reaches people who already have the site open.
+
+**Sessions are never stored.** `session_schedules` holds one rule per group:
+ISO weekdays, local `HH:MM`, an IANA timezone, every 1–4 weeks, an anchor date
+and a length. `lib/schedule.js` computes concrete sessions on every read, so
+changing the rule cannot leave stale session rows behind. The rule is wall-clock
+time plus a zone, never a UTC instant, or "Tuesdays 20:30" drifts an hour twice a
+year. All calendar arithmetic runs on `YYYY-MM-DD` strings through UTC midnight;
+only `zonedInstant()` consults the zone, with a second pass for the case where a
+daylight-saving change falls between the naive guess and the answer. A session
+stays "next" until its end, which is why the scan starts from yesterday — a late
+session crosses local midnight.
+
+**Attendance is opt-out.** No row means coming. `session_rsvps` is keyed by the
+session's local date, not its instant, so moving the start time keeps the answers.
+`'in'` is stored **only** where it overrides an away range; the route deletes the
+row otherwise. Storing it everywhere would let one idle click on "Coming" silently
+defeat an away range added later. For the same reason a new away range deletes
+earlier `'in'` rows inside it: the newest statement wins.
+
+**Anyone may answer for anyone in the group**, with `set_by` shown as "by Ama".
+That is deliberate: the real message arrives in a group chat, and an unclaimed
+placeholder cannot answer at all. The target must be a membership of
+`data.group.group_id`; `unaway` deletes by id **and** group, since away ids are
+global (invariant 2). Changing the rule is owner-only, like every other group rule.
+`claimSeedIdentity` repoints a placeholder's answers and ranges with `UPDATE OR
+IGNORE`, so an answer the real account already gave for that date wins — which is
+also why migration 038 must land before the code (see `docs/OPERATIONS.md`).
+
+**Away ranges are ranges**, not a batch of per-session answers, so they also cover
+sessions a later rule change creates. Bounded at a year long, a year ahead and
+20 active ranges per person. Both tables prune anything 30 days past on the next
+schedule write rather than needing a cron. Removing the rule keeps answers; they
+come back if the same days are set again. Schedule data is not in exports: it is
+forward-looking coordination, not group history.
+
+On the client, `defaultAttendees()` is the next session's crew (maybe counts as
+coming; nobody available falls back to everyone), and the attendee chip signature
+includes the selection so the chips follow a changed answer without rebuilding on
+the user's own click. "Rank games for them" on a later session sets `crewFrom`, and
+the note under the chips always says where the selection came from. The strip
+re-renders every minute without fetching (relative time, a finished session
+dropping off); other people's answers arrive on focus, throttled to 15 seconds.
+Play next shows four sessions with a toggle for all eight: it is a page about games.
+
+`test/harness.mjs` calls the **real** route through its D1 shim rather than a
+reimplementation, and seeds a Tuesday 20:30 Berlin rule with Dave out, Pat maybe
+and Leo away. `SCHEDULE=none` starts without a rule to exercise setup.
 
 ## Exports and achievements
 

@@ -347,6 +347,87 @@ kbd {
 .replay-opts .seg.is-on { border-color: rgba(57,135,229,.55); }
 .replay-reveal { justify-self: start; margin: 4px 0 2px; }
 
+/* ─────────────────────────── regular sessions ─────────────────────────── */
+/* The strip sits under the topbar on every view. It wraps rather than truncates:
+   on a phone the answer buttons drop to their own line, which is still one tap. */
+.session-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 8px 20px; font-size: 13.5px; color: var(--text-secondary);
+  background: var(--surface-1); border-bottom: 1px solid var(--border);
+}
+.strip-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.strip-when strong { color: var(--text-primary); font-weight: 600; }
+.strip-rel { margin-left: 6px; color: var(--text-muted); }
+.strip-out { color: #f2d79a; }
+.strip-actions { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.strip-answer .seg { padding: 4px 10px; font-size: 12.5px; }
+.strip-answer .seg[data-strip-answer="out"].is-on { background: rgba(208,59,59,.22); color: #f0a3a3; }
+.strip-answer .seg[data-strip-answer="maybe"].is-on { background: rgba(250,178,25,.18); color: #f2d79a; }
+
+.session-panel .panel-head { flex-wrap: wrap; }
+.session-rule { font-size: 13px; color: var(--text-secondary); }
+.session-empty { margin: 0 0 10px; font-size: 13.5px; color: var(--text-secondary); }
+/* Wide groups scroll inside the panel, never the page; the session column stays put. */
+.session-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.session-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.session-table th, .session-table td { padding: 7px 8px; text-align: left; vertical-align: top; border-top: 1px solid var(--gridline); }
+.session-table thead th {
+  border-top: 0; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-muted); white-space: nowrap;
+}
+.session-table tbody th {
+  position: sticky; left: 0; z-index: 1; background: var(--surface-1);
+  font-weight: 550; white-space: nowrap; color: var(--text-primary);
+}
+.session-table tbody th small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.session-person { display: inline-flex; align-items: center; gap: 6px; }
+.attend {
+  font: inherit; font-size: 12.5px; padding: 4px 6px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary);
+}
+.attend:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+.attend-out { background: rgba(208,59,59,.16); border-color: rgba(208,59,59,.45); color: #f0a3a3; }
+.attend-maybe { background: rgba(250,178,25,.12); border-color: rgba(250,178,25,.42); color: #f2d79a; }
+.attend-src { display: block; margin-top: 3px; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.session-crew { white-space: nowrap; color: var(--text-secondary); }
+.session-crew .btn { margin-left: 6px; padding: 3px 8px; font-size: 12.5px; }
+.session-more { margin-top: 8px; font-size: 13px; }
+
+.away-block { margin-top: 14px; }
+.away-block summary { cursor: pointer; font-size: 13.5px; color: var(--text-secondary); }
+.away-block[open] summary { margin-bottom: 10px; }
+.away-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.away-form .input { min-width: 140px; }
+.away-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.away-list li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.away-list li > span { flex: 1; min-width: 0; }
+.away-list small { color: var(--text-muted); }
+
+.crew-note { margin: 8px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.link-btn {
+  font: inherit; padding: 0; border: 0; background: none; color: var(--series-1);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+
+.weekday-pick { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+.weekday-pick legend {
+  display: block; margin-bottom: 7px; font-size: 11.5px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted);
+}
+.weekday-pick:disabled .attendee { cursor: default; opacity: .7; }
+.schedule-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.schedule-fields .sch-zone { grid-column: span 2; }
+.schedule-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+@media (max-width: 720px) {
+  .session-strip { padding: 8px 14px; }
+  .strip-actions { margin-left: 0; }
+  .schedule-fields .sch-zone { grid-column: auto; }
+}
+
 /* ───────────────────────────── play next ──────────────────────────────── */
 .attendee-filter { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .attendee-filter legend {

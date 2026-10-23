@@ -79,6 +79,17 @@ separate block. Unreleased and Early Access games are hidden by default, but can
 be included when the group is planning ahead. Steam header art keeps both lists
 recognizable at a glance.
 
+**Regular sessions.** The owner sets when the group usually plays — say Tuesdays
+at 20:30, weekly or every other week, in the group's timezone — and the next
+session sits under the top bar on every page with who is coming. Attendance is
+opt-out: everyone counts as coming until they say **Maybe** or **Can't make it**,
+and anyone can answer for anyone, because the real message usually arrives in a
+group chat. **Away** ranges cover holidays without answering week by week. Play
+next preselects the next session's crew, so the ranking is already for the people
+who will actually be there, and any upcoming session can rank games for its own
+crew. Times show in each viewer's own timezone and stay on the group's wall-clock
+time through daylight-saving changes. Personal workspaces have no schedule.
+
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
 Filterable by whose votes a game already has, by group score, and by whether
@@ -354,7 +365,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 190 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 256 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -387,6 +398,7 @@ functions/
       invites.js                 owner search, invite and cancellation
       steam-import.js            selective library/wishlist import
       play-night.js              attendee-specific backlog ranking
+      schedule.js                regular session, attendance and away ranges
       export.js                  owner-only JSON and CSV downloads
       achievements.js            cached per-game Trophy relay
       rate.js  skip.js  stats.js  claim.js  members.js  enrich.js
@@ -395,6 +407,7 @@ lib/
   groups.js    slugs, invite codes, membership lookup
   history.js   missing-fact prompts and bounded automatic suggestions
   stats.js     shared library-shape, genre, timeline and playtime aggregations
+  schedule.js  session dates from the standing rule, timezone maths, attendance
   score.js     plain-mean scoring + viability
   ownership.js three-state Steam-library ownership
   steam.js     Steam Web API and store endpoints, cache-first
@@ -486,8 +499,8 @@ account; the existing group, member, and game caps remain the longer-term guardr
 
 ## What's next
 
-Steam playtime/ownership sync, attendee filtering, personal workspaces, group
-exports, automatic per-game achievement progress, Complete our history, comments,
+Steam playtime/ownership sync, attendee filtering, regular sessions, personal
+workspaces, group exports, automatic per-game achievement progress, Complete our history, comments,
 archiving and the recommender are
 **done**. Still open,
 roughly in value order:
@@ -503,3 +516,8 @@ roughly in value order:
   group has members. Rating coverage is the app's core problem — in the original
   spreadsheet it ranged from 89% to 27% per person.
 - **Public read-only group pages**, also the cheapest growth loop the site has.
+- **Rescheduling.** "Can't make it" exists; the next step is turning it into a
+  decision: propose replacement slots, everyone marks which work, and the group
+  confirms play-anyway, move or skip for that one week. After that, a private
+  calendar (.ics) feed per member and a Discord webhook, so a moved session
+  reaches people who do not have the site open.

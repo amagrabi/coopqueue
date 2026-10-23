@@ -22,7 +22,7 @@ Live at <https://coopqueue.app>.
 ## Before you finish
 
 ```bash
-npm test                 # 190 assertions — MUST pass before any deploy
+npm test                 # 256 assertions — MUST pass before any deploy
 node test/harness.mjs    # local UI; SCENARIO=anon|fresh|claim|member
 npm run deploy           # pins --branch main; see OPERATIONS.md for why
 ```
@@ -119,13 +119,13 @@ its numbers in `CLAUDE.md`.
 ```
 functions/api/          Pages Functions (the API)
   g/[slug]/             everything group-scoped — behind _middleware.js
-lib/                    shared pure modules: auth, steam, score, stats, coop, recommend, groups, ownership
+lib/                    shared pure modules: auth, steam, score, stats, coop, recommend, groups, ownership, schedule
 public/                 the entire frontend: index.html, app.js, styles.css, brand/
   vendor/hls.min.js     the one vendored dependency
 crawler/                the hourly cron Worker (Pages Functions cannot carry crons)
 migrations/             additive, idempotent, applied by hand
 scripts/                setup, crawl, IGDB measurement, tags, palette validation
-test/isolation.mjs      190 assertions against the REAL route handlers
+test/isolation.mjs      256 assertions against the REAL route handlers
 test/harness.mjs        local server; reimplements routes over real lib/ + schema
 schema.sql              fresh installs and tests ONLY — never production
 ```

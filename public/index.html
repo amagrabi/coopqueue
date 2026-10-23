@@ -9,7 +9,7 @@
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://coopqueue.app/">
 <!-- Fresh URLs bypass the four-hour copies cached before these assets revalidated. -->
-<link rel="stylesheet" href="/styles.css?v=2026-10-18-1">
+<link rel="stylesheet" href="/styles.css?v=2026-10-23-1">
 
 <!-- Icons carry a dark field rather than transparency on purpose: the three figures
      inside the controller are white, so a transparent icon leaves them invisible
@@ -297,6 +297,10 @@
     </div>
   </header>
 
+  <!-- The next regular session, on every view: "when do we play" is the question
+       people open the site to answer, so it should not hide behind a tab. -->
+  <div id="session-strip" class="session-strip" role="region" aria-label="Next session" hidden></div>
+
   <main class="main">
 
     <!-- ══════════════ RATE ══════════════ -->
@@ -493,9 +497,23 @@
           <span>Hide unreleased games</span>
         </label>
       </div>
+      <section class="panel session-panel" id="session-panel" aria-labelledby="session-title" hidden>
+        <div class="panel-head">
+          <h3 class="panel-title" id="session-title">Upcoming sessions</h3>
+          <span class="session-rule" id="session-rule"></span>
+        </div>
+        <p class="panel-sub" id="session-sub">Everyone counts as coming unless they say otherwise. Anyone
+          can update anyone's answer — handy when somebody said it in chat instead.</p>
+        <div id="session-grid"></div>
+        <details class="away-block" id="away-block">
+          <summary>Away for a while?</summary>
+          <div id="away-body"></div>
+        </details>
+      </section>
       <fieldset class="attendee-filter">
         <legend>Who's playing?</legend>
         <div id="pn-attendees" class="attendee-list"></div>
+        <p class="crew-note" id="pn-crew-note" hidden></p>
       </fieldset>
       <div class="budget-filter">
         <label for="pn-budget">Budget per person</label>
@@ -781,6 +799,12 @@
           <div id="group-settings"></div>
         </section>
       </div>
+      <section class="panel" id="schedule-settings-panel">
+        <h3 class="panel-title">Regular session</h3>
+        <p class="panel-sub">When the group usually plays. Everyone sees the next session at the top of
+          every page and can say when they can't make it; one-off changes never alter this rule.</p>
+        <div id="schedule-settings"></div>
+      </section>
       <section class="panel" id="group-invite-panel">
         <h3 class="panel-title">Invite</h3>
         <div id="invite-panel"></div>
@@ -933,6 +957,6 @@
      plays in a bare <video>. Vendored rather than pulled from a CDN so the site
      stays a self-contained static bundle. app.js loads it only when a rating card
      actually needs an HLS trailer; the rest of the app does not pay that cost. -->
-<script src="/app.js?v=2026-10-18-1" type="module"></script>
+<script src="/app.js?v=2026-10-23-1" type="module"></script>
 </body>
 </html>
