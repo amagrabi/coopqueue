@@ -620,8 +620,11 @@ forward-looking coordination, not group history.
 On the client, `defaultAttendees()` is the next session's crew (maybe counts as
 coming; nobody available falls back to everyone), and the attendee chip signature
 includes the selection so the chips follow a changed answer without rebuilding on
-the user's own click. "Rank games for them" on a later session sets `crewFrom`, and
-the note under the chips always says where the selection came from. The strip
+the user's own click. The note under the chips says whether the selection is the
+next session's crew or your own, with a link back to the former. A per-session
+"Rank games for them" button existed briefly and was removed at the owner's request:
+the next session is already preselected, a later crew is two unticks away, and eight
+identical buttons widened a column that already scrolled on phones. The strip
 re-renders every minute without fetching (relative time, a finished session
 dropping off); other people's answers arrive on focus, throttled to 15 seconds.
 Play next shows four sessions with a toggle for all eight: it is a page about games.

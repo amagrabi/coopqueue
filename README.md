@@ -86,8 +86,7 @@ opt-out: everyone counts as coming until they say **Maybe** or **Can't make it**
 and anyone can answer for anyone, because the real message usually arrives in a
 group chat. **Away** ranges cover holidays without answering week by week. Play
 next preselects the next session's crew, so the ranking is already for the people
-who will actually be there, and any upcoming session can rank games for its own
-crew. Times show in each viewer's own timezone and stay on the group's wall-clock
+who will actually be there. Times show in each viewer's own timezone and stay on the group's wall-clock
 time through daylight-saving changes. When the group has already agreed on a
 one-off change, the owner can **move** a single session to another day or time, or
 **cancel** it, without changing the regular slot; everyone sees "moved from Tue 27

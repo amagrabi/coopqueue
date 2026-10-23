@@ -25,7 +25,6 @@ const state = {
                         // back button can return to it; see goBack()
   nextAttendees: null,  // selected member ids; null means the next session's crew
                         // (or everybody, without a schedule) — see defaultAttendees()
-  crewFrom: null,       // the session date a "Rank for this crew" click picked
   schedule: null,       // GET /schedule: the regular session and who is coming
   history: null,        // current member's missing shared-history facts
   view: 'queue',
@@ -576,7 +575,6 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   // Its session key belongs to the workspace being left.
   for (const id of ['#session-dialog', '#poll-dialog', '#poll-create-dialog']) if ($(id).open) $(id).close();
   state.nextAttendees = null;
-  state.crewFrom = null;
   state.replayFor = null;
   state.lastAction = null;
   state.history = null;
@@ -1978,7 +1976,6 @@ function renderAttendeeFilter() {
     </label>`).join('');
   $$('input', box).forEach((input) => input.addEventListener('change', () => {
     state.nextAttendees = $$('input:checked', box).map((checked) => checked.value);
-    state.crewFrom = null;
     box.dataset.members = attendeeSignature();
     renderNext();
   }));
@@ -2201,9 +2198,7 @@ function renderSessions() {
                 ${['in', 'maybe', 'out'].map((v) => `<option value="${v}"${a.state === v ? ' selected' : ''}>${ATTEND_LABEL[v]}</option>`).join('')}
               </select>${hint ? `<small class="attend-src">${esc(hint)}</small>` : ''}</td>`;
             }).join('')}
-            <td class="session-crew"><span>${crew.length} of ${members.length}</span>
-              <button type="button" class="btn btn-sm btn-ghost" data-use-crew="${s.key}"
-                ${crew.length ? '' : 'disabled'}>Rank games for them</button></td>
+            <td class="session-crew"><span>${crew.length} of ${members.length}</span></td>
           </tr>`;
         }).join('')}</tbody></table></div>
         ${sessions.length > SESSION_ROWS ? `<button type="button" class="link-btn session-more" aria-expanded="${sessionsExpanded}">${
@@ -2221,14 +2216,6 @@ function renderSessions() {
       $$('#session-grid [data-edit-session]').forEach((b) => b.addEventListener('click', () => openSessionDialog(b.dataset.editSession)));
       $$('#session-grid [data-poll-new]').forEach((b) => b.addEventListener('click', () => openPollCreate(b.dataset.pollNew)));
       $$('#session-grid [data-poll-open]').forEach((b) => b.addEventListener('click', () => openPollDialog(Number(b.dataset.pollOpen))));
-      $$('#session-grid [data-use-crew]').forEach((b) => b.addEventListener('click', () => {
-        const session = upcomingSessions().find((s) => s.key === b.dataset.useCrew);
-        if (!session) return;
-        state.nextAttendees = crewOf(session);
-        state.crewFrom = session.key;
-        renderNext();
-        $('#pn-attendees').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }));
     }
   }
   if (rule) renderAway();
@@ -2626,11 +2613,7 @@ function renderCrewNote() {
   const session = nextSession();
   if (!session) { note.hidden = true; return; }
   note.hidden = false;
-  const crewSession = state.crewFrom && upcomingSessions().find((s) => s.key === state.crewFrom && !s.cancelled);
-  if (crewSession) {
-    note.innerHTML = `Selected from ${esc(sessionDay(crewSession.startsAt))}'s session.
-      <button type="button" class="link-btn" data-crew-reset>Back to the next session</button>`;
-  } else if (state.nextAttendees) {
+  if (state.nextAttendees) {
     note.innerHTML = `Your own selection.
       <button type="button" class="link-btn" data-crew-reset>Use the next session's crew</button>`;
   } else {
@@ -2642,7 +2625,6 @@ function renderCrewNote() {
   }
   $('[data-crew-reset]', note)?.addEventListener('click', () => {
     state.nextAttendees = null;
-    state.crewFrom = null;
     renderNext();
   });
 }
