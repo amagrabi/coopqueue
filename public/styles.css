@@ -403,6 +403,42 @@ kbd {
 .session-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 #session-dialog { width: min(480px, calc(100vw - 32px)); }
 
+.poll-list { display: grid; gap: 8px; margin: 0 0 16px; }
+.poll-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); font-size: 13.5px;
+}
+.poll-card.is-open { border-color: rgba(57,135,229,.45); }
+.poll-card-sub { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-secondary); }
+.poll-todo { color: #f2d79a; }
+.poll-slots { display: grid; gap: 10px; margin-bottom: 10px; }
+.poll-slot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.poll-slot .detail-field { flex: 1 1 140px; }
+.pc-cantmake { margin-top: 14px; }
+#poll-create-dialog { width: min(520px, calc(100vw - 32px)); }
+.poll-share {
+  margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface-2);
+}
+.poll-share.is-new { border-color: rgba(12,163,12,.5); }
+.poll-share label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.poll-share-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.poll-share-row .input { flex: 1 1 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.poll-table tr.is-best th, .poll-table tr.is-chosen th { color: #8fe08f; }
+.session-table tbody th small.poll-best { color: #8fe08f; }
+.vote { display: inline-block; min-width: 2.5em; font-size: 12.5px; color: var(--text-muted); }
+.vote-yes { color: #8fe08f; }
+.vote-maybe { color: #f2d79a; }
+.vote-no { color: #f0a3a3; }
+select.vote-yes { background: rgba(12,163,12,.14); border-color: rgba(12,163,12,.45); }
+select.vote-maybe { background: rgba(250,178,25,.12); border-color: rgba(250,178,25,.42); }
+select.vote-no { background: rgba(208,59,59,.16); border-color: rgba(208,59,59,.45); }
+.poll-table .session-crew .btn { display: block; margin: 4px 0 0; }
+.poll-table tbody th { white-space: normal; min-width: 120px; max-width: 220px; }
+.poll-add { margin-top: 12px; }
+.poll-add summary { cursor: pointer; font-size: 13.5px; color: var(--text-secondary); margin-bottom: 8px; }
+
 .away-block { margin-top: 14px; }
 .away-block summary { cursor: pointer; font-size: 13.5px; color: var(--text-secondary); }
 .away-block[open] summary { margin-bottom: 10px; }

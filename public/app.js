@@ -295,10 +295,12 @@ async function boot() {
   try {
     me = await api('/api/me');
   } catch {
-    // Not signed in. Keep any invite code so it survives the Steam round-trip.
-    const join = params.get('join');
-    if (join) $$('#landing a[href^="/api/auth/steam"]').forEach((a) => {
-      a.href = `/api/auth/steam?join=${encodeURIComponent(join)}`;
+    // Not signed in. Keep any invite code or poll link so it survives the Steam
+    // round-trip; the server re-validates both before redirecting back.
+    const carry = new URLSearchParams();
+    for (const name of ['join', 'poll']) if (params.get(name)) carry.set(name, params.get(name));
+    if ([...carry].length) $$('#landing a[href^="/api/auth/steam"]').forEach((a) => {
+      a.href = `/api/auth/steam?${carry}`;
     });
     showLanding();
     return;
@@ -324,8 +326,18 @@ async function boot() {
     }
   }
 
+  // Arrived via a poll link: open that workspace's Play next, then the poll.
+  const pollMatch = /^([a-z0-9-]{1,64})\.([1-9]\d{0,9})$/.exec(params.get('poll') || '');
+  if (params.get('poll')) history.replaceState(null, '', '/');
+  if (pollMatch && !state.groups.some((g) => g.slug === pollMatch[1])) {
+    toast("That poll is in a group you're not in yet. Ask for the group's invite link first.");
+  } else if (pollMatch) {
+    location.hash = `#/g/${pollMatch[1]}/next`;
+  }
+
   if (!state.groups.length) return showOnboard();
   await openFromHash();
+  if (pollMatch && state.group?.slug === pollMatch[1] && !$('#app').hidden) openPollDialog(Number(pollMatch[2]));
 }
 
 function showLanding(message) {
@@ -562,7 +574,7 @@ async function loadGroup(expectedSlug = state.group?.slug) {
   state.schedule = schedule;
   scheduleFetchedAt = Date.now();
   // Its session key belongs to the workspace being left.
-  if ($('#session-dialog').open) $('#session-dialog').close();
+  for (const id of ['#session-dialog', '#poll-dialog', '#poll-create-dialog']) if ($(id).open) $(id).close();
   state.nextAttendees = null;
   state.crewFrom = null;
   state.replayFor = null;
@@ -1034,6 +1046,20 @@ function wireOnce() {
   $('#sd-cancel').addEventListener('click', () => void changeSession('cancel'));
   $('#sd-restore').addEventListener('click', () => void changeSession('restore'));
   $('#sd-close').addEventListener('click', () => $('#session-dialog').close());
+  $('#pc-close').addEventListener('click', () => $('#poll-create-dialog').close());
+  $('#pc-more').addEventListener('click', () => {
+    // The day after the latest suggestion, never the session's own day: that is
+    // the one time the poll is asking to replace.
+    const session = upcomingSessions().find((x) => x.key === pollCreateKey);
+    const dates = $$('#pc-slots input[type="date"]').map((i) => i.value).filter(Boolean).sort();
+    let date = dates.length ? addDaysLocal(dates.at(-1), 1) : '';
+    if (date && date === session?.date) date = addDaysLocal(date, 1);
+    const last = $$('#pc-slots .poll-slot').at(-1);
+    addPollSlotRow(date, last ? $('input[type="time"]', last).value : undefined);
+    $$('#pc-slots input[type="date"]').at(-1)?.focus();
+  });
+  $('#pc-create').addEventListener('click', () => void createPoll());
+  $('#pd-close').addEventListener('click', () => $('#poll-dialog').close());
   $('#hide-ea').addEventListener('change', renderNext);
   $('#hide-unreleased').addEventListener('change', renderNext);
   $('#pn-budget').addEventListener('input', renderNext);
@@ -2030,6 +2056,8 @@ async function refreshSchedule(force = false) {
   state.schedule = data;
   renderSessionStrip();
   if (state.view === 'next') renderNext();
+  // Not while a select inside it is being used; pollAction repaints after its own write.
+  if ($('#poll-dialog').open && !$('#poll-dialog').contains(document.activeElement)) renderPollDialog();
   if (state.view === 'members' && state.cache.members?.slug === slug) {
     renderScheduleSettings(state.group.role === 'owner');
   }
@@ -2065,6 +2093,10 @@ function renderSessionStrip() {
   const mine = attendOf(session, state.me.steamId).state;
   // A called-off week before the next session is the news people most need to see.
   const off = upcomingSessions().filter((s) => s.cancelled && s.startsAt < session.startsAt);
+  // Any open poll is news, whichever session it is about; the one with the most
+  // unanswered options for this viewer is the one to surface.
+  const poll = pollsNow().filter((p) => p.status === 'open')
+    .sort((a, b) => pollUnanswered(b) - pollUnanswered(a) || a.replacesStartsAt - b.replacesStartsAt)[0];
   strip.hidden = false;
   strip.innerHTML = `
     <span class="strip-label">${live ? 'Playing now' : 'Next session'}</span>
@@ -2080,8 +2112,13 @@ function renderSessionStrip() {
         ${['in', 'maybe', 'out'].map((a) => `<button type="button" class="seg${mine === a ? ' is-on' : ''}"
           data-strip-answer="${a}" aria-pressed="${mine === a}">${ATTEND_LABEL[a]}</button>`).join('')}
       </span>
+      ${poll ? `<button type="button" class="btn btn-sm${pollUnanswered(poll) ? ' btn-primary' : ''}" data-strip-poll="${poll.id}">${
+        pollUnanswered(poll) ? 'Answer poll' : 'Poll'}: ${esc(sessionDay(poll.replacesStartsAt))}</button>`
+        : mine === 'out' ? '<button type="button" class="btn btn-sm" data-strip-suggest>Suggest other days</button>' : ''}
       <button type="button" class="btn btn-sm btn-ghost" data-strip-schedule>Schedule</button>
     </span>`;
+  $('[data-strip-poll]', strip)?.addEventListener('click', (e) => openPollDialog(Number(e.currentTarget.dataset.stripPoll)));
+  $('[data-strip-suggest]', strip)?.addEventListener('click', () => openPollCreate(session.key));
   $$('[data-strip-answer]', strip).forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.stripAnswer === mine) return;
     $$('[data-strip-answer]', strip).forEach((x) => { x.disabled = true; });
@@ -2114,12 +2151,13 @@ function renderSessions() {
   const sessions = upcomingSessions();
   // Rebuilding on every Play next repaint (the budget slider fires per pixel)
   // would also throw away the focus of a select somebody is using.
-  const signature = JSON.stringify([state.group.slug, state.members.map((m) => [m.steam_id, m.short_name]), rule, sessions, sched.canEdit]);
+  const signature = JSON.stringify([state.group.slug, state.members.map((m) => [m.steam_id, m.short_name]), rule, sessions, sched.canEdit, sched.polls]);
   if (signature !== sessionSignature) {
     sessionSignature = signature;
     $('#session-rule').textContent = rule ? ruleText(rule) : '';
     $('#session-sub').hidden = !rule;
     $('#away-block').hidden = !rule;
+    if (rule) renderPollList(); else $('#poll-list').hidden = true;
     if (!rule) {
       $('#session-grid').innerHTML = `<p class="session-empty">No regular session yet. ${sched.canEdit
         ? 'Set one up and everyone sees when the next one is, and who can make it.</p><button type="button" class="btn btn-sm" data-goto-schedule>Set a regular session</button>'
@@ -2139,8 +2177,12 @@ function renderSessions() {
         <tbody>${sessions.map((s, i) => {
           const hide = i >= SESSION_ROWS && !sessionsExpanded ? ' hidden' : '';
           const by = s.changedBy ? ` by ${esc(nameOf(s.changedBy))}` : '';
-          const edit = sched.canEdit ? `<button type="button" class="link-btn session-edit" data-edit-session="${s.key}"
-            aria-label="Change the ${esc(sessionDay(s.startsAt))} session">Change</button>` : '';
+          const pollHere = openPollFor(s.key);
+          const edit = `${sched.canEdit ? `<button type="button" class="link-btn session-edit" data-edit-session="${s.key}"
+            aria-label="Change the ${esc(sessionDay(s.startsAt))} session">Change</button>` : ''}${s.cancelled ? ''
+            : pollHere ? `<button type="button" class="link-btn session-edit" data-poll-open="${pollHere.id}">Poll open</button>`
+            : `<button type="button" class="link-btn session-edit" data-poll-new="${s.key}"
+                aria-label="Suggest other times for ${esc(sessionDay(s.startsAt))}">Suggest other days</button>`}`;
           if (s.cancelled) {
             return `<tr class="is-cancelled"${hide}>
               <th scope="row"><s>${esc(sessionWhen(s.startsAt))}</s><small>cancelled${by}</small>${edit}</th>
@@ -2177,6 +2219,8 @@ function renderSessions() {
         void setAttendance(sel.dataset.key, sel.dataset.member, sel.value);
       }));
       $$('#session-grid [data-edit-session]').forEach((b) => b.addEventListener('click', () => openSessionDialog(b.dataset.editSession)));
+      $$('#session-grid [data-poll-new]').forEach((b) => b.addEventListener('click', () => openPollCreate(b.dataset.pollNew)));
+      $$('#session-grid [data-poll-open]').forEach((b) => b.addEventListener('click', () => openPollDialog(Number(b.dataset.pollOpen))));
       $$('#session-grid [data-use-crew]').forEach((b) => b.addEventListener('click', () => {
         const session = upcomingSessions().find((s) => s.key === b.dataset.useCrew);
         if (!session) return;
@@ -2244,6 +2288,279 @@ async function changeSession(action) {
   sessionSignature = '';
   renderSessionStrip();
   if (state.view === 'next') renderNext();
+}
+
+/* ─────────────────────────── reschedule polls ─────────────────────────── */
+/* "I can't make Tuesday — would any of these work instead?" Anyone starts one and
+   shares the link; everyone marks the times; whoever started it (or the owner)
+   settles it, which moves or cancels the session exactly like the owner's direct
+   change. The link is a query parameter because Steam's login drops fragments. */
+const POLL_ANSWER = { yes: 'Yes', maybe: 'Maybe', no: 'No' };
+const pollsNow = () => state.schedule?.polls || [];
+const openPollFor = (key) => pollsNow().find((p) => p.key === key && p.status === 'open') || null;
+const pollLink = (poll) => `${location.origin}/?poll=${encodeURIComponent(state.group.slug)}.${poll.id}`;
+const canSettle = (poll) => poll.createdBy === state.me.steamId || state.group.role === 'owner';
+/** Options the viewer has not answered yet; the strip's nudge. Never the starter's
+    own poll: they answered by suggesting the times. */
+const pollUnanswered = (poll) => poll.createdBy === state.me.steamId ? 0
+  : poll.options.filter((o) => !o.votes[state.me.steamId]).length;
+
+function optionLabel(poll, option) {
+  if (option.kind === 'slot') return sessionWhen(option.startsAt);
+  const day = sessionWhen(poll.replacesStartsAt);
+  if (option.kind === 'skip') return `Skip this week (no ${sessionDay(poll.replacesStartsAt)} session)`;
+  const out = state.members.map((m) => m.steam_id).filter((id) => id === poll.createdBy);
+  return `Keep ${day}${out.length ? ` without ${nameList(out)}` : ''}`;
+}
+
+function pollOutcome(poll) {
+  const option = poll.options.find((o) => o.id === poll.decidedOption);
+  if (poll.status === 'withdrawn') return 'Withdrawn';
+  if (poll.status === 'expired') return 'Closed without a decision — the session stayed as planned';
+  if (!option) return '';
+  const by = poll.decidedBy ? ` by ${nameOf(poll.decidedBy)}` : '';
+  if (option.kind === 'slot') return `Moved to ${sessionWhen(option.startsAt)}${by}`;
+  if (option.kind === 'skip') return `Skipped this week${by}`;
+  return `Playing as planned${by}`;
+}
+
+/** The poll summaries above the session table: open ones first, then recent results. */
+function renderPollList() {
+  const box = $('#poll-list');
+  const polls = pollsNow().filter((p) => p.status === 'open'
+    || (p.status !== 'withdrawn' && p.replacesStartsAt > Date.now() - 2 * 86400000));
+  box.hidden = !polls.length;
+  box.innerHTML = polls.map((p) => {
+    const best = p.options.find((o) => o.id === p.best);
+    const open = p.status === 'open';
+    const todo = open ? pollUnanswered(p) : 0;
+    return `<div class="poll-card${open ? ' is-open' : ''}">
+      <div>
+        <strong>${esc(nameOf(p.createdBy))} can't make ${esc(sessionDay(p.replacesStartsAt))}</strong>
+        <span class="poll-card-sub">${open
+          ? `${best ? `Best so far: ${esc(optionLabel(p, best))} · ${best.yes} yes` : 'No answers yet'}${
+            todo ? ` · <span class="poll-todo">${todo} waiting for your answer</span>` : ''}`
+          : esc(pollOutcome(p))}</span>
+      </div>
+      <button type="button" class="btn btn-sm${open && todo ? ' btn-primary' : ''}" data-poll-open="${p.id}">${open ? (todo ? 'Answer' : 'Open') : 'View'}</button>
+    </div>`;
+  }).join('');
+  $$('[data-poll-open]', box).forEach((b) => b.addEventListener('click', () => openPollDialog(Number(b.dataset.pollOpen))));
+}
+
+let pollCreateKey = null;
+function openPollCreate(key) {
+  const session = upcomingSessions().find((s) => s.key === key);
+  const rule = state.schedule?.schedule;
+  if (!session || !rule) return;
+  const existing = openPollFor(key);
+  if (existing) return openPollDialog(existing.id);
+  pollCreateKey = key;
+  $('#poll-create-title').textContent = `Suggest other times for ${sessionDay(session.startsAt)}`;
+  $('#pc-slots').innerHTML = '';
+  // Two starting rows on the days either side, at the usual time: the common case
+  // is "a day earlier or later", and editing beats starting from blank inputs.
+  for (const offset of [1, -1]) addPollSlotRow(addDaysLocal(session.date, offset), session.time);
+  $('#pc-zone').hidden = rule.timezone === viewerZone();
+  $('#pc-zone').textContent = `Times are ${rule.timezone.replace(/_/g, ' ')} time, like the regular session.`;
+  $('#pc-cantmake').checked = true;
+  $('#pc-status').textContent = '';
+  $('#pc-create').disabled = false;
+  $('#pc-more').hidden = false;
+  $('#poll-create-dialog').showModal();
+  $('#pc-slots input[type="date"]')?.focus();
+}
+
+const addDaysLocal = (date, n) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+function addPollSlotRow(date = '', time = state.schedule?.schedule?.time || '20:30') {
+  const rows = $$('#pc-slots .poll-slot');
+  if (rows.length >= 5) return;
+  const n = rows.length + 1;
+  const row = document.createElement('div');
+  row.className = 'poll-slot';
+  row.innerHTML = `
+    <div class="detail-field"><label for="pc-date-${n}">Option ${n}</label>
+      <input type="date" id="pc-date-${n}" class="input" value="${esc(date)}"></div>
+    <div class="detail-field"><label for="pc-time-${n}">Starts at</label>
+      <input type="time" id="pc-time-${n}" class="input" value="${esc(time)}"></div>
+    <button type="button" class="btn btn-icon" aria-label="Remove option ${n}">✕</button>`;
+  $('button', row).addEventListener('click', () => { row.remove(); $('#pc-more').hidden = false; });
+  $('#pc-slots').append(row);
+  $('#pc-more').hidden = $$('#pc-slots .poll-slot').length >= 5;
+}
+
+async function createPoll() {
+  const key = pollCreateKey;
+  const slug = state.group.slug;
+  const slots = $$('#pc-slots .poll-slot').map((row) => ({
+    date: $('input[type="date"]', row).value, time: $('input[type="time"]', row).value,
+  })).filter((s) => s.date && s.time);
+  if (!slots.length) { $('#pc-status').textContent = 'Add at least one time.'; return; }
+  const session = upcomingSessions().find((x) => x.key === key);
+  const same = slots.findIndex((x) => x.date === session?.date && x.time === session?.time);
+  if (same >= 0) {
+    $('#pc-status').textContent = `Option ${same + 1} is the session's current time — pick a different day or time.`;
+    return;
+  }
+  $('#pc-create').disabled = true;
+  let r;
+  try {
+    r = await gapiFor(slug, '/polls', { method: 'POST', body: {
+      action: 'create', key, slots, cantMake: $('#pc-cantmake').checked,
+    } });
+  } catch (e) {
+    $('#pc-status').textContent = e.message;
+    $('#pc-create').disabled = false;
+    return;
+  }
+  if (state.group?.slug !== slug) return;
+  $('#poll-create-dialog').close();
+  await afterPollWrite();
+  openPollDialog(r.pollId, { justCreated: true });
+}
+
+async function afterPollWrite() {
+  await refreshSchedule(true);
+  sessionSignature = '';
+  renderSessionStrip();
+  if (state.view === 'next') renderNext();
+}
+
+let pollDialogId = null;
+let pollJustCreated = false;
+function openPollDialog(id, { justCreated = false } = {}) {
+  const poll = pollsNow().find((p) => p.id === id);
+  if (!poll) { toast('That poll has ended or no longer exists'); return; }
+  pollDialogId = id;
+  pollJustCreated = justCreated;
+  renderPollDialog();
+  if (!$('#poll-dialog').open) $('#poll-dialog').showModal();
+  $('#poll-body select, #poll-body button')?.focus();
+}
+
+function renderPollDialog(focus) {
+  const poll = pollsNow().find((p) => p.id === pollDialogId);
+  if (!poll) { if ($('#poll-dialog').open) $('#poll-dialog').close(); return; }
+  const open = poll.status === 'open';
+  // The viewer's own column first: most people arrive from a chat link on a phone,
+  // where every other column is a sideways scroll away.
+  const members = [...state.members].sort((a, b) =>
+    (b.steam_id === state.me.steamId) - (a.steam_id === state.me.steamId));
+  const settle = open && canSettle(poll);
+  const link = pollLink(poll);
+  const day = sessionDay(poll.replacesStartsAt);
+  $('#poll-title').textContent = `Instead of ${sessionWhen(poll.replacesStartsAt)}`;
+  const share = poll.createdBy === state.me.steamId
+    ? `Can't make ${day}. Which of these would work for you instead? ${link}`
+    : `${nameOf(poll.createdBy)} can't make ${day}. Which of these would work instead? ${link}`;
+  $('#poll-body').innerHTML = `
+    <p id="poll-sub" class="panel-sub">${open
+      ? `${esc(capitalise(nameList([poll.createdBy])))} can't make it. Mark which of these work${
+        settle ? ', then choose one when everyone has answered' : ''}. Nothing changes until ${
+        poll.createdBy === state.me.steamId ? 'you or the owner choose' : `${esc(nameOf(poll.createdBy))} or the owner chooses`}.`
+      : esc(pollOutcome(poll))}</p>
+    ${open ? `<div class="poll-share${pollJustCreated ? ' is-new' : ''}">
+      <label for="pd-link">${pollJustCreated ? 'Poll started — send this to the group' : 'Link for the group chat'}</label>
+      <div class="poll-share-row">
+        <input id="pd-link" class="input" readonly value="${esc(link)}">
+        <button type="button" class="btn btn-sm btn-primary" id="pd-copy">Copy message</button>
+        ${navigator.share ? '<button type="button" class="btn btn-sm" id="pd-share">Share…</button>' : ''}
+      </div>
+      <p class="field-help">Everyone needs to be in this group on CoopQueue to answer.</p>
+    </div>` : ''}
+    <div class="session-scroll"><table class="session-table poll-table">
+      <thead><tr><th scope="col">Option</th>${members.map((m) => `
+        <th scope="col"><span class="session-person"><i class="dot" style="background:${colorOf(m.steam_id)}"></i>${esc(m.short_name)}</span></th>`).join('')}
+        <th scope="col">Works for</th></tr></thead>
+      <tbody>${poll.options.map((o) => {
+        const best = o.id === poll.best;
+        const chosen = o.id === poll.decidedOption;
+        const started = o.kind === 'slot' && o.startsAt <= Date.now();
+        return `<tr class="${best ? 'is-best' : ''}${chosen ? ' is-chosen' : ''}">
+          <th scope="row">${esc(optionLabel(poll, o))}${best ? '<small class="poll-best">best so far</small>' : ''}${
+            chosen ? '<small class="poll-best">chosen</small>' : ''}${
+            o.kind === 'slot' && o.addedBy && o.addedBy !== poll.createdBy ? `<small>added by ${esc(nameOf(o.addedBy))}</small>` : ''}</th>
+          ${members.map((m) => {
+            const v = o.votes[m.steam_id];
+            const by = v?.setBy && v.setBy !== m.steam_id ? `<small class="attend-src">by ${esc(nameOf(v.setBy))}</small>` : '';
+            if (!open || started) return `<td><span class="vote vote-${v?.answer || 'none'}">${v ? POLL_ANSWER[v.answer] : '–'}</span>${by}</td>`;
+            return `<td><select class="attend vote-select vote-${v?.answer || 'none'}" data-option="${o.id}" data-member="${esc(m.steam_id)}"
+                aria-label="${esc(m.short_name)}: ${esc(optionLabel(poll, o))}">
+              <option value=""${v ? '' : ' selected'}>–</option>
+              ${['yes', 'maybe', 'no'].map((a) => `<option value="${a}"${v?.answer === a ? ' selected' : ''}>${POLL_ANSWER[a]}</option>`).join('')}
+            </select>${by}</td>`;
+          }).join('')}
+          <td class="session-crew"><span>${o.yes} yes${o.maybe ? ` · ${o.maybe} maybe` : ''}</span>${
+            settle && !started ? `<button type="button" class="btn btn-sm${best ? ' btn-primary' : ''}" data-decide="${o.id}">Choose</button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    ${open && poll.options.filter((o) => o.kind === 'slot').length < 6 ? `
+      <details class="poll-add"><summary>Suggest another time</summary>
+        <div class="poll-slot">
+          <div class="detail-field"><label for="pd-add-date">Day</label><input type="date" id="pd-add-date" class="input"></div>
+          <div class="detail-field"><label for="pd-add-time">Starts at</label>
+            <input type="time" id="pd-add-time" class="input" value="${esc(state.schedule?.schedule?.time || '20:30')}"></div>
+          <button type="button" class="btn btn-sm" id="pd-add">Add</button>
+        </div>
+      </details>` : ''}
+    <p class="add-status" id="pd-status" role="status"></p>
+    ${settle ? `<div class="session-dialog-actions"><button type="button" class="btn btn-ghost" id="pd-withdraw">Withdraw poll</button></div>` : ''}`;
+
+  $('#pd-copy')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(share); toast('Copied — paste it into your group chat'); }
+    catch { $('#pd-link').select(); toast('Copy the selected link'); }
+  });
+  $('#pd-share')?.addEventListener('click', () => { navigator.share({ text: share }).catch(() => {}); });
+  $$('#poll-body select.vote-select').forEach((sel) => sel.addEventListener('change', () => {
+    sel.disabled = true;
+    void pollAction({ action: 'vote', optionId: Number(sel.dataset.option), steamId: sel.dataset.member,
+                      answer: sel.value || null }, `[data-option="${sel.dataset.option}"][data-member="${CSS.escape(sel.dataset.member)}"]`);
+  }));
+  $$('#poll-body [data-decide]').forEach((b) => b.addEventListener('click', () => {
+    const option = poll.options.find((o) => o.id === Number(b.dataset.decide));
+    const consequence = option.kind === 'slot'
+      ? `move this session to ${optionLabel(poll, option)}. Whoever said no is marked as not coming`
+      : option.kind === 'skip' ? 'cancel this session' : 'keep the session as planned';
+    if (!confirm(`This will ${consequence} and close the poll. Continue?`)) return;
+    void pollAction({ action: 'decide', pollId: poll.id, optionId: option.id }, null, () => {
+      toast(option.kind === 'slot' ? `Moved to ${optionLabel(poll, option)}`
+        : option.kind === 'skip' ? 'Session cancelled' : 'Playing as planned');
+    });
+  }));
+  $('#pd-add')?.addEventListener('click', () => {
+    const date = $('#pd-add-date').value;
+    const time = $('#pd-add-time').value;
+    if (!date || !time) { $('#pd-status').textContent = 'Pick a day and a time.'; return; }
+    void pollAction({ action: 'add', pollId: poll.id, date, time }, '#pd-add-date');
+  });
+  $('#pd-withdraw')?.addEventListener('click', () => {
+    if (!confirm('Withdraw this poll? The session stays as it is.')) return;
+    void pollAction({ action: 'withdraw', pollId: poll.id }, null, () => toast('Poll withdrawn'));
+  });
+  if (focus) $(focus, $('#poll-body'))?.focus();
+}
+
+async function pollAction(body, refocus, done) {
+  const slug = state.group.slug;
+  $$('#poll-body button').forEach((b) => { b.disabled = true; });
+  try {
+    await gapiFor(slug, '/polls', { method: 'POST', body });
+  } catch (e) {
+    if (state.group?.slug !== slug) return;
+    renderPollDialog(refocus);
+    $('#pd-status').textContent = e.message;
+    return;
+  }
+  if (state.group?.slug !== slug) return;
+  pollJustCreated = false;
+  done?.();
+  await afterPollWrite();
+  renderPollDialog(refocus);
 }
 
 /* Away ranges cover every session in them, including sessions a later rule change

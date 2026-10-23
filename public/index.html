@@ -9,7 +9,7 @@
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://coopqueue.app/">
 <!-- Fresh URLs bypass the four-hour copies cached before these assets revalidated. -->
-<link rel="stylesheet" href="/styles.css?v=2026-10-23-2">
+<link rel="stylesheet" href="/styles.css?v=2026-10-23-3">
 
 <!-- Icons carry a dark field rather than transparency on purpose: the three figures
      inside the controller are white, so a transparent icon leaves them invisible
@@ -504,6 +504,7 @@
         </div>
         <p class="panel-sub" id="session-sub">Everyone counts as coming unless they say otherwise. Anyone
           can update anyone's answer — handy when somebody said it in chat instead.</p>
+        <div id="poll-list" class="poll-list" hidden></div>
         <div id="session-grid"></div>
         <details class="away-block" id="away-block">
           <summary>Away for a while?</summary>
@@ -978,12 +979,42 @@
   </div>
 </dialog>
 
+<!-- Any member: "I can't make it — would any of these work instead?" -->
+<dialog id="poll-create-dialog" class="dialog" aria-labelledby="poll-create-title">
+  <div class="dialog-head">
+    <h3 id="poll-create-title">Suggest other times</h3>
+    <button class="btn btn-icon" type="button" id="pc-close" aria-label="Close">✕</button>
+  </div>
+  <div class="dialog-body">
+    <p class="panel-sub" id="pc-sub">Add the times that work for you. Everyone else marks which of them work for
+      them too, and the poll also asks whether to play as planned without you or skip the week.</p>
+    <div id="pc-slots" class="poll-slots"></div>
+    <button class="link-btn" type="button" id="pc-more">+ Add another time</button>
+    <p class="field-help" id="pc-zone" hidden></p>
+    <label class="toggle pc-cantmake"><input type="checkbox" id="pc-cantmake" checked>
+      <span>I can't make the original time</span></label>
+    <p class="add-status" id="pc-status" role="status"></p>
+    <div class="session-dialog-actions">
+      <button class="btn btn-primary" type="button" id="pc-create">Start poll</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- A poll: answer, share the link, and (starter or owner) settle it. -->
+<dialog id="poll-dialog" class="dialog dialog-wide" aria-labelledby="poll-title" aria-describedby="poll-sub">
+  <div class="dialog-head">
+    <h3 id="poll-title">Reschedule poll</h3>
+    <button class="btn btn-icon" type="button" id="pd-close" aria-label="Close">✕</button>
+  </div>
+  <div class="dialog-body" id="poll-body"></div>
+</dialog>
+
 <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
 <!-- Steam serves trailers only as segmented HLS now, which nothing but Safari
      plays in a bare <video>. Vendored rather than pulled from a CDN so the site
      stays a self-contained static bundle. app.js loads it only when a rating card
      actually needs an HLS trailer; the rest of the app does not pay that cost. -->
-<script src="/app.js?v=2026-10-23-2" type="module"></script>
+<script src="/app.js?v=2026-10-23-3" type="module"></script>
 </body>
 </html>

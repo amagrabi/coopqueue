@@ -91,8 +91,16 @@ crew. Times show in each viewer's own timezone and stay on the group's wall-cloc
 time through daylight-saving changes. When the group has already agreed on a
 one-off change, the owner can **move** a single session to another day or time, or
 **cancel** it, without changing the regular slot; everyone sees "moved from Tue 27
-Oct" or a struck-through week, and the next one is back on the usual day. Personal
-workspaces have no schedule.
+Oct" or a struck-through week, and the next one is back on the usual day.
+
+**Reschedule polls.** Can't make a session? **Suggest other days** offers a few
+times that work for you and gives you a link to paste into the group chat. Everyone
+marks each time Yes, Maybe or No — and also whether to play as planned without you
+or skip the week. Whoever started the poll, or the owner, picks the result; a new
+time moves that one session and whoever said no is marked as not coming. Nothing
+changes until somebody picks, so an unanswered poll leaves the session as it was.
+The link only works for members of the group. Personal workspaces have no
+schedule.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
@@ -369,7 +377,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 266 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 282 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 
@@ -403,6 +411,7 @@ functions/
       steam-import.js            selective library/wishlist import
       play-night.js              attendee-specific backlog ranking
       schedule.js                regular session, attendance and away ranges
+      polls.js                   reschedule polls: create, vote, add a time, settle
       export.js                  owner-only JSON and CSV downloads
       achievements.js            cached per-game Trophy relay
       rate.js  skip.js  stats.js  claim.js  members.js  enrich.js
@@ -412,6 +421,7 @@ lib/
   history.js   missing-fact prompts and bounded automatic suggestions
   stats.js     shared library-shape, genre, timeline and playtime aggregations
   schedule.js  session dates from the standing rule, timezone maths, attendance
+  polls.js     loading reschedule polls and picking the suggested option
   score.js     plain-mean scoring + viability
   ownership.js three-state Steam-library ownership
   steam.js     Steam Web API and store endpoints, cache-first
@@ -520,8 +530,6 @@ roughly in value order:
   group has members. Rating coverage is the app's core problem — in the original
   spreadsheet it ranged from 89% to 27% per person.
 - **Public read-only group pages**, also the cheapest growth loop the site has.
-- **Rescheduling.** "Can't make it" exists; the next step is turning it into a
-  decision: propose replacement slots, everyone marks which work, and the group
-  confirms play-anyway, move or skip for that one week. After that, a private
-  calendar (.ics) feed per member and a Discord webhook, so a moved session
-  reaches people who do not have the site open.
+- **Session reminders.** A private calendar (.ics) feed per member and a Discord
+  webhook, so a moved session or an open poll reaches people who do not have the
+  site open.

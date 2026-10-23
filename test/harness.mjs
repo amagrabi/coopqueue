@@ -23,6 +23,7 @@ import { activityFeed, markActivityRead, markActivityItemRead, statusActivity } 
 import { buildHistoryItems } from '../lib/history.js';
 import { buildLibraryStats, buildPersonalStats, PLAYED_OUTCOMES } from '../lib/stats.js';
 import * as scheduleRoute from '../functions/api/g/[slug]/schedule.js';
+import * as pollsRoute from '../functions/api/g/[slug]/polls.js';
 import { upcomingSessions, addDays } from '../lib/schedule.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -387,6 +388,21 @@ if (SCENARIO === 'member' && process.env.SCHEDULE !== 'none') {
                                VALUES (1,?,?,?,?,?)`);
   override.run(second.date, addDays(second.date, -1), '20:00', 0, ME);
   override.run(fourth.date, null, null, 1, ME);
+  // Dave can't make the next one and has asked whether the day before or after
+  // works instead. Leo has answered; Ama (the viewer) has not, so the strip nudges.
+  db.prepare(`INSERT INTO session_polls (id,group_id,session_key,replaces_date,replaces_time,created_by)
+              VALUES (1,1,?,?,?,'seed:1:dave')`).run(next.date, next.date, rule.time);
+  const option = db.prepare('INSERT INTO poll_options (id,poll_id,kind,slot_date,slot_time,added_by) VALUES (?,1,?,?,?,?)');
+  option.run(1, 'slot', addDays(next.date, -1), '20:30', 'seed:1:dave');
+  option.run(2, 'slot', addDays(next.date, 2), '19:00', 'seed:1:dave');
+  option.run(3, 'asplanned', null, null, 'seed:1:dave');
+  option.run(4, 'skip', null, null, 'seed:1:dave');
+  const vote = db.prepare('INSERT INTO poll_votes (option_id,group_id,steam_id,answer,set_by) VALUES (?,1,?,?,?)');
+  vote.run(1, 'seed:1:dave', 'yes', 'seed:1:dave');
+  vote.run(2, 'seed:1:dave', 'yes', 'seed:1:dave');
+  vote.run(1, 'seed:1:leo', 'yes', ME);
+  vote.run(2, 'seed:1:leo', 'no', ME);
+  vote.run(3, 'seed:1:leo', 'maybe', ME);
 }
 if (SCENARIO === 'member') {
   // Synthetic recent actions over the normal fixtures; production has no backfill.
@@ -1003,9 +1019,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, appid: Number(b.appid) });
     }
 
-    // The real handler over the same shim, so the local schedule is the shipped one.
-    if (sub === '/schedule') {
-      const handler = scheduleRoute[`onRequest${req.method[0]}${req.method.slice(1).toLowerCase()}`];
+    // The real handlers over the same shim, so the local schedule is the shipped one.
+    if (sub === '/schedule' || sub === '/polls') {
+      const route = sub === '/schedule' ? scheduleRoute : pollsRoute;
+      const handler = route[`onRequest${req.method[0]}${req.method.slice(1).toLowerCase()}`];
       if (!handler) return send(res, 405, { error: 'method not allowed' });
       const raw = await readBody(req);
       const request = new Request('http://x/', { method: req.method === 'GET' ? 'GET' : 'POST',

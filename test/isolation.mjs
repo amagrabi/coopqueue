@@ -3900,5 +3900,238 @@ await check('session override migration is additive and idempotent', () => withS
   return JSON.stringify(f.rows('session_overrides')) === before || 'replay changed overrides';
 }));
 
+console.log('\nReschedule polls');
+
+const pollsRoute = await import(path.join(SITE, 'functions/api/g/[slug]/polls.js'));
+const { carriedParams } = await import(path.join(SITE, 'lib/auth.js'));
+const { bestOption } = await import(path.join(SITE, 'lib/polls.js'));
+const poll = (data, input) => pollsRoute.onRequestPost({ env, data, request: req(input) });
+/** A Tuesday rule, the second upcoming session, and a poll Bob starts for it. */
+async function withPoll(f, slots) {
+  await f.put(f.a, TUESDAYS);
+  const [, one, two] = tuesdays();
+  const options = slots || [
+    { date: sched.addDays(one.key, -1), time: '20:30' },
+    { date: sched.addDays(one.key, 2), time: '19:00' },
+  ];
+  const created = await (await poll(f.b, { action: 'create', key: one.key, slots: options })).json();
+  const read = async (data = f.a) => (await f.get(data)).polls.find((p) => p.id === created.pollId);
+  return { one, two, pollId: created.pollId, read };
+}
+const optionOf = (p, kind, n = 0) => p.options.filter((o) => o.kind === kind)[n];
+
+await check('any member can start a poll; it lists their times plus "as planned" and "skip"', () => withSchedule(async (f) => {
+  const { one, pollId, read } = await withPoll(f);
+  const p = await read();
+  const slots = p.options.filter((o) => o.kind === 'slot');
+  const attendance = (await f.get(f.a)).sessions.find((s) => s.key === one.key).attendance[SCH_B];
+  return (pollId > 0 && p.status === 'open' && p.createdBy === SCH_B && slots.length === 2
+    && p.options.map((o) => o.kind).join() === 'slot,slot,asplanned,skip'
+    && slots.every((o) => o.votes[SCH_B]?.answer === 'yes') && p.best === null
+    && p.replacesStartsAt === one.startsAt && attendance.state === 'out')
+    || JSON.stringify({ pollId, p, attendance });
+}));
+
+await check('one open poll per session; a second start returns the existing one', () => withSchedule(async (f) => {
+  const { one, pollId } = await withPoll(f);
+  const again = await poll(f.a, { action: 'create', key: one.key, slots: [{ date: sched.addDays(one.key, 3), time: '20:00' }] });
+  const body = await again.json();
+  const count = sqlite.prepare('SELECT COUNT(*) AS n FROM session_polls WHERE group_id=5201').get().n;
+  return (again.status === 409 && body.pollId === pollId && count === 1) || JSON.stringify({ status: again.status, body, count });
+}));
+
+await check('poll times are validated and a refused poll writes nothing', () => withSchedule(async (f) => {
+  await f.put(f.a, TUESDAYS);
+  const [, one, two] = tuesdays();
+  const slot = (date, time = '20:30') => ({ date, time });
+  const cases = [
+    [], [1, 2, 3, 4, 5, 6].map((n) => slot(sched.addDays(one.key, n))),
+    [slot(sched.addDays(one.key, -30))], [slot(two.key)], [slot(one.key)],
+    [slot(sched.addDays(one.key, 1)), slot(sched.addDays(one.key, 1))], [slot('soon')], [slot(sched.addDays(one.key, 1), '7pm')],
+  ];
+  const statuses = [];
+  for (const slots of cases) statuses.push((await poll(f.b, { action: 'create', key: one.key, slots })).status);
+  await f.post(f.a, { action: 'cancel', key: two.key });
+  statuses.push((await poll(f.b, { action: 'create', key: two.key, slots: [slot(sched.addDays(two.key, 1))] })).status);
+  const rows = ['session_polls', 'session_rsvps'].map((t) => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE group_id=5201`).get().n);
+  return (statuses.join() === '400,400,400,409,409,400,400,400,409' && rows.join() === '0,0') || `${statuses.join()} rows ${rows.join()}`;
+}));
+
+await check('votes can be given for any member, are attributed, and can be cleared', () => withSchedule(async (f) => {
+  const { pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  await poll(f.a, { action: 'vote', optionId: first.id, answer: 'yes' });
+  await poll(f.a, { action: 'vote', optionId: first.id, steamId: 'seed:5201:zed', answer: 'maybe' });
+  const p = await read();
+  const v = optionOf(p, 'slot').votes;
+  await poll(f.a, { action: 'vote', optionId: first.id, answer: null });
+  const cleared = optionOf(await read(), 'slot').votes[SCH_A];
+  const outsider = await poll(f.a, { action: 'vote', optionId: first.id, steamId: SCH_C, answer: 'yes' });
+  const bad = await poll(f.a, { action: 'vote', optionId: first.id, answer: 'definitely' });
+  return (v[SCH_A].answer === 'yes' && v['seed:5201:zed'].answer === 'maybe' && v['seed:5201:zed'].setBy === SCH_A
+    && p.best === first.id && cleared === undefined && outsider.status === 400 && bad.status === 400 && pollId > 0)
+    || JSON.stringify({ v, best: p.best, cleared, outsider: outsider.status, bad: bad.status });
+}));
+
+await check("another group's poll options, polls and links are 404 and stay untouched", () => withSchedule(async (f) => {
+  const { pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  await f.put(f.other, TUESDAYS);
+  const statuses = [
+    (await poll(f.other, { action: 'vote', optionId: first.id, answer: 'no' })).status,
+    (await poll(f.other, { action: 'add', pollId, date: sched.addDays(first.date, 3), time: '20:00' })).status,
+    (await poll(f.other, { action: 'decide', pollId, optionId: first.id })).status,
+    (await poll(f.other, { action: 'withdraw', pollId })).status,
+  ];
+  const otherView = (await f.get(f.other)).polls;
+  const p = await read();
+  return (statuses.every((s) => s === 404) && otherView.length === 0 && p.status === 'open'
+    && p.options.length === 4 && Object.keys(optionOf(p, 'slot').votes).join() === SCH_B)
+    || JSON.stringify({ statuses, otherView, p });
+}));
+
+await check('any member can add a time, bounded and de-duplicated', () => withSchedule(async (f) => {
+  const { one, pollId, read } = await withPoll(f);
+  const add = (n, data = f.a) => poll(data, { action: 'add', pollId, date: sched.addDays(one.key, n), time: '21:00' });
+  const r = await add(3);
+  const dup = await add(3);
+  for (const n of [4, 5, 6]) await add(n);
+  const over = await add(9);
+  const p = await read();
+  const added = p.options.find((o) => o.date === sched.addDays(one.key, 3));
+  return (r.status === 200 && dup.status === 409 && over.status === 409
+    && p.options.filter((o) => o.kind === 'slot').length === 6 && added.addedBy === SCH_A
+    && added.votes[SCH_A].answer === 'yes') || JSON.stringify({ r: r.status, dup: dup.status, over: over.status });
+}));
+
+await check('only the starter or the owner can settle or withdraw a poll', () => withSchedule(async (f) => {
+  sqlite.prepare("INSERT INTO users (steam_id,display_name) VALUES ('76561198000520009','Dee')").run();
+  sqlite.prepare("INSERT INTO memberships (group_id,steam_id,short_name) VALUES (5201,'76561198000520009','Dee')").run();
+  const d = (await ctxFor('76561198000520009', 'schedule-team')).data;
+  const { pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  const decide = await poll(d, { action: 'decide', pollId, optionId: first.id });
+  const withdraw = await poll(d, { action: 'withdraw', pollId });
+  const still = (await read()).status;
+  const starter = await poll(f.b, { action: 'withdraw', pollId });
+  sqlite.prepare("DELETE FROM users WHERE steam_id='76561198000520009'").run();
+  return (decide.status === 403 && withdraw.status === 403 && still === 'open' && starter.status === 200)
+    || JSON.stringify({ decide: decide.status, withdraw: withdraw.status, still, starter: starter.status });
+}));
+
+await check('choosing a time moves the session and carries the votes into attendance', () => withSchedule(async (f) => {
+  const { one, two, pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  await poll(f.a, { action: 'vote', optionId: first.id, answer: 'no' });
+  await poll(f.a, { action: 'vote', optionId: first.id, steamId: 'seed:5201:zed', answer: 'maybe' });
+  await f.post(f.a, { action: 'rsvp', date: two.key, answer: 'out' });
+  const r = await poll(f.a, { action: 'decide', pollId, optionId: first.id });
+  const body = await f.get(f.a);
+  const s = body.sessions.find((x) => x.key === one.key);
+  const p = body.polls.find((x) => x.id === pollId);
+  const next = body.sessions.find((x) => x.key === two.key);
+  const vote = await poll(f.b, { action: 'vote', optionId: first.id, answer: 'no' });
+  return (r.status === 200 && s.moved && s.date === first.date && s.time === first.time
+    && s.attendance[SCH_A].state === 'out' && s.attendance['seed:5201:zed'].state === 'maybe'
+    && s.attendance[SCH_B].state === 'in' && p.status === 'decided' && p.decidedOption === first.id
+    && p.decidedBy === SCH_A && next.attendance[SCH_A].state === 'out' && vote.status === 409)
+    || JSON.stringify({ r: r.status, s, p, next: next.attendance, vote: vote.status });
+}));
+
+await check('"as planned" keeps the session and the starter out; "skip" cancels it', () => withSchedule(async (f) => {
+  const { one, two, pollId, read } = await withPoll(f);
+  await poll(f.b, { action: 'decide', pollId, optionId: optionOf(await read(), 'asplanned').id });
+  const kept = (await f.get(f.a)).sessions.find((s) => s.key === one.key);
+  const second = await (await poll(f.a, { action: 'create', key: two.key, slots: [{ date: sched.addDays(two.key, 1), time: '20:30' }] })).json();
+  const p2 = (await f.get(f.a)).polls.find((p) => p.id === second.pollId);
+  await poll(f.a, { action: 'decide', pollId: second.pollId, optionId: optionOf(p2, 'skip').id });
+  const skipped = (await f.get(f.a)).sessions.find((s) => s.key === two.key);
+  return (!kept.moved && !kept.cancelled && kept.attendance[SCH_B].state === 'out'
+    && skipped.cancelled && f.rows('session_rsvps').some((r) => r.session_date === two.key && r.answer === 'out'))
+    || JSON.stringify({ kept, skipped });
+}));
+
+await check('settling a time the owner already moved the session to just closes the poll', () => withSchedule(async (f) => {
+  const { one, pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  await f.post(f.a, { action: 'move', key: one.key, date: first.date, time: first.time });
+  await f.post(f.b, { action: 'rsvp', date: one.key, answer: 'maybe' });
+  const r = await poll(f.a, { action: 'decide', pollId, optionId: first.id });
+  const s = (await f.get(f.a)).sessions.find((x) => x.key === one.key);
+  return (r.status === 200 && s.date === first.date && s.attendance[SCH_B].state === 'maybe')
+    || JSON.stringify({ status: r.status, s });
+}));
+
+await check('a poll is read-only once its session is over', () => withSchedule(async (f) => {
+  const { pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  // Its session was yesterday, as far as the rule is concerned.
+  const yesterday = sched.addDays(sched.localDate('Europe/Berlin', Date.now()), -1);
+  sqlite.prepare('UPDATE session_polls SET session_key=? WHERE id=?').run(yesterday, pollId);
+  await f.put(f.a, DAILY);
+  const p = await read();
+  const vote = await poll(f.a, { action: 'vote', optionId: first.id, answer: 'yes' });
+  const decide = await poll(f.b, { action: 'decide', pollId, optionId: first.id });
+  return (p.status === 'expired' && p.best === null && vote.status === 409 && decide.status === 409)
+    || JSON.stringify({ status: p.status, vote: vote.status, decide: decide.status });
+}));
+
+await check('the suggestion ignores the starter\'s own votes and prefers more yes, fewer no', () => {
+  const o = (id, votes, startsAt = id) => ({ id, kind: 'slot', startsAt, votes,
+    yes: Object.values(votes).filter((v) => v.answer === 'yes').length,
+    no: Object.values(votes).filter((v) => v.answer === 'no').length,
+    maybe: Object.values(votes).filter((v) => v.answer === 'maybe').length });
+  const y = { answer: 'yes' }, n = { answer: 'no' };
+  const onlyStarter = bestOption([o(1, { s: y })], 0, 's');
+  const tie = bestOption([o(1, { s: y, a: y, b: n }, 10), o(2, { s: y, a: y }, 20)], 0, 's');
+  const started = bestOption([o(1, { a: y, b: y }, -5), o(2, { a: y }, 20)], 0, 's');
+  return (onlyStarter === null && tie === 2 && started === 2) || JSON.stringify({ onlyStarter, tie, started });
+});
+
+await check('claiming a placeholder carries its poll votes; leaving drops a member\'s votes', () => withSchedule(async (f) => {
+  const { pollId, read } = await withPoll(f);
+  const first = optionOf(await read(), 'slot');
+  await poll(f.a, { action: 'vote', optionId: first.id, steamId: 'seed:5201:zed', answer: 'no' });
+  sqlite.prepare("INSERT INTO memberships (group_id,steam_id,short_name) VALUES (5201,?,'Carol')").run(SCH_C);
+  await claimSeedIdentity(DB, 5201, SCH_C, 'seed:5201:zed');
+  const claimed = optionOf(await read(), 'slot').votes[SCH_C]?.answer;
+  sqlite.prepare('DELETE FROM memberships WHERE group_id=5201 AND steam_id=?').run(SCH_B);
+  const p = await read();
+  return (claimed === 'no' && !optionOf(p, 'slot').votes[SCH_B] && p.createdBy === SCH_B && pollId > 0)
+    || JSON.stringify({ claimed, votes: optionOf(p, 'slot').votes });
+}));
+
+await check('personal workspaces refuse polls', () => withSchedule(async (f) => {
+  const r = await poll(f.solo, { action: 'create', key: '2026-12-01', slots: [{ date: '2026-12-02', time: '20:00' }] });
+  return r.status === 409 || `got ${r.status}`;
+}));
+
+await check('poll migration is additive and idempotent; deleting a group removes its polls', async () => {
+  let before;
+  await withSchedule(async (f) => {
+    const { read } = await withPoll(f);
+    await poll(f.a, { action: 'vote', optionId: optionOf(await read(), 'slot').id, answer: 'yes' });
+    const snap = () => JSON.stringify(['session_polls', 'poll_options', 'poll_votes'].map((t) => sqlite.prepare(`SELECT * FROM ${t}`).all()));
+    before = snap();
+    const migration = fs.readFileSync(path.join(SITE, 'migrations/040-session-polls.sql'), 'utf8');
+    sqlite.exec(migration);
+    sqlite.exec(migration);
+    if (snap() !== before) before = 'CHANGED';
+  });
+  const left = ['session_polls', 'poll_options', 'poll_votes'].map((t) => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n);
+  return (before !== 'CHANGED' && left.every((n) => n === 0)) || `${before === 'CHANGED' ? 'replay changed data; ' : ''}left ${left}`;
+});
+
+await check('only well-formed invite codes and poll links survive the login round-trip', () => {
+  const t = (q) => carriedParams(new URLSearchParams(q));
+  const cases = {
+    'join=ABC234&poll=g4m1ng.12': 'join=ABC234&poll=g4m1ng.12',
+    'poll=g4m1ng.0': '', 'poll=https://evil.example/x': '', 'poll=g4m1ng.1&next=//evil': 'poll=g4m1ng.1',
+    'join=../../x': '', 'poll=G4M1NG.1': '', 'x=1': '',
+  };
+  const wrong = Object.entries(cases).filter(([q, want]) => t(q) !== want);
+  return !wrong.length || JSON.stringify(wrong.map(([q]) => [q, t(q)]));
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

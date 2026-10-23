@@ -4,6 +4,7 @@ import {
   parseRule, ruleFromRow, upcomingSessions, attendanceOn, findSession, sessionClash,
   validTime, localDate, addDays, daysBetween, parseDate, awayCovers,
 } from '../../../../lib/schedule.js';
+import { loadPolls } from '../../../../lib/polls.js';
 
 /**
  * The group's regular session: the standing rule, the next few sessions it
@@ -53,6 +54,7 @@ export async function onRequestGet({ env, data }) {
   const overrides = await overrideRows(env.DB, gid);
   const changedBy = new Map(overrides.map((o) => [o.original_date, o.set_by]));
   const sessions = upcomingSessions(rule, now, SESSION_COUNT, overrides);
+  const pollsPromise = loadPolls(env.DB, gid, rule, overrides, now, today);
   let rsvps = [];
   if (sessions.length) {
     // By key, not by a date range: a moved session's key can sit far from its neighbours.
@@ -69,6 +71,7 @@ export async function onRequestGet({ env, data }) {
     schedule: rule,
     today,
     away,
+    polls: await pollsPromise,
     sessions: sessions.map((s) => ({
       ...s,
       changedBy: s.moved || s.cancelled ? changedBy.get(s.key) || null : null,

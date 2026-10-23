@@ -56,7 +56,7 @@ below, and it is why a preview deploy boots with no session support at all.
 ## Deploying
 
 ```bash
-npm test          # 266 assertions — ALWAYS before a deploy
+npm test          # 282 assertions — ALWAYS before a deploy
 npm run deploy
 ```
 
@@ -200,6 +200,13 @@ session changes. Back up first; it adds only `session_overrides` and changes no
 existing row. Until it exists, `GET /schedule` fails (the client then shows no
 strip) and every schedule write returns 500, because each write also prunes old
 overrides.
+
+Migration `040-session-polls.sql` must be applied before deploying reschedule polls.
+Back up first; it adds `session_polls`, `poll_options` and `poll_votes` and changes
+no existing row. As with 038, the order matters beyond the feature: claiming a
+placeholder now repoints its poll votes, so code deployed ahead of the migration
+breaks seed claims, and `GET /schedule` (which ships the polls) fails until the
+tables exist.
 
 ### Useful queries
 

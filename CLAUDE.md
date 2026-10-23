@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 266 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 282 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -383,7 +383,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-266/266 assertions pass. `npm run test:ui` does **not** run on macOS: it
+282/282 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -503,8 +503,8 @@ the first and a full list of zeroes for the second.
    group has members. Rating coverage is the app's core problem — in the original
    spreadsheet it ranged from 89% to 27% per person.
 4. **Public read-only group pages.** Also the cheapest growth loop the site has.
-5. **Rescheduling, phases 2–4.** See Regular sessions below: replacement-slot polls
-   with a confirm step, a private .ics feed per member, and a Discord webhook.
+5. **Session reminders, phases 3–4.** See Regular sessions below: a private .ics
+   feed per member, and a Discord webhook. Polls (phase 2) are done.
 
 ## Group hours
 
@@ -577,13 +577,11 @@ does not persist session state.
 
 ## Regular sessions
 
-Phase 1 of an agreed four-phase plan (owner, October 2026): a standing rule, the
-next-session strip, opt-out attendance with away ranges, and Play next prefilled
-with the next session's crew. Still to come, in order: rescheduling polls
-(replacement slots, everyone marks which work, any member confirms play-anyway,
-move or skip, and the original plan holds if nobody decides), a private `.ics`
-feed per member, and a Discord webhook. The last two matter because the bell only
-reaches people who already have the site open.
+Phases 1 and 2 of an agreed four-phase plan (owner, October 2026): a standing rule,
+the next-session strip, opt-out attendance with away ranges, Play next prefilled
+with the next session's crew, owner one-off moves, and reschedule polls. Still to
+come: a private `.ics` feed per member and a Discord webhook, which matter because
+neither the strip nor the bell reaches anyone who does not have the site open.
 
 **Sessions are never stored.** `session_schedules` holds one rule per group:
 ISO weekdays, local `HH:MM`, an IANA timezone, every 1–4 weeks, an anchor date
@@ -657,7 +655,49 @@ Overrides prune 30 days after both their key and their played date have passed.
 `test/harness.mjs` calls the **real** route through its D1 shim rather than a
 reimplementation, and seeds a Tuesday 20:30 Berlin rule with Dave out, Pat maybe,
 Leo away, the second session moved to the Monday before at 20:00 and the fourth
-cancelled. `SCHEDULE=none` starts without a rule to exercise setup.
+cancelled, plus an open poll from Dave that Leo has answered and Ama (the viewer)
+has not, so the strip shows "Answer poll". `SCHEDULE=none` starts without a rule.
+
+### Reschedule polls
+
+"I can't make Tuesday — would any of these work instead?" Any member starts one
+for a session, suggesting 1–5 times; it always also offers **as planned** (keep the
+session without whoever can't make it) and **skip**. Starting one marks the starter
+out of that session and records their yes on their own times. Anyone can add a time
+(up to six) and answer for anyone, attributed as with attendance. One open poll per
+session is a partial unique index, which is also how the creating batch finds the
+new poll: a D1 batch cannot pass a returned id between statements.
+
+**Settling is limited to the starter and the owner.** Settling moves or cancels a
+session; letting any member do it would route around the owner-only direct move.
+It writes the very same `session_overrides` row, so a poll result and a direct move
+are indistinguishable afterwards. Choosing a time also carries the poll into
+attendance: answers for the old time are cleared as with any move, then a "no"
+becomes out and a "maybe" stays maybe. Choosing the time the owner has already
+moved the session to just closes the poll. If nobody settles it, nothing changes:
+the poll turns read-only (`expired`, computed on read) once its session is over,
+and the starter stays out.
+
+`session_polls.replaces_date/time` record when the session was when the poll
+started, because it may already have been moved and a settled poll still has to say
+what it replaced. The suggested option ignores the starter's own votes — a fresh
+poll has no favourite — and orders by yes, then no, then maybe, then earliest.
+The starter is never nudged to answer their own poll.
+
+**The link is `/?poll=<slug>.<id>`, a query parameter**, for the same reason invite
+links are: Steam's login drops the fragment. `carriedParams()` in `lib/auth.js`
+pattern-checks `join` and `poll` on the way out to Steam and again on the way back,
+so a crafted link cannot smuggle anything else into the post-login redirect. The
+link is not an invitation: someone outside the group gets a toast saying they need
+the invite link first, and the API answers 404 as for any other group data. That
+matters for the seeded group, whose placeholder identities are claimed only when
+the friend *joins*, not merely signs in. The poll grid puts the viewer's own column
+first, because most people arrive from a chat link on a phone.
+
+There is no notification beyond the strip, which surfaces the open poll with the
+most unanswered options for the viewer; `group_activity` cannot carry it without the
+table rebuild noted in Group activity. Polls are pruned 30 days after their session,
+read for 14.
 
 ## Exports and achievements
 

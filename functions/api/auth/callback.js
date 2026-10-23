@@ -1,5 +1,5 @@
 import { redirect } from '../../../lib/http.js';
-import { makeSessionCookie, isAllowed } from '../../../lib/auth.js';
+import { makeSessionCookie, isAllowed, carriedParams } from '../../../lib/auth.js';
 import { playerSummary } from '../../../lib/steam.js';
 
 /**
@@ -42,8 +42,9 @@ export async function onRequestGet({ request, env }) {
        last_seen_at = unixepoch()`
   ).bind(steamId, name, profile?.avatar || null).run();
 
-  // Preserve an invite code carried through the login round-trip, so clicking
-  // an invite while signed out still lands you in the right group.
-  const back = url.searchParams.get('join') ? `/?join=${encodeURIComponent(url.searchParams.get('join'))}` : '/';
+  // Preserve an invite code or poll link carried through the login round-trip, so
+  // clicking either while signed out still lands you where it pointed.
+  const carried = carriedParams(url.searchParams);
+  const back = carried ? `/?${carried}` : '/';
   return redirect(back, { 'set-cookie': await makeSessionCookie(steamId, env.SESSION_SECRET) });
 }
