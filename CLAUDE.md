@@ -85,7 +85,7 @@ skipping them gives you an empty instance.
 ```bash
 npm run setup            # one-shot Cloudflare provisioning + first deploy
 npm run deploy           # ship changes
-npm test                 # 282 tenancy/permission/scoring assertions — ALWAYS run before deploying
+npm test                 # 284 tenancy/permission/scoring assertions — ALWAYS run before deploying
 npm run test:ui          # renders every screen headless — does NOT run on macOS, see State
 npm run db:backup        # wrangler d1 export — D1's free tier has NO automatic backups
 node test/harness.mjs    # local UI dev server; SCENARIO=anon|fresh|claim|member
@@ -383,7 +383,7 @@ is that no unresolved import can be caught locally (no build step, and
 `test/isolation.mjs` does not import `functions/api/steam/search.js`), so
 `npm run deploy` is the first thing that ever type-checks the bundle.
 
-282/282 assertions pass. `npm run test:ui` does **not** run on macOS: it
+284/284 assertions pass. `npm run test:ui` does **not** run on macOS: it
 imports `playwright`, which is not in `package.json`, and hardcodes a Linux
 Chrome path (`/opt/pw-browsers/…`) from the container it was written in.
 
@@ -680,6 +680,20 @@ becomes out and a "maybe" stays maybe. Choosing the time the owner has already
 moved the session to just closes the poll. If nobody settles it, nothing changes:
 the poll turns read-only (`expired`, computed on read) once its session is over,
 and the starter stays out.
+
+**A poll knows everyone who is out, not just its starter.** Reported by a member
+of group 1: Pat could not make Tuesday either, and the poll could only offer him
+"keep Tuesday without Ama", so he answered No — which reads as "I don't want to
+play without Ama". `loadPolls()` now resolves the session's attendance with the
+same `attendanceOn()` the schedule uses (answers over away ranges) and returns
+`out`. The wording follows it ("Ama and Pat can't make it", "Keep Tue 3 Nov without
+Ama and Pat"), and the keep-as-planned row gains a **Can't make it** answer that
+is the session's attendance, not a poll vote: choosing it posts an `rsvp out` (and
+drops any earlier keep-vote), choosing anything else from it posts `rsvp in` first.
+Answers from people who are out are excluded from that row's counts on the server,
+so a stale yes cannot recommend keeping a session its voter cannot attend. Their
+answers on replacement times still count. Existing answers were not migrated: a No
+may genuinely mean No.
 
 `session_polls.replaces_date/time` record when the session was when the poll
 started, because it may already have been moved and a settled poll still has to say
@@ -982,6 +996,24 @@ them, which is correct whether the cascade fires or not. **Test any future rebui
 the same way**: restore `npm run db:backup` output into a local SQLite file with
 `PRAGMA foreign_keys = ON`, replay the migration, and compare row counts *and* a
 checksum of the ratings before and after.
+
+## The top bar on phones
+
+Below 720px the top bar is two rows: logo, workspace switcher and three 40px
+controls (Add game as a bare "+", the bell, the avatar), then the tabs across the
+full width. It used to be three, with the account controls on a half-empty row of
+their own. **Sign out lives in a small menu behind the avatar** on every width,
+with the group name and Steam name above it; a standing Sign out button was what
+pushed the account controls off row 1. The switcher's cap is whatever row 1 has
+left (`calc(100vw - 214px)`), because flex-wrap breaks lines on content width,
+before anything gets a chance to shrink.
+
+The tabs scroll sideways, bleed to the screen edges and fade on whichever edge has
+more beyond it (`syncTabFades()`, on scroll and resize). The active tab is scrolled
+into view with `inline: 'nearest'`, not `'center'` — centring is what cut "Rate" in
+half on arriving at Library — and `scroll-padding-inline` equals the fade width so
+the active tab never parks under a fade. Without an avatar the circle shows the
+initial rather than an empty image box.
 
 ## Gotchas in the client worth not rediscovering
 

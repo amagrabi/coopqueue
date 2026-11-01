@@ -54,7 +54,7 @@ export async function onRequestGet({ env, data }) {
   const overrides = await overrideRows(env.DB, gid);
   const changedBy = new Map(overrides.map((o) => [o.original_date, o.set_by]));
   const sessions = upcomingSessions(rule, now, SESSION_COUNT, overrides);
-  const pollsPromise = loadPolls(env.DB, gid, rule, overrides, now, today);
+  const pollsPromise = loadPolls(env.DB, gid, rule, overrides, now, today, members, aways);
   let rsvps = [];
   if (sessions.length) {
     // By key, not by a date range: a moved session's key can sit far from its neighbours.

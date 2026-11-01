@@ -98,8 +98,9 @@ marks each time Yes, Maybe or No — and also whether to play as planned without
 or skip the week. Whoever started the poll, or the owner, picks the result; a new
 time moves that one session and whoever said no is marked as not coming. Nothing
 changes until somebody picks, so an unanswered poll leaves the session as it was.
-The link only works for members of the group. Personal workspaces have no
-schedule.
+The link only works for members of the group. If you can't make the original time
+either, answer **Can't make it** on the "keep it" option; the poll then names
+everyone who is out. Personal workspaces have no schedule.
 
 **Library.** Every game, every score, sortable — including by "most
 disagreement" and "fewest votes", which is how you find what needs attention.
@@ -376,7 +377,7 @@ SCENARIO=claim node test/harness.mjs  # first run in a group
 ### Tests
 
 ```bash
-node test/isolation.mjs   # 282 tenancy / permission / scoring assertions
+node test/isolation.mjs   # 284 tenancy / permission / scoring assertions
 node test/shots.mjs       # renders every screen, fails on any console error
 ```
 

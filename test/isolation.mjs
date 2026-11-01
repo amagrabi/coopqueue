@@ -4101,6 +4101,36 @@ await check('claiming a placeholder carries its poll votes; leaving drops a memb
     || JSON.stringify({ claimed, votes: optionOf(p, 'slot').votes });
 }));
 
+await check('a poll names everyone who is out, from answers and away ranges alike', () => withSchedule(async (f) => {
+  const { one, read } = await withPoll(f);
+  const before = (await read()).out;
+  await f.post(f.b, { action: 'rsvp', date: one.key, steamId: 'seed:5201:zed', answer: 'out' });
+  await f.post(f.a, { action: 'away', from: one.key, to: one.key });
+  const after = (await read()).out;
+  // Coming after all, over the top of the away range.
+  await f.post(f.a, { action: 'rsvp', date: one.key, answer: 'in' });
+  const back = (await read()).out;
+  const sorted = (ids) => [...ids].sort().join();
+  return (sorted(before) === SCH_B && sorted(after) === sorted([SCH_A, SCH_B, 'seed:5201:zed'])
+    && sorted(back) === sorted([SCH_B, 'seed:5201:zed'])) || JSON.stringify({ before, after, back });
+}));
+
+await check('"keep it as planned" ignores answers from people who are out; other times still count them', () => withSchedule(async (f) => {
+  const { one, read } = await withPoll(f);
+  const p = await read();
+  const keep = optionOf(p, 'asplanned');
+  const slot = optionOf(p, 'slot');
+  await poll(f.a, { action: 'vote', optionId: keep.id, answer: 'yes' });
+  await poll(f.a, { action: 'vote', optionId: slot.id, answer: 'yes' });
+  const counted = optionOf(await read(), 'asplanned');
+  await f.post(f.a, { action: 'rsvp', date: one.key, answer: 'out' });
+  const after = await read();
+  const keepAfter = optionOf(after, 'asplanned');
+  return (counted.yes === 1 && keepAfter.yes === 0 && !keepAfter.votes[SCH_A]
+    && optionOf(after, 'slot').votes[SCH_A]?.answer === 'yes' && after.out.includes(SCH_A))
+    || JSON.stringify({ counted, keepAfter, out: after.out });
+}));
+
 await check('personal workspaces refuse polls', () => withSchedule(async (f) => {
   const r = await poll(f.solo, { action: 'create', key: '2026-12-01', slots: [{ date: '2026-12-02', time: '20:00' }] });
   return r.status === 409 || `got ${r.status}`;

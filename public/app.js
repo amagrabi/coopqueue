@@ -630,9 +630,18 @@ function showClaim(unclaimed) {
 }
 
 function renderChrome() {
-  $('#me-name').textContent = state.members.find((m) => m.steam_id === state.me.steamId)?.short_name
+  const myName = state.members.find((m) => m.steam_id === state.me.steamId)?.short_name
     || state.me.displayName || '';
+  $('#me-name').textContent = myName;
+  // No Steam avatar leaves an initial in the same circle, never an empty box.
   if (state.me.avatar) $('#me-avatar').src = state.me.avatar;
+  $('#me-avatar').hidden = !state.me.avatar;
+  $('#me-initial').hidden = !!state.me.avatar;
+  $('#me-initial').textContent = myName.trim().charAt(0).toUpperCase();
+  $('#account-btn').setAttribute('aria-label', `Account: ${myName}`);
+  $('#account-name').textContent = myName;
+  $('#account-steam').textContent = state.me.displayName && state.me.displayName !== myName
+    ? `Steam: ${state.me.displayName}` : '';
   $('#group-name').textContent = state.group.name;
   $('#workspace-tab').textContent = state.group.mode === 'personal' ? 'Settings' : 'Group';
   $('#browse-fit-option').textContent = state.group.mode === 'personal' ? 'Recommended for me' : 'Recommended for us';
@@ -838,6 +847,21 @@ const closeGroupMenu = () => {
   $('#group-btn').setAttribute('aria-expanded', 'false');
 };
 
+function closeAccountMenu(returnFocus = false) {
+  if ($('#account-menu').hidden) return;
+  $('#account-menu').hidden = true;
+  $('#account-btn').setAttribute('aria-expanded', 'false');
+  if (returnFocus) $('#account-btn').focus();
+}
+
+/* The tab row scrolls sideways on a phone. A fade on whichever edge has more tabs
+   beyond it says so; a hard cut through "Rate" looked like a rendering fault. */
+function syncTabFades() {
+  const tabs = $('.tabs');
+  tabs.classList.toggle('more-left', tabs.scrollLeft > 2);
+  tabs.classList.toggle('more-right', tabs.scrollLeft + tabs.clientWidth < tabs.scrollWidth - 2);
+}
+
 /* ───────────────────────────── navigation ────────────────────────────── */
 const VIEWS = ['queue', 'next', 'library', 'browse', 'stats', 'members'];
 
@@ -880,8 +904,10 @@ function setView(view) {
     const current = t.dataset.view === view;
     if (current) t.setAttribute('aria-current', 'page');
     else t.removeAttribute('aria-current');
+    // 'nearest', not 'center': a tab already in view stays put, so arriving at
+    // Library no longer slides Rate half off the edge.
     if (current && matchMedia('(max-width: 720px)').matches) {
-      t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
   });
   $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
@@ -917,6 +943,7 @@ function wireOnce() {
     const panel = $('#activity-panel');
     if (!panel.hidden) return closeActivity(true);
     closeGroupMenu();
+    closeAccountMenu();
     const rect = $('#activity-btn').getBoundingClientRect();
     const width = Math.min(400, innerWidth - 32);
     const top = Math.max(rect.bottom, $('.topbar').getBoundingClientRect().bottom) + 8;
@@ -956,8 +983,32 @@ function wireOnce() {
     renderLibrary();
   }));
 
+  $('.tabs').addEventListener('scroll', syncTabFades, { passive: true });
+  window.addEventListener('resize', syncTabFades);
+  requestAnimationFrame(syncTabFades);
+
+  $('#account-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = $('#account-menu');
+    if (!menu.hidden) return closeAccountMenu();
+    closeGroupMenu();
+    closeActivity();
+    menu.hidden = false;
+    $('#account-btn').setAttribute('aria-expanded', 'true');
+    $('.account-item', menu).focus();
+  });
+  $('#account-menu').addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => closeAccountMenu());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#account-menu').hidden) {
+      e.preventDefault();
+      closeAccountMenu(true);
+    }
+  });
+
   $('#group-btn').addEventListener('click', (e) => {
     e.stopPropagation();
+    closeAccountMenu();
     const menu = $('#group-menu');
     menu.hidden = !menu.hidden;
     $('#group-btn').setAttribute('aria-expanded', String(!menu.hidden));
@@ -2287,17 +2338,27 @@ const pollsNow = () => state.schedule?.polls || [];
 const openPollFor = (key) => pollsNow().find((p) => p.key === key && p.status === 'open') || null;
 const pollLink = (poll) => `${location.origin}/?poll=${encodeURIComponent(state.group.slug)}.${poll.id}`;
 const canSettle = (poll) => poll.createdBy === state.me.steamId || state.group.role === 'owner';
+/** Everyone not coming to the session the poll is about, in member order. The
+    server reads it from attendance, so somebody who also can't make it is named
+    alongside the starter rather than being offered "keep it without them". */
+const pollOut = (poll) => state.members.map((m) => m.steam_id).filter((id) => (poll.out || [poll.createdBy]).includes(id));
 /** Options the viewer has not answered yet; the strip's nudge. Never the starter's
-    own poll: they answered by suggesting the times. */
+    own poll: they answered by suggesting the times. Being out of the session is
+    the answer to "keep it as planned". */
 const pollUnanswered = (poll) => poll.createdBy === state.me.steamId ? 0
-  : poll.options.filter((o) => !o.votes[state.me.steamId]).length;
+  : poll.options.filter((o) => !o.votes[state.me.steamId]
+    && !(o.kind === 'asplanned' && pollOut(poll).includes(state.me.steamId))).length;
+const pollWho = (poll) => {
+  const out = pollOut(poll);
+  return out.length ? `${capitalise(nameList(out))} can't make` : `${capitalise(nameList([poll.createdBy]))} suggested other times for`;
+};
 
 function optionLabel(poll, option) {
   if (option.kind === 'slot') return sessionWhen(option.startsAt);
   const day = sessionWhen(poll.replacesStartsAt);
   if (option.kind === 'skip') return `Skip this week (no ${sessionDay(poll.replacesStartsAt)} session)`;
-  const out = state.members.map((m) => m.steam_id).filter((id) => id === poll.createdBy);
-  return `Keep ${day}${out.length ? ` without ${nameList(out)}` : ''}`;
+  const out = pollOut(poll);
+  return `Keep ${day}${out.length ? ` without ${nameList(out)}` : ' as planned'}`;
 }
 
 function pollOutcome(poll) {
@@ -2323,7 +2384,7 @@ function renderPollList() {
     const todo = open ? pollUnanswered(p) : 0;
     return `<div class="poll-card${open ? ' is-open' : ''}">
       <div>
-        <strong>${esc(nameOf(p.createdBy))} can't make ${esc(sessionDay(p.replacesStartsAt))}</strong>
+        <strong>${esc(pollWho(p))} ${esc(sessionDay(p.replacesStartsAt))}</strong>
         <span class="poll-card-sub">${open
           ? `${best ? `Best so far: ${esc(optionLabel(p, best))} · ${best.yes} yes` : 'No answers yet'}${
             todo ? ` · <span class="poll-todo">${todo} waiting for your answer</span>` : ''}`
@@ -2447,7 +2508,7 @@ function renderPollDialog(focus) {
     : `${nameOf(poll.createdBy)} can't make ${day}. Which of these would work instead? ${link}`;
   $('#poll-body').innerHTML = `
     <p id="poll-sub" class="panel-sub">${open
-      ? `${esc(capitalise(nameList([poll.createdBy])))} can't make it. Mark which of these work${
+      ? `${esc(pollWho(poll).replace(/ for$/, ''))}${pollOut(poll).length ? ' it' : ''}. Mark which of these work${
         settle ? ', then choose one when everyone has answered' : ''}. Nothing changes until ${
         poll.createdBy === state.me.steamId ? 'you or the owner choose' : `${esc(nameOf(poll.createdBy))} or the owner chooses`}.`
       : esc(pollOutcome(poll))}</p>
@@ -2473,13 +2534,21 @@ function renderPollDialog(focus) {
             chosen ? '<small class="poll-best">chosen</small>' : ''}${
             o.kind === 'slot' && o.addedBy && o.addedBy !== poll.createdBy ? `<small>added by ${esc(nameOf(o.addedBy))}</small>` : ''}</th>
           ${members.map((m) => {
-            const v = o.votes[m.steam_id];
+            /* "Keep it as planned" means nothing to somebody who can't make that
+               time, so the row carries one more answer: being out, which is the
+               session's attendance rather than a poll vote. */
+            const asPlanned = o.kind === 'asplanned';
+            const isOut = asPlanned && pollOut(poll).includes(m.steam_id);
+            const v = isOut ? null : o.votes[m.steam_id];
+            const value = isOut ? 'out' : v?.answer || '';
             const by = v?.setBy && v.setBy !== m.steam_id ? `<small class="attend-src">by ${esc(nameOf(v.setBy))}</small>` : '';
-            if (!open || started) return `<td><span class="vote vote-${v?.answer || 'none'}">${v ? POLL_ANSWER[v.answer] : '–'}</span>${by}</td>`;
-            return `<td><select class="attend vote-select vote-${v?.answer || 'none'}" data-option="${o.id}" data-member="${esc(m.steam_id)}"
-                aria-label="${esc(m.short_name)}: ${esc(optionLabel(poll, o))}">
-              <option value=""${v ? '' : ' selected'}>–</option>
-              ${['yes', 'maybe', 'no'].map((a) => `<option value="${a}"${v?.answer === a ? ' selected' : ''}>${POLL_ANSWER[a]}</option>`).join('')}
+            const label = isOut ? "Can't make it" : v ? POLL_ANSWER[v.answer] : '–';
+            if (!open || started) return `<td><span class="vote vote-${value || 'none'}">${label}</span>${by}</td>`;
+            return `<td><select class="attend vote-select vote-${value || 'none'}" data-option="${o.id}" data-member="${esc(m.steam_id)}"
+                data-was="${value}"${asPlanned ? ' data-asplanned' : ''} aria-label="${esc(m.short_name)}: ${esc(optionLabel(poll, o))}">
+              <option value=""${value ? '' : ' selected'}>–</option>
+              ${['yes', 'maybe', 'no'].map((a) => `<option value="${a}"${value === a ? ' selected' : ''}>${POLL_ANSWER[a]}</option>`).join('')}
+              ${asPlanned ? `<option value="out"${isOut ? ' selected' : ''}>Can't make it</option>` : ''}
             </select>${by}</td>`;
           }).join('')}
           <td class="session-crew"><span>${o.yes} yes${o.maybe ? ` · ${o.maybe} maybe` : ''}</span>${
@@ -2505,8 +2574,19 @@ function renderPollDialog(focus) {
   $('#pd-share')?.addEventListener('click', () => { navigator.share({ text: share }).catch(() => {}); });
   $$('#poll-body select.vote-select').forEach((sel) => sel.addEventListener('change', () => {
     sel.disabled = true;
-    void pollAction({ action: 'vote', optionId: Number(sel.dataset.option), steamId: sel.dataset.member,
-                      answer: sel.value || null }, `[data-option="${sel.dataset.option}"][data-member="${CSS.escape(sel.dataset.member)}"]`);
+    const steamId = sel.dataset.member;
+    const vote = (answer) => ['/polls', { action: 'vote', optionId: Number(sel.dataset.option), steamId, answer }];
+    const rsvp = (answer) => ['/schedule', { action: 'rsvp', date: poll.key, steamId, answer }];
+    const was = sel.dataset.was;
+    const now = sel.value;
+    /* Out of the session is attendance, not a vote: the strip, the session table
+       and Play next's crew all follow it. Any earlier "keep it" answer is dropped
+       so it cannot reappear if they later turn out to be coming after all. */
+    const requests = !('asplanned' in sel.dataset) ? [vote(now || null)]
+      : now === 'out' ? [rsvp('out'), ...(was ? [vote(null)] : [])]
+      : was === 'out' ? [rsvp('in'), ...(now ? [vote(now)] : [])]
+      : [vote(now || null)];
+    void pollAction(requests, `[data-option="${sel.dataset.option}"][data-member="${CSS.escape(steamId)}"]`);
   }));
   $$('#poll-body [data-decide]').forEach((b) => b.addEventListener('click', () => {
     const option = poll.options.find((o) => o.id === Number(b.dataset.decide));
@@ -2514,7 +2594,7 @@ function renderPollDialog(focus) {
       ? `move this session to ${optionLabel(poll, option)}. Whoever said no is marked as not coming`
       : option.kind === 'skip' ? 'cancel this session' : 'keep the session as planned';
     if (!confirm(`This will ${consequence} and close the poll. Continue?`)) return;
-    void pollAction({ action: 'decide', pollId: poll.id, optionId: option.id }, null, () => {
+    void pollAction([['/polls', { action: 'decide', pollId: poll.id, optionId: option.id }]], null, () => {
       toast(option.kind === 'slot' ? `Moved to ${optionLabel(poll, option)}`
         : option.kind === 'skip' ? 'Session cancelled' : 'Playing as planned');
     });
@@ -2523,22 +2603,25 @@ function renderPollDialog(focus) {
     const date = $('#pd-add-date').value;
     const time = $('#pd-add-time').value;
     if (!date || !time) { $('#pd-status').textContent = 'Pick a day and a time.'; return; }
-    void pollAction({ action: 'add', pollId: poll.id, date, time }, '#pd-add-date');
+    void pollAction([['/polls', { action: 'add', pollId: poll.id, date, time }]], '#pd-add-date');
   });
   $('#pd-withdraw')?.addEventListener('click', () => {
     if (!confirm('Withdraw this poll? The session stays as it is.')) return;
-    void pollAction({ action: 'withdraw', pollId: poll.id }, null, () => toast('Poll withdrawn'));
+    void pollAction([['/polls', { action: 'withdraw', pollId: poll.id }]], null, () => toast('Poll withdrawn'));
   });
   if (focus) $(focus, $('#poll-body'))?.focus();
 }
 
-async function pollAction(body, refocus, done) {
+/** Requests are [path, body] pairs sent in order; one answer can be an attendance
+    change followed by a vote. A failure part-way still repaints from the server. */
+async function pollAction(requests, refocus, done) {
   const slug = state.group.slug;
   $$('#poll-body button').forEach((b) => { b.disabled = true; });
   try {
-    await gapiFor(slug, '/polls', { method: 'POST', body });
+    for (const [path, body] of requests) await gapiFor(slug, path, { method: 'POST', body });
   } catch (e) {
     if (state.group?.slug !== slug) return;
+    await afterPollWrite();
     renderPollDialog(refocus);
     $('#pd-status').textContent = e.message;
     return;

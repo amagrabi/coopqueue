@@ -176,8 +176,37 @@ kbd {
 .activity-item:hover, .activity-item:focus-visible { background: var(--surface-2); }
 .activity-item.is-unread { box-shadow: inset 3px 0 var(--series-1); }
 .activity-item small { display: block; margin-top: 3px; font-size: 12px; color: var(--text-muted); }
-.who { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 550; }
-.who img { border-radius: 50%; background: var(--surface-2); }
+.add-game-btn { gap: 5px; }
+.account { position: relative; }
+.account-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px;
+  font: inherit; font-size: 14px; font-weight: 550; color: var(--text-primary);
+  background: transparent; border: 1px solid transparent; border-radius: 999px; cursor: pointer;
+}
+.account-btn:hover, .account-btn[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
+.account-btn:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.account-btn img, .account-initial {
+  width: 28px; height: 28px; border-radius: 50%; flex: none; background: var(--surface-2);
+}
+.account-initial {
+  display: inline-grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--text-secondary);
+}
+.account-initial[hidden] { display: none; }
+.account-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; min-width: 200px;
+  max-width: calc(100vw - 32px); padding: 6px; display: grid; gap: 2px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.account-who { margin: 0; padding: 8px 10px 10px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.account-who strong { display: block; }
+.account-who span { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.account-who span:empty { display: none; }
+.account-item {
+  display: block; padding: 9px 10px; border-radius: var(--radius-sm); font-size: 14px;
+  color: var(--text-primary); text-decoration: none;
+}
+.account-item:hover, .account-item:focus-visible { background: var(--surface-2); outline: none; }
 
 .banner {
   display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline;
@@ -434,6 +463,11 @@ kbd {
 select.vote-yes { background: rgba(12,163,12,.14); border-color: rgba(12,163,12,.45); }
 select.vote-maybe { background: rgba(250,178,25,.12); border-color: rgba(250,178,25,.42); }
 select.vote-no { background: rgba(208,59,59,.16); border-color: rgba(208,59,59,.45); }
+/* Native selects size to their longest option, and only the "keep it" row has
+   "Can't make it": a fixed width keeps every column the same. */
+.poll-table select.vote-select { width: 8.5em; }
+.vote-out { color: var(--text-muted); font-style: italic; }
+select.vote-out { background: rgba(208,59,59,.10); border-color: rgba(208,59,59,.35); color: #f0a3a3; font-style: italic; }
 .poll-table .session-crew .btn { display: block; margin: 4px 0 0; }
 .poll-table tbody th { white-space: normal; min-width: 120px; max-width: 220px; }
 .poll-add { margin-top: 12px; }
@@ -954,13 +988,29 @@ td.miss { color: #4a4a47; }
 
 @media (max-width: 720px) {
   .topbar { gap: 10px; padding: 10px 14px; }
+  /* Two rows: brand, switcher and the account controls, then the tabs across the
+     full width. The tabs bleed to the screen edges and fade where more are hidden. */
   .tabs {
-    order: 3; width: 100%; overflow-x: auto; scroll-snap-type: x proximity;
-    scrollbar-width: thin;
+    order: 3; width: calc(100% + 28px); margin: 0 -14px; padding: 0 14px;
+    overflow-x: auto; scrollbar-width: none;
+    /* As wide as the fade, so scrolling the active tab into view never parks it
+       under one: at the last tab that means scrolling all the way to the end. */
+    scroll-padding-inline: 40px;
   }
-  .tab { flex: none; scroll-snap-align: center; }
-  .topbar-right { gap: 8px; }
-  .who span { display: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+  .tabs.more-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); }
+  .tabs.more-left.more-right {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  }
+  .tab { flex: none; }
+  .topbar-right { gap: 6px; }
+  /* All three right-hand controls share the bell's 40px box, which is also a
+     comfortable touch target. */
+  .add-game-btn { width: 40px; height: 40px; padding: 0; font-size: 20px; font-weight: 500; }
+  .add-game-label, .account-name, .account-btn .caret { display: none; }
+  .account-btn { padding: 3px; }
+  .account-btn img, .account-initial { width: 32px; height: 32px; }
   .main { padding: 18px 14px 60px; }
   .grid-2 { grid-template-columns: 1fr; }
   .panel-head { align-items: flex-start; flex-direction: column; }
@@ -1175,7 +1225,8 @@ td.miss { color: #4a4a47; }
 
 @media (max-width: 720px) {
   .hero { padding: 48px 0 40px; }
-  .group-btn { max-width: 130px; }
+  /* Whatever row 1 has left after the logo and three 36-40px controls. */
+  .group-btn { max-width: min(200px, calc(100vw - 214px)); }
   /* Anchored to the button's LEFT edge, not its right. Right-aligning it was meant
      to keep the menu on screen, but the switcher sits near the left edge of the
      topbar, so a 260px menu hung ~114px off the left of a 375px phone. The cap is
